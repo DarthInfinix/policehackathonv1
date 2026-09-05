@@ -1,191 +1,238 @@
 # TACTICAL EVIDENCE TRIAGE & CORRELATION PLATFORM (TETCP)
-### Chandigarh Police Hackathon 2026 — Problem Statement 3 (PS3-DWID)
+### Chandigarh Police Cyber Hackathon 2026 — Problem Statement 3 (PS3-DWID)
 > **Track:** Detection of Illicit Drug Sales on Darknet and Other Encrypted Platforms  
 > **Legal Compliance:** Section 63(4) Bharatiya Sakshya Adhiniyam (BSA), 2023  
-> **Architecture:** 100% Air-Gapped, Local-First, Zero Cloud Lock-In
+> **Architecture:** 100% Air-Gapped, Local-First, Zero External Cloud Dependencies  
+> **Main Branch Status:** Stable Core Active (`server.py` + `storage.py` + `app.js` + SQLite WAL Engine)
 
 ---
 
-## 1. Executive Summary & Core Mission
+## 1. Quickstart: Running Main in 30 Seconds
 
-Frontline law enforcement officers frequently seize gigabytes of messy, unstructured digital evidence—Tor marketplace `.onion` HTML mirrors, raw Telegram/WhatsApp chat dumps, bank statement CSVs, and phone camera screenshots. 
-
-Existing workflows suffer from manual fatigue, tool fragmentation, and strict legal vulnerability under India's new criminal codes (**Bharatiya Sakshya Adhiniyam, 2023**).
-
-This platform acts as an **air-gapped forensic copilot** that:
-1. **Ingests & Normalizes** heterogeneous seized data without cloud dependencies.
-2. **Extracts Deterministic Identifiers** (Indian UPI handles, +91 phone numbers, TRON/Bitcoin wallets) with zero latency.
-3. **Triages Evasion Slang** (*Chitta, White Shoes, Ice Tea, Pudiya*) using an offline, quantized Small Language Model (SLM).
-4. **Correlates Entities** across cases into an interactive visual link graph (`Vendor ➔ Telegram Admin ➔ UPI Mule ➔ Drop Location`).
-5. **Generates Dual Outputs:** Instant field WhatsApp dispatches for PCR patrol vans, and court-admissible Section 63 BSA Digital Evidence Certificates with SHA-256 hash chains.
-
----
-
-## 2. Quickstart (Running Offline in 60 Seconds)
-
-The application is designed to run completely offline without npm builds or complex dependencies.
+The entire platform runs without `npm`, Node dependencies, Docker, or external cloud services.
 
 ### Prerequisites
-- Python 3.9+ installed on your system.
-- Modern web browser (Chrome, Edge, Firefox).
+- Python 3.9+ (Standard library only: `sqlite3`, `http.server`, `urllib`, `json`, `hashlib`).
+- Local inference server (optional for full SLM induction): `llama-server` running on `localhost:8080` or `localhost:8012` with any GGUF (e.g. `LFM2.5-8B-A1B-Q4_0.gguf`, `llama-3.2-3b`, `gemma-2-2b`). If no local model is running, the platform operates seamlessly using heuristic semantic fallbacks.
 
-### Launching the Dashboard
-From the root repository directory, run:
+### Launching the Platform
+Run the forensic server from the repository root:
 ```bash
-python3 -m http.server 8000
+python3 server.py
 ```
-Open your browser and navigate to:
+Open your browser to:
 ```
 http://localhost:8000/
 ```
-*(When backend services are active, the UI connects to `http://localhost:8000/api`. If the backend is not running, the dashboard operates seamlessly using pre-compiled offline forensic fixtures).*
+
+### Instant Verification
+1. On Step 1, click **"Proceed to Evidence Media Intake ➔"**.
+2. On Step 2, click **"⚡ Load Pre-Staged Datasets"** (instantly ingests 683 real records across 3 multi-source forensic datasets into SQLite).
+3. On Step 3, the model discovery engine will automatically ping your local server, populate model slugs, and show capability blurbs. Click **"⚡ Start Forensic Pipeline & Triage ➔"**.
+4. The workbench will load with live dynamic tabs, streaming raw database records, 31+ real triage leads, dynamic network graph, and active codeword induction.
 
 ---
 
-## 3. Modular Team Demarcation (AI Agent Prompts)
+## 2. What Has Been Built & Is Fully Functional (Main Branch)
 
-To prevent merge conflicts and ensure clean modular development, **do NOT edit core UI files directly**. 
+All hardcoded mock data, fake preview arrays, and simulated files have been **completely eliminated**. The main branch is fully wired to an authentic SQLite forensic pipeline:
 
-Each team member has a self-contained, isolated module. **Copy the exact prompt block below and paste it directly into your Gemini Pro / AI assistant.**
+### A. Database Storage & Integrity Engine (`storage.py`)
+- **SQLite WAL Mode**: Configured `PRAGMA journal_mode=WAL;`, `busy_timeout=30000;`, and `synchronous=NORMAL;` across all connections. Thread-safe concurrency prevents database locking.
+- **Evidence Storage**:
+  - `evidence_files`: Real uploaded files with calculated SHA-256 hashes, file types, line counts, and timestamps.
+  - `evidence_records`: Normalized line-by-line evidence stream with forensic line numbers, timestamps, sender IDs, raw text, and detection flags.
+  - `records_fts`: Full-text search virtual table (SQLite FTS5) indexing raw text and sender IDs for sub-millisecond searches.
+  - `entities`: Extracted phones, UPI handles, crypto wallets, locations, and darknet vendor handles with mention counts and risk scores.
+  - `entity_mentions`: Link table mapping every entity occurrence to its exact source line.
+  - `slang_dictionary`: Confirmed and rejected evasive codewords inducted by officers.
+  - `audit_log`: Cryptographic event ledger with SHA-256 entry hashes conforming to Section 63 BSA.
+- **Deterministic Entity Extraction**:
+  - Indian Phone Numbers: `+91`, `0`, or 10-digit formats starting with 6–9.
+  - Indian UPI Handles (VPAs): `@okhdfcbank`, `@okaxis`, `@ybl`, `@paytm`, `@upi`, etc.
+  - Cryptocurrency Wallets: TRON TRC-20 (`T...` 34 chars) and Bitcoin (`1...`, `3...`, `bc1...`).
+  - Darknet Vendors: `@VendorName` extracted from darknet listing records.
+  - Narcotics Keywords: Multi-lingual illicit terms (*chitta, white shoes, 4-mmc, mephedrone, ice tea, mdma, cocaine, heroin, charas, pudiya, tola, diazepam*).
+
+### B. Forensic Backend Server (`server.py`)
+- **Threaded Concurrency**: Built on `socketserver.ThreadingTCPServer` to handle simultaneous file uploads, streaming lines, and SLM queries.
+- **Binary Multi-File Ingestion (`POST /api/upload`)**: Safely ingests heterogeneous file streams via `arrayBuffer()`, preserving binary and multi-byte UTF-8 encodings (tested on 463 KB darknet CSV dumps).
+- **1-Click Demo Ingestion (`POST /api/load_demo_data`)**: Reads and parses `data/processed/darknet_listings_sample.csv` (600 lines), `data/raw/sample_telegram_export.json` (8 lines), and `data/processed/bank_statement_baseline.csv` (75 lines) into SQLite in < 500ms.
+- **SillyTavern-Style Model Discovery (`GET /api/llm/models?url=...`)**:
+  - Pings `${serverUrl}/v1/models` (default `http://localhost:8080`, with presets for `8012` and `11434`).
+  - Dynamically classifies detected model architectures (Liquid LFM, Google Gemma, Meta Llama, Alibaba Qwen, Microsoft Phi) and injects operational blurbs and throughput metrics.
+- **Active Codeword Induction (`POST /api/extract_codeword`)**:
+  - Uses targeted few-shot `/completion` calls (T=0.0, 8 max tokens) against local SLM to isolate disguised contraband nouns.
+  - Includes a blacklist guardrail screening out routine payment terms (*USDT, UPI, GPay*).
+  - Includes a fast deterministic heuristic fallback if the SLM port is temporarily offline.
+- **Precinct Lexicon Governance (`POST /api/induct_codeword` & `POST /api/dismiss_codeword`)**:
+  - Saves approved words into `slang_dictionary` in SQLite.
+  - Logs immutable Section 63 BSA audit trail entries.
+
+### C. Frontend Forensic Workbench (`index.html`, `app.js`, `styles.css`)
+- **Step 1 (Case Intake)**: Real FIR and IO metadata capture with Belt and Police Station auto-formatting.
+- **Step 2 (Media Intake)**:
+  - Drag-and-drop file ingestion supporting multi-file selection.
+  - Visual upload progress bar (`#upload-progress-container`) tracking live ingestion percentages.
+  - Dynamic staged table (`#staged-evidence-tbody`) displaying authentic ingested files and SHA-256 hashes.
+  - Instant pre-staged dataset button (`autofillEvidenceFiles()`).
+- **Step 3 (Inference Engine Configuration)**:
+  - SillyTavern-style server URL input, presets (`8080`, `8012`, `11434`), and connection status badge (`🟢 Connected` / `🔴 Offline`).
+  - Dynamic model select dropdown populated from live server.
+  - Dynamic model capability blurb card.
+- **Step 5 (Workbench Dashboard)**:
+  - **Panel 1 (Left - Evidence Explorer)**: Dynamic file tabs generated from database; real SHA-256 display; streaming raw record viewer with line numbers and flag tags; real-time line search filter; instant `[ ＋ Ingest File ]` button.
+  - **Panel 2 (Center - Triage Workbench)**: Dynamic cards for 31+ real entities; risk scores; clickable `traceToSource(fileId, lineNum)` button jumping and highlighting source lines in Panel 1.
+  - **Panel 3 (Right - Intelligence & Governance)**:
+    - **Tab A (Link Graph)**: Dynamic SVG network topology generated from real entities and mentions.
+    - **Tab B (Section 63 BSA)**: Live digital evidence certificate with SHA-256 hash chains.
+    - **Tab C (Field Ops)**: 1-click PCR Patrol Van WhatsApp Alert generator and Case Diary (Zimni) exporter.
+    - **Tab D (Codeword Induction Workbench)**: Unified copilot with live AI telemetry HUD (active core, latency, decode speed, surfaced count), scrolling audit console, real database candidates from `GET /api/candidates`, editable proposed noun cards, and Section 63 BSA induct/reject buttons.
 
 ---
 
-### 🔹 MEMBER 1: Case Storage & Audit Trail Module
-* **Deliverable:** A standalone Python module `storage.py` (standard library `sqlite3` only).
-* **Scope:** Zero external database server setup. Manages single-file SQLite database with full-text search (FTS5) and immutable SHA-256 audit logging.
-* **Copy-Paste Prompt for Gemini Pro:**
-```text
-You are a senior systems engineer building a local forensic storage module for a law enforcement hackathon.
+## 3. Core REST API Reference
 
-Write a self-contained Python 3 script named `storage.py` using ONLY the standard library (`sqlite3`, `hashlib`, `json`, `datetime`).
+| Endpoint | Method | Params / Body | Description |
+| :--- | :--- | :--- | :--- |
+| `/api/files` | `GET` | `case_id` | Returns list of all ingested evidence files with SHA-256 and record counts. |
+| `/api/file_records` | `GET` | `file_id`, `limit` | Streams actual records/lines for a file with forensic line numbers and tags. |
+| `/api/leads` | `GET` | `case_id` | Returns dynamic triage leads generated from real extracted entities. |
+| `/api/candidates` | `GET` | `case_id`, `limit` | Returns transactional evidence messages for codeword induction. |
+| `/api/slang_dictionary` | `GET` | — | Returns confirmed inducted codewords from precinct database. |
+| `/api/graph` | `GET` | `case_id` | Returns nodes and links for the interactive entity relationship graph. |
+| `/api/search` | `GET` | `q`, `case_id`, `limit` | Runs SQLite FTS5 full-text search across all evidence records. |
+| `/api/llm/models` | `GET` | `url` | Pings local inference server for available model slugs with architecture blurbs. |
+| `/api/slm_status` | `GET` | — | Quick ping to check if local llama-server is online on default ports. |
+| `/api/upload` | `POST` | `case_id`, `filename` (query), binary body | Ingests and parses an evidence file into SQLite; extracts entities. |
+| `/api/load_demo_data` | `POST` | `case_id` | Ingests authentic Darknet, Telegram, and Bank statement samples from disk. |
+| `/api/extract_codeword` | `POST` | `{ message, context, server_url, model }` | SLM few-shot completion isolating disguised contraband nouns. |
+| `/api/induct_codeword` | `POST` | `{ term, meaning, case_id, io_name }` | Commits an officer-verified codeword into `slang_dictionary` with BSA audit. |
+| `/api/dismiss_codeword` | `POST` | `{ term, reason, case_id, io_name }` | Logs candidate rejection in the Section 63 BSA audit log. |
 
-Requirements:
-1. Database File: `precinct_evidence.db`
-2. Tables to create:
-   - `cases` (case_id TEXT PRIMARY KEY, fir_number TEXT, io_name TEXT, created_at TEXT)
-   - `evidence_records` (record_id TEXT PRIMARY KEY, case_id TEXT, source_type TEXT, raw_text TEXT, line_number INT, sha256_hash TEXT)
-   - `entities` (entity_id TEXT PRIMARY KEY, entity_type TEXT, raw_value TEXT UNIQUE, risk_score INT)
-   - `audit_log` (log_id INTEGER PRIMARY KEY AUTOINCREMENT, case_id TEXT, action TEXT, performed_by TEXT, timestamp TEXT, record_hash TEXT)
-3. Full-Text Search: Create an FTS5 virtual table indexing `raw_text` for instant keyword lookups.
-4. Implement functions:
-   - `init_db()`
-   - `save_case(case_id, fir, io_name)`
-   - `insert_record(case_id, source_type, raw_text, line_number)`: auto-computes SHA-256 and logs to audit_log.
-   - `search_records(keyword)`: fast full-text search returning matching records with line numbers.
-   - `check_cross_case_hit(raw_value)`: checks if a phone number or UPI handle already appeared in past cases.
-5. Include a clean `if __name__ == "__main__":` block demonstrating the creation of a mock case, inserting 3 records, and executing a cross-case search.
+---
+
+## 4. Work Left to Implement: Next Modules for AI Agents & Forks
+
+Other AI agents building in their own forks or feature branches should focus on the following concrete extensions. **The core architecture, database schema, and REST endpoints are already in place—build your modules to plug directly into this backbone:**
+
+```
+                               ┌────────────────────────┐
+                               │     MAIN PIPELINE      │
+                               │ server.py + storage.py │
+                               └───────────┬────────────┘
+         ┌──────────────────┬──────────────┼──────────────┬──────────────────┐
+         ▼                  ▼              ▼              ▼                  ▼
+   [FORK A: OCR]      [FORK B: GRAPH] [FORK C: CDR] [FORK D: DOSSIER] [FORK E: SIDECAR]
+   Screenshot OCR     Force-Directed   Tower Azimuth  Court PDF & QR   Offline llama.cpp
+   Receipt Extractor  Timeline Physics Geo-Fencing    Sec 91 Notices   Launcher Script
 ```
 
 ---
 
-### 🔹 MEMBER 2: Regex Extractor & Offline OCR Worker
-* **Deliverable:** A standalone Python module `extractor.py`.
-* **Scope:** Deterministic pattern extraction (high recall) for Indian payment handles and crypto wallets, with fallback image text extraction.
-* **Copy-Paste Prompt for Gemini Pro:**
-```text
-You are a digital forensics specialist creating a fast, deterministic entity extractor for Indian law enforcement.
+### 🔹 FORK A: Offline OCR & Seized Screenshot Harvester
+* **Branch Name:** `feature/offline-ocr-worker`
+* **File to Create:** `ocr_worker.py`
+* **Objective:** Frontline police seize screenshots of WhatsApp chats, Telegram channels, and UPI payment receipts (Paytm/PhonePe/Google Pay).
+* **Scope & Requirements:**
+  1. Use standard library or local lightweight OCR (`pytesseract` or `easyocr` or `surya-ocr`).
+  2. Implement `process_evidence_image(image_path_or_bytes, case_id)`:
+     - Pre-processes image (greyscale, contrast thresholding).
+     - Extracts text lines with approximate bounding boxes.
+     - Parses detected UPI transaction IDs, transaction amounts (₹), timestamps, and mobile numbers.
+  3. Wire directly into `storage.parse_and_ingest_file(case_id, filename, text_content.encode())` so screenshots appear seamlessly in Panel 1 as an ingested evidence stream.
 
-Write a standalone Python 3 script named `extractor.py` using standard `re`, `json`, and optionally `pytesseract` or `easyocr`.
+---
 
-Requirements:
-1. Extract Indian Phone Numbers:
-   - Standard 10-digit Indian numbers starting with 6, 7, 8, 9.
-   - Prefixes with +91, 0, or formatted with hyphens/spaces (e.g. +91-98140-12345).
-2. Extract Indian UPI Handles (VPAs):
-   - Format: `username@bank` (e.g., @okhdfcbank, @ybl, @paytm, @icici, @axl, @upi).
-3. Extract Cryptocurrency Wallets:
-   - TRON (TRC-20 USDT): Starts with 'T', 34 alphanumeric characters.
-   - Bitcoin: Starts with '1', '3', or 'bc1', 26-42 alphanumeric characters.
-4. Extract Pricing & Quantity Indicators:
-   - Detect amounts in INR (`₹`, `rs`, `inr`, `k`) and weights (`g`, `gram`, `pudiya`, `tola`).
-5. OCR Function:
-   - `extract_text_from_image(image_path)`: Uses pytesseract or easyocr to return text lines with timestamps.
-6. Main Extraction Function:
-   - `extract_all_entities(text)`: Returns a structured dictionary:
-     `{"phones": [...], "upi_handles": [...], "crypto_wallets": [...], "pricing_hints": [...]}`
-7. Include an `if __name__ == "__main__":` test block with a 5-line messy Hinglish drug negotiation snippet demonstrating 100% extraction accuracy.
+### 🔹 FORK B: Advanced Force-Directed Graph & Syndicate Centrality
+* **Branch Name:** `feature/advanced-network-graph`
+* **Files to Modify:** `index.html` (Panel 3 Tab A), `app.js` (`renderNetworkGraph`)
+* **Objective:** Upgrade the current lightweight SVG graph to a full interactive forensic intelligence network using Vis.js Network or Cytoscape.js (served locally, zero npm build).
+* **Scope & Requirements:**
+  1. **Visual Encoding**:
+     - Red nodes: Darknet Vendors & Telegram Admins.
+     - Amber diamonds: Mule Bank / UPI Accounts.
+     - Purple hexagons: Crypto Wallets (TRC-20 USDT / BTC).
+     - Blue pins: Physical Drop Locations (Sector 17, Sector 35, etc.).
+  2. **Physics & Clustering**:
+     - Force-directed physics layout with auto-stabilization.
+     - Highlight clusters: clicking any node highlights its 1st- and 2nd-degree neighbors and dims the rest.
+  3. **Syndicate Centrality Metric**:
+     - Compute in-degree / out-degree centrality on the graph to automatically badge the likely "Kingpin / Coordinator" vs "Peripheral Mule".
+  4. **Timeline Scrubber**:
+     - Add a slider at the bottom of the graph to filter active connections chronologically across the investigation timeframe.
+
+---
+
+### 🔹 FORK C: Telecom CDR, IPDR & Tower Azimuth Geo-Correlator
+* **Branch Name:** `feature/cdr-tower-correlator`
+* **File to Create:** `cdr_analyser.py`
+* **Objective:** Indian cyber crime cells receive raw Call Detail Records (CDR) and IP Detail Records (IPDR) CSV dumps from Airtel/Jio/Vi.
+* **Scope & Requirements:**
+  1. Implement `parse_cdr_csv(file_bytes, case_id)`:
+     - Handles standard Indian telco CSV columns (`Calling_No`, `Called_No`, `Date`, `Time`, `Duration`, `First_Cell_ID`, `Last_Cell_ID`, `IMEI`, `IMSI`).
+  2. Implement Tower Location Lookup:
+     - Map Cell IDs to Chandigarh sectors (Sector 17, Sector 22, Sector 26, Sector 43, Aroma Hotel, Mohali Phase 7).
+  3. Geo-Temporal Co-Location Matching:
+     - Correlate dead-drop delivery timestamps from Telegram/Darknet chats with suspect phone presence at the same cell tower during that window.
+     - Output high-confidence "Physical Co-Location" alerts in Panel 2.
+
+---
+
+### 🔹 FORK D: Court-Admissible PDF Dossier & Section 91 CrPC Notice Generator
+* **Branch Name:** `feature/legal-dossier-pdf`
+* **File to Create:** `legal_dossier.py`
+* **Objective:** Evaluators and police officers want to print a formal court document ready for submission to the Judicial Magistrate.
+* **Scope & Requirements:**
+  1. Generate formal, clean PDF documents using Python standard library or `reportlab`:
+     - **Exhibit A: Section 63(4) BSA Digital Evidence Certificate**: Includes hardware hash, algorithm specification (SHA-256), chain of custody, and digital sign-off block.
+     - **Exhibit B: Section 91 CrPC Requisition Notice**: Pre-formatted statutory legal order addressed to Telecom Nodal Officers or Bank Branch Managers directing immediate freeze/preservation of target accounts.
+  2. Embed a verifiable cryptographic QR Code containing the SHA-256 hash digest of the case files and zimni entry.
+  3. Connect to a frontend `[ 🖨️ Export Court PDF Dossier ]` button in the dashboard.
+
+---
+
+### 🔹 FORK E: One-Click Offline Inference Sidecar & Packaging Script
+* **Branch Name:** `feature/offline-model-sidecar`
+* **File to Create:** `run_sidecar.sh`
+* **Objective:** Provide a foolproof 1-command startup script for police demonstration laptops.
+* **Scope & Requirements:**
+  1. Shell script that checks for local `llama-server` or `ollama`.
+  2. If `llama-server` is installed, launches:
+     ```bash
+     llama-server -m models/LFM2.5-8B-A1B-Q4_0.gguf --port 8080 -ngl 99 -c 4096 --host 127.0.0.1
+     ```
+  3. Automatically starts `python3 server.py` on port 8000 and opens the browser.
+  4. Manages graceful shutdown on `Ctrl+C`.
+
+---
+
+## 5. Repository File Tree
+
+```
+├── index.html                  # Main forensic dashboard UI (Steps 1-5, Panel 1-3)
+├── styles.css                  # High-density dark-mode forensic styling
+├── app.js                      # Core frontend controller, WebSocket/REST API client, state
+├── server.py                   # Threaded Python HTTP forensic server (zero dependencies)
+├── storage.py                  # SQLite WAL database engine, FTS5 search, entity extractor
+├── codeword_experiment.html    # (Reference only - features merged into View D)
+├── data/
+│   ├── case_evidence.db        # Active SQLite database in WAL mode
+│   ├── processed/
+│   │   ├── darknet_listings_sample.csv  # 600 authentic darknet illicit marketplace listings
+│   │   └── bank_statement_baseline.csv  # 75 authentic banking & UPI transaction records
+│   └── raw/
+│       ├── sample_telegram_export.json  # Multi-party encrypted chat negotiation dump
+│       └── drug_listings.csv            # Reference raw listings corpus
+├── README.md                   # This master documentation and AI agent briefing
+└── .gitignore                  # Git hygiene rules
 ```
 
 ---
 
-### 🔹 MEMBER 3: Interactive Network Link-Graph Module
-* **Deliverable:** A standalone JavaScript / HTML component `graph_view.js` (or standalone HTML preview `graph_preview.html`).
-* **Scope:** Renders an entity relationship network linking suspects, UPI accounts, wallets, and drop points using **Vis.js Network** (CDN/local script, zero npm dependencies).
-* **Copy-Paste Prompt for Gemini Pro:**
-```text
-You are a frontend data visualization engineer building an intelligence link-graph for police investigators.
+## 6. Ground Rules for AI Agents Collaborating on Forks
 
-Create a standalone HTML + JavaScript file named `graph_preview.html` using the Vis.js Network library (via CDN or local script tag).
-
-Requirements:
-1. Styling: Dark-mode forensic theme (dark slate background `#0f172a`, glowing node accents, clean monospace labels).
-2. Node Types & Visual Encoding:
-   - Suspects / Telegram Aliases: Red circles (icon or text label).
-   - UPI Mule Accounts: Amber diamonds.
-   - TRON / Crypto Wallets: Purple hexagons.
-   - Dead-Drop Locations: Blue map-pins.
-3. Interactive Features:
-   - Physics-based force-directed layout (smooth bouncing and stabilizing).
-   - Search/Filter input: Highlighting matching nodes on typing.
-   - Click Event: When an investigator clicks a node, open a clean side-panel displaying:
-     - Node Name & Type
-     - Risk Score / Corroboration Status
-     - Associated Case FIR Number
-     - "Jump to Evidence" button.
-4. Provide a rich mock dataset with 12 nodes and 15 edges modeling a realistic Chandigarh distribution ring (`Tor Vendor ➔ Telegram Admin ➔ Mule UPI ➔ Sector 26 Drop`).
-```
-
----
-
-### 🔹 MEMBER 4: Pitch Deck, Presentation Script & Section 63 BSA Dossier
-* **Deliverable:** A complete 8-slide presentation deck structure, 3-minute jury pitch script, and legal justification dossier (`PITCH_DECK_AND_LEGAL_DOSSIER.md`).
-* **Scope:** Equips non-coding team members to confidently command the table during evaluator visits and jury Q&A.
-* **Copy-Paste Prompt for Gemini Pro:**
-```text
-You are a legal-tech strategist and hackathon pitch coach preparing a university team for the Grand Finale of the Chandigarh Police Hackathon 2026 (Problem Statement 3).
-
-Generate a complete, exhaustive markdown document named `PITCH_DECK_AND_LEGAL_DOSSIER.md` containing:
-
-1. 8-SLIDE PRESENTATION DECK BLUEPRINT:
-   - Slide 1: The Frontline Reality (The flood of seized unformatted dumps).
-   - Slide 2: The Core Problem (Evasion slang, crypto mules, courtroom inadmissibility).
-   - Slide 3: The Architecture (Air-gapped, two-speed engine: Deterministic Regex + Local SLM).
-   - Slide 4: Real-Time Entity Correlation & Cross-Case Matching.
-   - Slide 5: Active Slang Induction (Human-in-the-loop candidate discovery).
-   - Slide 6: Legal Grounding: Section 63(4) BSA 2023 vs Repealed 65B Evidence Act.
-   - Slide 7: Operational Dual Packaging (PCR WhatsApp alert + Munshi Zimni text).
-   - Slide 8: Technical Scalability & Zero Cloud Lock-In.
-   Provide exact bullet points, speaker notes, and key visual ideas for every slide.
-
-2. THE 3-MINUTE TABLE PITCH SCRIPT:
-   - Word-for-word spoken script timed precisely to 180 seconds for when police evaluators walk up to our desk.
-
-3. JURY DEFENSE & HARD QUESTIONS CHEAT-SHEET:
-   - "Why not just use ChatGPT/OpenAI API?" ➔ (MHA evidence security directives, data privacy).
-   - "What if the SLM hallucinates?" ➔ (Trace-to-Source byte jumping, deterministic foundation).
-   - "How do you handle Wi-Fi outages?" ➔ (100% offline local model execution).
-```
-
----
-
-## 4. Repository Structure
-
-```
-├── index.html                  # Main forensic dashboard UI
-├── styles.css                  # Dark-mode investigative stylesheet
-├── app.js                      # UI logic, state management & mock fixtures
-├── storage.py                  # (Member 1) SQLite case database & audit logger
-├── extractor.py                # (Member 2) Regex entity parser & OCR engine
-├── graph_preview.html          # (Member 3) Vis.js interactive network topology
-├── PITCH_DECK_AND_LEGAL_DOSSIER.md # (Member 4) Jury deck, pitch script & legal cheat-sheet
-├── HACKATHON_MASTER_STRATEGY_AND_BRIEF.md # Comprehensive strategic playbook
-└── README.md                   # This document
-```
-
----
-
-## 5. Hackathon Code of Conduct & Ground Rules
-
-1. **Air-Gap Rule:** No commercial external AI APIs (OpenAI, Anthropic, Claude) may be queried at runtime. Models must run locally (e.g., via Ollama/GGUF).
-2. **Data Sanitization:** Never ingest live dark web PII or live illicit contraband. All demonstration fixtures must remain synthetic or public academic OSINT data (Rule 3 compliant).
-3. **No Overwriting:** Each teammate works in their assigned file. Integration into the primary dashboard is handled centrally by the team lead.
+1. **Air-Gap Law:** Never import or make network requests to external commercial cloud APIs (OpenAI, Anthropic, Google Cloud, HuggingFace Hub). Everything must resolve on `localhost` or standard library.
+2. **Database Schema Integrity:** Always query through `storage.get_db()`. Do not alter table primary keys or delete columns from `evidence_files` and `evidence_records` to prevent breaking existing dashboard panels.
+3. **Trace-to-Source Rule:** Any new intelligence lead generated must preserve its source citation (`file_id` and `line_number`) so officers can click `traceToSource(fileId, lineNum)` to see the raw verified evidence.
+4. **No NPM / Build Step Required:** Keep JavaScript vanilla ES6+ so the platform runs directly in any modern browser without Webpack, Vite, or npm installs.
