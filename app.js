@@ -21,6 +21,7 @@
 
 let CURRENT_SECTION = 'home';
 let CURRENT_STEP = 1;
+let MAX_REACHED_STEP = 1;
 
 let CASE_METADATA = {
   fir: "FIR No. 104/2026/CYBER",
@@ -568,8 +569,144 @@ function showSection(sectionId) {
 // 3. 5-STEP MULTI-PAGE APPLICATION WORKFLOW CONTROLLER
 // ============================================================================
 
+function isStep1Complete() {
+  const firInput = document.getElementById('intake-fir');
+  const psInput = document.getElementById('intake-ps');
+  const ioInput = document.getElementById('intake-io');
+  const beltInput = document.getElementById('intake-belt');
+
+  const fir = firInput ? firInput.value.trim() : CASE_METADATA.fir;
+  const ps = psInput ? psInput.value.trim() : CASE_METADATA.ps;
+  const io = ioInput ? ioInput.value.trim() : CASE_METADATA.io;
+  const belt = beltInput ? beltInput.value.trim() : CASE_METADATA.belt;
+
+  return Boolean(fir && ps && io && belt);
+}
+
+function isStep2Complete() {
+  return isStep1Complete() && Array.isArray(EVIDENCE_FILES) && EVIDENCE_FILES.length > 0;
+}
+
+function isStep3Complete() {
+  return isStep2Complete();
+}
+
+function highlightMissingStep1Fields() {
+  const fields = [
+    { id: 'intake-fir', label: 'FIR Number' },
+    { id: 'intake-ps', label: 'Police Station' },
+    { id: 'intake-io', label: 'IO Name' },
+    { id: 'intake-belt', label: 'Belt ID' }
+  ];
+
+  let firstMissing = null;
+  fields.forEach(f => {
+    const el = document.getElementById(f.id);
+    if (el) {
+      if (!el.value.trim()) {
+        el.style.borderColor = 'var(--accent-red)';
+        el.style.backgroundColor = '#FEF2F2';
+        if (!firstMissing) firstMissing = el;
+      } else {
+        el.style.borderColor = '';
+        el.style.backgroundColor = '';
+      }
+    }
+  });
+
+  if (firstMissing) {
+    firstMissing.focus();
+  }
+}
+
+function updateStepperUI() {
+  for (let i = 1; i <= 5; i++) {
+    const node = document.getElementById(`step-node-${i}`);
+    if (!node) continue;
+
+    node.classList.remove('active', 'completed', 'locked');
+
+    if (i === CURRENT_STEP) {
+      node.classList.add('active');
+      node.title = `Step ${i} (Currently Active)`;
+    } else if (i < CURRENT_STEP) {
+      node.classList.add('completed');
+      node.title = `Step ${i} Completed — Click to revisit`;
+    } else if (i <= MAX_REACHED_STEP) {
+      node.classList.add('completed');
+      node.title = `Step ${i} Unlocked — Click to view`;
+    } else {
+      // Future steps (i > MAX_REACHED_STEP) are strictly locked until previous step is completed!
+      node.classList.add('locked');
+      node.title = `Step ${i} Locked — Complete previous step first`;
+    }
+
+    // Connectors
+    if (i < 5) {
+      const conn = document.getElementById(`step-conn-${i}`);
+      if (conn) {
+        if (i < Math.max(CURRENT_STEP, MAX_REACHED_STEP)) {
+          conn.classList.add('completed');
+        } else {
+          conn.classList.remove('completed');
+        }
+      }
+    }
+  }
+}
+
+function requestStep(targetStep) {
+  if (targetStep === CURRENT_STEP) return;
+
+  // 1. Re-visiting earlier completed steps is always permitted
+  if (targetStep < CURRENT_STEP) {
+    goToStep(targetStep);
+    return;
+  }
+
+  // 2. Strict sequential progression: user must complete previous steps first
+  if (targetStep > CURRENT_STEP) {
+    // Check Step 1 prerequisites
+    if (!isStep1Complete()) {
+      showToast("⚠️ Step 1 incomplete: Please fill all mandatory fields (FIR, Police Station, IO Name, Belt ID) or click Autofill.", "alert");
+      highlightMissingStep1Fields();
+      if (CURRENT_STEP !== 1) goToStep(1);
+      return;
+    }
+
+    // Check Step 2 prerequisites
+    if (targetStep >= 3 && !isStep2Complete()) {
+      showToast("⚠️ Step 2 incomplete: Please ingest at least 1 evidence file before advancing.", "alert");
+      if (CURRENT_STEP !== 2) goToStep(2);
+      return;
+    }
+
+    // If targetStep was previously unlocked/completed and prerequisites hold, allow direct return
+    if (targetStep <= MAX_REACHED_STEP) {
+      goToStep(targetStep);
+      return;
+    }
+
+    // Strict sequential rule: cannot jump ahead into locked future steps
+    if (targetStep > CURRENT_STEP + 1) {
+      showToast(`⚠️ Step ${targetStep} is locked: Please complete Step ${CURRENT_STEP} and proceed sequentially.`, "alert");
+      return;
+    }
+
+    // If target is step 5, execute pipeline
+    if (targetStep === 5) {
+      startLoadingPipeline();
+      return;
+    }
+
+    // Advance to next sequential step
+    proceedToStep(targetStep);
+  }
+}
+
 function goToStep(stepNum) {
   CURRENT_STEP = stepNum;
+  MAX_REACHED_STEP = Math.max(MAX_REACHED_STEP, stepNum);
 
   // Hide all step screens
   for (let i = 1; i <= 5; i++) {
@@ -577,15 +714,8 @@ function goToStep(stepNum) {
     if (screen) screen.style.display = 'none';
   }
 
-  // Update stepper items
-  for (let i = 1; i <= 5; i++) {
-    const node = document.getElementById(`step-node-${i}`);
-    if (node) {
-      node.classList.remove('active', 'completed');
-      if (i === stepNum) node.classList.add('active');
-      else if (i < stepNum) node.classList.add('completed');
-    }
-  }
+  // Update stepper items and linear progress bar
+  updateStepperUI();
 
   // Update progress text
   const perc = (stepNum * 20);
@@ -602,18 +732,26 @@ function goToStep(stepNum) {
   if (stepNum === 4) {
     populateReviewScreen();
   }
+
+  window.scrollTo({ top: 120, behavior: 'smooth' });
 }
 
 function proceedToStep(nextStep) {
   // Validate Step 1 before allowing advance
   if (CURRENT_STEP === 1 && nextStep === 2) {
-    const fir = document.getElementById('intake-fir').value.trim();
-    const ps = document.getElementById('intake-ps').value.trim();
-    const io = document.getElementById('intake-io').value.trim();
-    const belt = document.getElementById('intake-belt').value.trim();
+    const firInput = document.getElementById('intake-fir');
+    const psInput = document.getElementById('intake-ps');
+    const ioInput = document.getElementById('intake-io');
+    const beltInput = document.getElementById('intake-belt');
+
+    const fir = firInput ? firInput.value.trim() : "";
+    const ps = psInput ? psInput.value.trim() : "";
+    const io = ioInput ? ioInput.value.trim() : "";
+    const belt = beltInput ? beltInput.value.trim() : "";
 
     if (!fir || !ps || !io || !belt) {
       showToast("⚠️ Please enter all mandatory fields (FIR, Police Station, IO Name, Belt ID) or click Autofill.", "alert");
+      highlightMissingStep1Fields();
       return;
     }
 
@@ -624,16 +762,22 @@ function proceedToStep(nextStep) {
     CASE_METADATA.sections = document.getElementById('intake-sections').value.trim() || CASE_METADATA.sections;
     CASE_METADATA.category = document.getElementById('intake-category').value;
 
-    document.getElementById('header-case-tag').textContent = fir;
-    document.getElementById('header-case-meta').textContent = `${ps} | IO: ${io} (${belt})`;
+    const firTag = document.getElementById('header-case-tag');
+    if (firTag) firTag.textContent = fir;
+    const metaTag = document.getElementById('header-case-meta');
+    if (metaTag) metaTag.textContent = `${ps} | IO: ${io} (${belt})`;
+    const wbFir = document.getElementById('wb-fir-tag');
+    if (wbFir) wbFir.textContent = fir;
+    const wbPs = document.getElementById('wb-ps-meta');
+    if (wbPs) wbPs.textContent = `${ps} • IO: ${io}`;
+
     logAuditEvent("CASE_METADATA_SAVED", `Updated details for ${fir}`);
   }
 
   // Validate Step 2 before allowing advance
   if (CURRENT_STEP === 2 && nextStep === 3) {
-    const stagedTable = document.getElementById('staged-evidence-tbody');
-    if (!stagedTable.children.length) {
-      showToast("⚠️ Please stage evidence files by clicking 'Load Multi-Source Case Files'.", "alert");
+    if (!EVIDENCE_FILES || EVIDENCE_FILES.length === 0) {
+      showToast("⚠️ Step 2 incomplete: Please ingest at least 1 evidence file (upload or load sample corpus).", "alert");
       return;
     }
   }
@@ -641,9 +785,9 @@ function proceedToStep(nextStep) {
   // Save Step 3 choices before Step 4
   if (CURRENT_STEP === 3 && nextStep === 4) {
     const engineSelect = document.getElementById('config-slm-engine');
-    CASE_METADATA.model = engineSelect.options[engineSelect.selectedIndex].text;
+    if (engineSelect) CASE_METADATA.model = engineSelect.options[engineSelect.selectedIndex].text;
     const lexiconSelect = document.getElementById('config-lexicon-pack');
-    CASE_METADATA.lexicon = lexiconSelect.options[lexiconSelect.selectedIndex].text;
+    if (lexiconSelect) CASE_METADATA.lexicon = lexiconSelect.options[lexiconSelect.selectedIndex].text;
   }
 
   goToStep(nextStep);
@@ -656,6 +800,16 @@ function autofillCaseDetails() {
   document.getElementById('intake-belt').value = "Belt #788-UT";
   document.getElementById('intake-sections').value = "NDPS Act Sec 21, 22, 29 / IT Act Sec 66D / BNS Sec 318";
   document.getElementById('intake-category').value = "NDPS_CYBER";
+
+  // Clear any validation error highlights
+  ['intake-fir', 'intake-ps', 'intake-io', 'intake-belt'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.style.borderColor = '';
+      el.style.backgroundColor = '';
+    }
+  });
+
   showToast("⚡ Autofilled official Chandigarh Police Case Details!", "success");
 }
 
@@ -2516,6 +2670,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderSchemes();
   renderDocumentVault();
   renderComplianceCenter();
+  updateStepperUI();
 
   // Close notifications dropdown when clicked outside
   document.addEventListener('click', (e) => {

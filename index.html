@@ -279,29 +279,29 @@
           <div class="wizard-step-badge" id="wizard-progress-text">Step 1 of 5 (20%)</div>
         </div>
 
-        <!-- Linear Stepper Bar -->
+        <!-- Linear Stepper Bar (Sequential Progression) -->
         <div class="stepper-horizontal" id="stepper-bar">
-          <div class="step-item active" id="step-node-1" onclick="goToStep(1)">
+          <div class="step-item active" id="step-node-1" onclick="requestStep(1)">
             <span class="step-num">1</span>
             <span class="step-name">Case Intake</span>
           </div>
-          <div class="step-connector"></div>
-          <div class="step-item" id="step-node-2" onclick="goToStep(2)">
+          <div class="step-connector" id="step-conn-1"></div>
+          <div class="step-item locked" id="step-node-2" onclick="requestStep(2)">
             <span class="step-num">2</span>
             <span class="step-name">Media Ingestion</span>
           </div>
-          <div class="step-connector"></div>
-          <div class="step-item" id="step-node-3" onclick="goToStep(3)">
+          <div class="step-connector" id="step-conn-2"></div>
+          <div class="step-item locked" id="step-node-3" onclick="requestStep(3)">
             <span class="step-num">3</span>
             <span class="step-name">Engine Config</span>
           </div>
-          <div class="step-connector"></div>
-          <div class="step-item" id="step-node-4" onclick="goToStep(4)">
+          <div class="step-connector" id="step-conn-3"></div>
+          <div class="step-item locked" id="step-node-4" onclick="requestStep(4)">
             <span class="step-num">4</span>
             <span class="step-name">Review Manifest</span>
           </div>
-          <div class="step-connector"></div>
-          <div class="step-item" id="step-node-5">
+          <div class="step-connector" id="step-conn-4"></div>
+          <div class="step-item locked" id="step-node-5" onclick="requestStep(5)">
             <span class="step-num">5</span>
             <span class="step-name">Pipeline Execution</span>
           </div>

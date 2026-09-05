@@ -717,6 +717,32 @@ body {
   z-index: 2;
   background: #FFFFFF;
   padding: 4px 8px;
+  border-radius: 4px;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.step-item.locked {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.step-item.locked:hover {
+  opacity: 0.55;
+}
+
+.step-item.locked .step-num {
+  background: #F1F5F9;
+  color: #94A3B8;
+  border: 1px dashed #CBD5E1;
+}
+
+.step-item.locked .step-name {
+  color: #94A3B8;
+}
+
+.step-item.completed:hover .step-name {
+  color: var(--gov-navy);
 }
 
 .step-num {
@@ -738,6 +764,7 @@ body {
   font-size: 12px;
   font-weight: 600;
   color: #64748B;
+  transition: color 0.15s ease;
 }
 
 .step-item.active .step-num {
@@ -766,6 +793,7 @@ body {
   height: 2px;
   background: #E2E8F0;
   margin: 0 8px;
+  transition: background 0.3s ease;
 }
 
 .step-connector.completed {
