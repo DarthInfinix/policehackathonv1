@@ -1,191 +1,144 @@
-# TACTICAL EVIDENCE TRIAGE & CORRELATION PLATFORM (TETCP)
+# TACTICAL EVIDENCE TRIAGE & STATUTORY COMPLIANCE PLATFORM (TETCP)
 ### Chandigarh Police Hackathon 2026 — Problem Statement 3 (PS3-DWID)
 > **Track:** Detection of Illicit Drug Sales on Darknet and Other Encrypted Platforms  
-> **Legal Compliance:** Section 63(4) Bharatiya Sakshya Adhiniyam (BSA), 2023  
-> **Architecture:** 100% Air-Gapped, Local-First, Zero Cloud Lock-In
+> **Statutory Compliance:** Section 63(4) Bharatiya Sakshya Adhiniyam (BSA), 2023 & Section 91 CrPC  
+> **Architecture:** 100% Air-Gapped, Local-First, Zero Cloud AI Lock-In
 
 ---
 
-## 1. Executive Summary & Core Mission
+## 1. Executive Summary & Upgraded Architecture
 
-Frontline law enforcement officers frequently seize gigabytes of messy, unstructured digital evidence—Tor marketplace `.onion` HTML mirrors, raw Telegram/WhatsApp chat dumps, bank statement CSVs, and phone camera screenshots. 
+The **Tactical Evidence Triage & Statutory Compliance Platform (TETCP)** is a unified, air-gapped forensic copilot and statutory approval gateway engineered for frontline law enforcement officers, cyber crime investigators, and judicial prosecution teams.
 
-Existing workflows suffer from manual fatigue, tool fragmentation, and strict legal vulnerability under India's new criminal codes (**Bharatiya Sakshya Adhiniyam, 2023**).
-
-This platform acts as an **air-gapped forensic copilot** that:
-1. **Ingests & Normalizes** heterogeneous seized data without cloud dependencies.
-2. **Extracts Deterministic Identifiers** (Indian UPI handles, +91 phone numbers, TRON/Bitcoin wallets) with zero latency.
-3. **Triages Evasion Slang** (*Chitta, White Shoes, Ice Tea, Pudiya*) using an offline, quantized Small Language Model (SLM).
-4. **Correlates Entities** across cases into an interactive visual link graph (`Vendor ➔ Telegram Admin ➔ UPI Mule ➔ Drop Location`).
-5. **Generates Dual Outputs:** Instant field WhatsApp dispatches for PCR patrol vans, and court-admissible Section 63 BSA Digital Evidence Certificates with SHA-256 hash chains.
+The platform provides a complete end-to-end investigative and compliance pipeline:
+1. **Government Portal Homepage:** "One Platform. Every Approval & Digital Forensics." Demonstrating problem-solution-value architecture and key performance metrics.
+2. **5-Step Application & Intake Workflow:** Seamless **← Previous / Next →** navigation, state validation, and pre-execution review manifest.
+3. **Multi-Source Evidence Ingestion:** Ingests Tor `.onion` HTML mirrors, Cellebrite Telegram JSON dumps, WhatsApp text exports, Bank statement CSVs, and EXIF imagery into Universal Forensic Message Envelopes (UFME) with pre-calculated SHA-256 hashes.
+4. **Deterministic NER + Local Quantized SLM:** Instant regex extraction for Indian UPI VPAs, mobile numbers, and TRON USDT/Bitcoin crypto addresses, paired with an offline SLM (Llama-3.2-3B / Qwen-2.5) for evasive slang disambiguation (*Chitta, White Shoes, Stamp Paper, Ice Tea*).
+5. **Trace-to-Source Byte Jumping & Glass-Box Explainability:** Every lead traces directly to the exact seized evidence line and discloses prompt task, temperature ($T=0.0$), and mathematical reasoning.
+6. **Interactive Entity Link Graph:** Force-directed SVG topology cross-linking Tor marketplace storefronts, syndicate telegram admins, burner SIMs, crypto escrows, and domestic bank accounts.
+7. **Statutory Compliance Center:** Live compliance scoring meter (94% Grade A+) under Section 63(4) Bharatiya Sakshya Adhiniyam, 2023.
+8. **Case & Application Tracking Dashboard:** Searchable case directory with a 5-stage lifecycle milestone timeline.
+9. **Document & Evidence Vault:** Tamper-evident repository with client-side real-time SHA-256 integrity verification.
+10. **Government Schemes & Statutory Acts Directory:** Searchable library of MHA cyber grants, I4C initiatives, CCPWC funds, and legal procedural acts.
+11. **Smart AI Forensic Copilot:** Offline statutory advisory answering queries on Section 63 BSA, Section 91 CrPC, and evidence prerequisites.
+12. **Dual Operational Packaging:** 1-click tactical WhatsApp alerts for PCR patrol vans and court-admissible Section 63 BSA Digital Evidence Certificates with Section 91 CrPC bank freeze and telecom CDR orders.
 
 ---
 
-## 2. Quickstart (Running Offline in 60 Seconds)
+## 2. Quickstart & Running the Platform
 
-The application is designed to run completely offline without npm builds or complex dependencies.
+The application is engineered to run 100% offline on any forensic workstation without npm, Node.js, or cloud dependencies.
 
 ### Prerequisites
-- Python 3.9+ installed on your system.
-- Modern web browser (Chrome, Edge, Firefox).
+* Python 3.9+ (Standard library only: `http.server`, `sqlite3`, `hashlib`, `json`, `re`)
+* Modern Web Browser (Google Chrome, Microsoft Edge, Mozilla Firefox)
 
-### Launching the Dashboard
+### Option A: Launching with Python Server & Local REST API (Recommended)
 From the root repository directory, run:
-```bash
-python3 -m http.server 8000
+```powershell
+python server.py
 ```
-Open your browser and navigate to:
+This automatically initializes the local SQLite database (`precinct_evidence.db`), seeds historical cases, and launches the air-gapped HTTP server and REST API at:
 ```
 http://localhost:8000/
 ```
-*(When backend services are active, the UI connects to `http://localhost:8000/api`. If the backend is not running, the dashboard operates seamlessly using pre-compiled offline forensic fixtures).*
+
+### Option B: Self-Testing Backend & Regex NER
+To run automated verification tests:
+```powershell
+python server.py --test
+```
+
+### Option C: Standalone Client Mode
+You can also run any standard static server:
+```powershell
+python -m http.server 8000
+```
+Open `http://localhost:8000/` in your browser.
 
 ---
 
-## 3. Modular Team Demarcation (AI Agent Prompts)
+## 3. Project File Structure
 
-To prevent merge conflicts and ensure clean modular development, **do NOT edit core UI files directly**. 
-
-Each team member has a self-contained, isolated module. **Copy the exact prompt block below and paste it directly into your Gemini Pro / AI assistant.**
-
----
-
-### 🔹 MEMBER 1: Case Storage & Audit Trail Module
-* **Deliverable:** A standalone Python module `storage.py` (standard library `sqlite3` only).
-* **Scope:** Zero external database server setup. Manages single-file SQLite database with full-text search (FTS5) and immutable SHA-256 audit logging.
-* **Copy-Paste Prompt for Gemini Pro:**
-```text
-You are a senior systems engineer building a local forensic storage module for a law enforcement hackathon.
-
-Write a self-contained Python 3 script named `storage.py` using ONLY the standard library (`sqlite3`, `hashlib`, `json`, `datetime`).
-
-Requirements:
-1. Database File: `precinct_evidence.db`
-2. Tables to create:
-   - `cases` (case_id TEXT PRIMARY KEY, fir_number TEXT, io_name TEXT, created_at TEXT)
-   - `evidence_records` (record_id TEXT PRIMARY KEY, case_id TEXT, source_type TEXT, raw_text TEXT, line_number INT, sha256_hash TEXT)
-   - `entities` (entity_id TEXT PRIMARY KEY, entity_type TEXT, raw_value TEXT UNIQUE, risk_score INT)
-   - `audit_log` (log_id INTEGER PRIMARY KEY AUTOINCREMENT, case_id TEXT, action TEXT, performed_by TEXT, timestamp TEXT, record_hash TEXT)
-3. Full-Text Search: Create an FTS5 virtual table indexing `raw_text` for instant keyword lookups.
-4. Implement functions:
-   - `init_db()`
-   - `save_case(case_id, fir, io_name)`
-   - `insert_record(case_id, source_type, raw_text, line_number)`: auto-computes SHA-256 and logs to audit_log.
-   - `search_records(keyword)`: fast full-text search returning matching records with line numbers.
-   - `check_cross_case_hit(raw_value)`: checks if a phone number or UPI handle already appeared in past cases.
-5. Include a clean `if __name__ == "__main__":` block demonstrating the creation of a mock case, inserting 3 records, and executing a cross-case search.
+```
+policehackathonv1/
+│
+├── index.html                  # Main Gov-Tech portal, 5-step wizard, 3-panel workbench, modals
+├── styles.css                  # Enterprise Gov-Tech stylesheet, responsive breakpoints, print theme
+├── app.js                      # Unified router, state management, triage logic, graph inspector
+├── server.py                   # Lightweight local Python 3 HTTP server, SQLite DB & REST API
+├── precinct_evidence.db        # Single-file SQLite database (auto-created on server launch)
+├── README.md                   # Complete documentation, setup guide & demo script
+├── Track 3 Documenation (1).pdf # Official Problem Statement 3 specification
+└── Chandigarh Police Hackathon Guidelines...pdf # Hackathon ground rules & compliance directives
 ```
 
 ---
 
-### 🔹 MEMBER 2: Regex Extractor & Offline OCR Worker
-* **Deliverable:** A standalone Python module `extractor.py`.
-* **Scope:** Deterministic pattern extraction (high recall) for Indian payment handles and crypto wallets, with fallback image text extraction.
-* **Copy-Paste Prompt for Gemini Pro:**
-```text
-You are a digital forensics specialist creating a fast, deterministic entity extractor for Indian law enforcement.
+## 4. Local REST API Reference
 
-Write a standalone Python 3 script named `extractor.py` using standard `re`, `json`, and optionally `pytesseract` or `easyocr`.
+The platform includes a zero-dependency local REST API running on `http://localhost:8000`:
 
-Requirements:
-1. Extract Indian Phone Numbers:
-   - Standard 10-digit Indian numbers starting with 6, 7, 8, 9.
-   - Prefixes with +91, 0, or formatted with hyphens/spaces (e.g. +91-98140-12345).
-2. Extract Indian UPI Handles (VPAs):
-   - Format: `username@bank` (e.g., @okhdfcbank, @ybl, @paytm, @icici, @axl, @upi).
-3. Extract Cryptocurrency Wallets:
-   - TRON (TRC-20 USDT): Starts with 'T', 34 alphanumeric characters.
-   - Bitcoin: Starts with '1', '3', or 'bc1', 26-42 alphanumeric characters.
-4. Extract Pricing & Quantity Indicators:
-   - Detect amounts in INR (`₹`, `rs`, `inr`, `k`) and weights (`g`, `gram`, `pudiya`, `tola`).
-5. OCR Function:
-   - `extract_text_from_image(image_path)`: Uses pytesseract or easyocr to return text lines with timestamps.
-6. Main Extraction Function:
-   - `extract_all_entities(text)`: Returns a structured dictionary:
-     `{"phones": [...], "upi_handles": [...], "crypto_wallets": [...], "pricing_hints": [...]}`
-7. Include an `if __name__ == "__main__":` test block with a 5-line messy Hinglish drug negotiation snippet demonstrating 100% extraction accuracy.
-```
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/health` | Service health status & BSA compliance flag |
+| `GET` | `/api/cases` | Retrieve all registered cases and tracking stages from SQLite |
+| `POST` | `/api/cases` | Register a new statutory case into the database |
+| `POST` | `/api/extract` | Deterministic entity extractor (phones, UPI handles, crypto wallets, pricing) |
+| `GET` | `/api/compliance`| Statutory Section 63 BSA compliance scores and checklist |
+| `GET` | `/api/audit` | Tamper-evident chronological audit ledger |
+| `POST` | `/api/audit` | Record an immutable officer action with SHA-256 signature |
 
 ---
 
-### 🔹 MEMBER 3: Interactive Network Link-Graph Module
-* **Deliverable:** A standalone JavaScript / HTML component `graph_view.js` (or standalone HTML preview `graph_preview.html`).
-* **Scope:** Renders an entity relationship network linking suspects, UPI accounts, wallets, and drop points using **Vis.js Network** (CDN/local script, zero npm dependencies).
-* **Copy-Paste Prompt for Gemini Pro:**
-```text
-You are a frontend data visualization engineer building an intelligence link-graph for police investigators.
+## 5. Verification & Testing Checklist
 
-Create a standalone HTML + JavaScript file named `graph_preview.html` using the Vis.js Network library (via CDN or local script tag).
-
-Requirements:
-1. Styling: Dark-mode forensic theme (dark slate background `#0f172a`, glowing node accents, clean monospace labels).
-2. Node Types & Visual Encoding:
-   - Suspects / Telegram Aliases: Red circles (icon or text label).
-   - UPI Mule Accounts: Amber diamonds.
-   - TRON / Crypto Wallets: Purple hexagons.
-   - Dead-Drop Locations: Blue map-pins.
-3. Interactive Features:
-   - Physics-based force-directed layout (smooth bouncing and stabilizing).
-   - Search/Filter input: Highlighting matching nodes on typing.
-   - Click Event: When an investigator clicks a node, open a clean side-panel displaying:
-     - Node Name & Type
-     - Risk Score / Corroboration Status
-     - Associated Case FIR Number
-     - "Jump to Evidence" button.
-4. Provide a rich mock dataset with 12 nodes and 15 edges modeling a realistic Chandigarh distribution ring (`Tor Vendor ➔ Telegram Admin ➔ Mule UPI ➔ Sector 26 Drop`).
-```
+- [x] **Homepage Hero & Navigation:** Loads authoritative Indian Gov-Tech header, statistics counter, and responsive navigation links.
+- [x] **5-Step Application Wizard:**
+  - [x] Step 1: Case details input + validation + autofill demo button.
+  - [x] Step 2: Evidence media drop zone + staged files table + SHA-256 hashes.
+  - [x] Step 3: Offline SLM engine selector + regional lexicon settings + modular toggles.
+  - [x] Step 4: Comprehensive pre-execution review manifest summarizing entered parameters.
+  - [x] Step 5: Pipeline progress bar with live terminal simulation and transition to Workbench.
+  - [x] **Previous & Next Navigation:** Previous disabled on Step 1, Next advances with validation, Previous preserves all entered data without reset.
+- [x] **Command Workbench (3 Panels):**
+  - [x] Panel 1: Multi-source stream selector (Tor, Telegram, WhatsApp, Bank CSV, EXIF) with search and line highlighting.
+  - [x] Panel 2: Corroborated triage cards with confidence scores, glass-box model rationale drawer, and Verify/Dismiss/Edit actions.
+  - [x] Panel 3: Target Summary metrics, novel slang harvester ("Ice Tea"), verified BSA table, and Section 91 CrPC requisitions.
+- [x] **Interactive Network Link Graph:** Clickable nodes open attributes card and filter correlated evidence leads.
+- [x] **Case & Application Tracking:** Searchable case cards with 5-stage chronological lifecycle timelines.
+- [x] **Statutory Compliance Center:** Radial progress gauge (94% Grade A+) and mandatory legal checklist.
+- [x] **Document Vault:** Registry of evidence files with live client-side SHA-256 calculation tool.
+- [x] **Government Schemes Directory:** Filterable cards covering I4C, CFSL, CCPWC, and legal acts.
+- [x] **Smart AI Forensic Copilot:** Offline rule-based advisory answering questions on BSA 63, CrPC 91, and drug slang.
+- [x] **Court Documents & Dispatches:** Print-ready Section 63 BSA certificate, Section 91 CrPC orders, and WhatsApp field alert text copy.
 
 ---
 
-### 🔹 MEMBER 4: Pitch Deck, Presentation Script & Section 63 BSA Dossier
-* **Deliverable:** A complete 8-slide presentation deck structure, 3-minute jury pitch script, and legal justification dossier (`PITCH_DECK_AND_LEGAL_DOSSIER.md`).
-* **Scope:** Equips non-coding team members to confidently command the table during evaluator visits and jury Q&A.
-* **Copy-Paste Prompt for Gemini Pro:**
-```text
-You are a legal-tech strategist and hackathon pitch coach preparing a university team for the Grand Finale of the Chandigarh Police Hackathon 2026 (Problem Statement 3).
+## 6. Hackathon Table Pitch Script (2–3 Minutes)
 
-Generate a complete, exhaustive markdown document named `PITCH_DECK_AND_LEGAL_DOSSIER.md` containing:
+When jury members and police evaluators walk up to your desk, follow this demonstration journey:
 
-1. 8-SLIDE PRESENTATION DECK BLUEPRINT:
-   - Slide 1: The Frontline Reality (The flood of seized unformatted dumps).
-   - Slide 2: The Core Problem (Evasion slang, crypto mules, courtroom inadmissibility).
-   - Slide 3: The Architecture (Air-gapped, two-speed engine: Deterministic Regex + Local SLM).
-   - Slide 4: Real-Time Entity Correlation & Cross-Case Matching.
-   - Slide 5: Active Slang Induction (Human-in-the-loop candidate discovery).
-   - Slide 6: Legal Grounding: Section 63(4) BSA 2023 vs Repealed 65B Evidence Act.
-   - Slide 7: Operational Dual Packaging (PCR WhatsApp alert + Munshi Zimni text).
-   - Slide 8: Technical Scalability & Zero Cloud Lock-In.
-   Provide exact bullet points, speaker notes, and key visual ideas for every slide.
+1. **Step 1 — The Hook & Platform Overview (0:00 - 0:30):**
+   * *"Good morning, esteemed jury. Frontline cyber crime officers face massive, messy dumps—Tor marketplace listings, Telegram chats, bank CSVs. Existing tools are fragmented and vulnerable under India's new criminal codes. Welcome to TETCP: One Platform. Every Approval & Digital Forensics."*
+   * Point to the **Portal Homepage** showing key metrics: 100% Air-Gapped, 94% Statutory Compliance, and zero cloud AI lock-in.
 
-2. THE 3-MINUTE TABLE PITCH SCRIPT:
-   - Word-for-word spoken script timed precisely to 180 seconds for when police evaluators walk up to our desk.
+2. **Step 2 — Structured 5-Step Intake & Hashing (0:30 - 1:00):**
+   * Click **New Intake**. Show Step 1 with autofilled case details (FIR-104 Sector 17).
+   * Click **Next** to show Step 2. Highlight the 5 multi-source evidence streams with pre-calculated SHA-256 hashes matching Malkhana barcodes.
+   * Demonstrate **Previous** to prove no data is lost, then advance through Step 3 (Engine Settings) and Step 4 (Review Manifest).
+   * Click **Submit & Run Pipeline** to watch the progress bar correlate the corpus into UFME.
 
-3. JURY DEFENSE & HARD QUESTIONS CHEAT-SHEET:
-   - "Why not just use ChatGPT/OpenAI API?" ➔ (MHA evidence security directives, data privacy).
-   - "What if the SLM hallucinates?" ➔ (Trace-to-Source byte jumping, deterministic foundation).
-   - "How do you handle Wi-Fi outages?" ➔ (100% offline local model execution).
-```
+3. **Step 3 — The Forensic Command Workbench (1:00 - 1:45):**
+   * Inside the **Workbench**, demonstrate **Trace-to-Source**: click *"Jump to Source"* on the UPI mule lead (`mule44@ybl`) to show Panel 1 scrolling and flashing the exact chat line.
+   * Open the **Glass-Box Model Rationale** to explain how the local SLM disambiguated `"Chitta"` and `"White Shoes 5g"` with temperature $T=0.0$.
+   * Click the **Network Graph** tab to show the interactive link graph connecting the Tor marketplace, syndicate admin, burner SIM, and UPI mule.
 
----
+4. **Step 4 — Statutory Compliance & Court Output (1:45 - 2:30):**
+   * Switch to the **Compliance Center** to show the 94% court admissibility score.
+   * Click **Generate Section 63(4) BSA Digital Evidence Certificate** to open the print-ready court document complete with Schedule A (file hashes), Schedule B (verified leads), and the Machine/Model Manifest.
+   * Show the **Section 91 CrPC Bank Freeze Notice** ready for immediate dispatch to SBI.
 
-## 4. Repository Structure
-
-```
-├── index.html                  # Main forensic dashboard UI
-├── styles.css                  # Dark-mode investigative stylesheet
-├── app.js                      # UI logic, state management & mock fixtures
-├── storage.py                  # (Member 1) SQLite case database & audit logger
-├── extractor.py                # (Member 2) Regex entity parser & OCR engine
-├── graph_preview.html          # (Member 3) Vis.js interactive network topology
-├── PITCH_DECK_AND_LEGAL_DOSSIER.md # (Member 4) Jury deck, pitch script & legal cheat-sheet
-├── HACKATHON_MASTER_STRATEGY_AND_BRIEF.md # Comprehensive strategic playbook
-└── README.md                   # This document
-```
-
----
-
-## 5. Hackathon Code of Conduct & Ground Rules
-
-1. **Air-Gap Rule:** No commercial external AI APIs (OpenAI, Anthropic, Claude) may be queried at runtime. Models must run locally (e.g., via Ollama/GGUF).
-2. **Data Sanitization:** Never ingest live dark web PII or live illicit contraband. All demonstration fixtures must remain synthetic or public academic OSINT data (Rule 3 compliant).
-3. **No Overwriting:** Each teammate works in their assigned file. Integration into the primary dashboard is handled centrally by the team lead.
+5. **Step 5 — Closing Impact (2:30 - 3:00):**
+   * *"In under 3 minutes, an officer goes from an unstructured seized dump to court-admissible electronic evidence, automated bank freeze orders, and tactical field alerts—all 100% offline. Thank you, and we welcome your questions."*

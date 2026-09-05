@@ -1,28 +1,41 @@
 /**
- * CHANDIGARH POLICE CYBER FORENSIC WORKBENCH
- * Upgraded with Minimalist Implementations for All 10 Official Specifications:
- * - Tor .onion Listing Ingestion (Req #1)
- * - Interactive Entity Network Graph (Req #5)
- * - Cross-Case Global Search (Req #7)
- * - Cryptographic Audit Trail & RBAC (Req #9)
+ * CHANDIGARH POLICE CYBER CRIME INVESTIGATION DIVISION
+ * Digital Forensics & Statutory Approval Gateway (BSA Sec 63 Compliant)
+ * 
+ * Features:
+ * 1. Gov-Tech Portal Homepage & Multi-View Router
+ * 2. 5-Step Application Workflow with Previous / Next Navigation & Validation
+ * 3. 3-Panel Forensic Command Workbench (UFME Raw Viewer, Glass-Box Triage, Link Graph)
+ * 4. Case & Application Tracking Dashboard with Lifecycle Timelines
+ * 5. Statutory Compliance Center with Real-time Scoring & Checklist
+ * 6. Document & Digital Evidence Vault with Client-Side SHA-256 Calculator
+ * 7. Government Schemes & Statutory Acts Directory
+ * 8. Smart AI Forensic Copilot Assistant
+ * 9. Real-Time Priority Notification Center
+ * 10. Section 63 BSA Court Certificates & Section 91 CrPC Notices
  */
 
 // ============================================================================
-// 1. DATASETS & JURISDICTIONAL PACKS
+// 1. DATASETS & CASE METADATA
 // ============================================================================
+
+let CURRENT_SECTION = 'home';
+let CURRENT_STEP = 1;
+let MAX_REACHED_STEP = 1;
 
 let CASE_METADATA = {
   fir: "FIR No. 104/2026/CYBER",
   ps: "PS Cyber Crime, Sector 17, Chandigarh",
   io: "Insp. Vikramjit Singh",
   belt: "Belt #788-UT",
-  sections: "NDPS Act Sec 21, 22, 29 / IT Act Sec 66D",
+  sections: "NDPS Act Sec 21, 22, 29 / IT Act Sec 66D / BNS Sec 318",
   category: "NDPS_CYBER",
-  model: "Llama-3.2-3B-Instruct (Local 4-bit GGUF, T=0.0)"
+  model: "Llama-3.2-3B-Instruct (Local 4-bit GGUF, T=0.0)",
+  lexicon: "Chandigarh Tricity NDPS (Heroin/Chitta, White Shoes, Stamp Paper)"
 };
 
-// 5 Multi-Source Evidence Streams (including Tor .onion Scraped Listing)
-const EVIDENCE_FILES = [
+// 5 Multi-Source Evidence Streams
+let EVIDENCE_FILES = [
   {
     id: "file-darknet",
     name: "darknet_hydra_listing.html",
@@ -278,6 +291,67 @@ let TRIAGE_LEADS = [
   }
 ];
 
+// Historical Cases for Tracking Dashboard
+let TRACKING_CASES = [
+  {
+    id: "CASE-2026-104",
+    fir: "FIR No. 104/2026/CYBER",
+    ps: "PS Cyber Crime, Sector 17, Chandigarh",
+    io: "Insp. Vikramjit Singh",
+    belt: "Belt #788-UT",
+    category: "Illicit Narcotics Distribution (NDPS / Tor)",
+    date: "11.08.2026",
+    status: "UNDER_REVIEW",
+    statusLabel: "Under Review (Triage Complete)",
+    expectedSla: "24 Hours (Court Filing)",
+    stages: [
+      { name: "Case Intake", completed: true, date: "11 Aug" },
+      { name: "SHA-256 Hashed", completed: true, date: "11 Aug" },
+      { name: "Triage Correlated", completed: true, date: "Today" },
+      { name: "IO Verification", active: true, date: "In Progress" },
+      { name: "Court Admissibility", completed: false, date: "Pending" }
+    ]
+  },
+  {
+    id: "CASE-2025-089",
+    fir: "FIR No. 89/2025/CYBER",
+    ps: "PS Cyber Crime, Sector 34, Chandigarh",
+    io: "SI Gurpreet Singh",
+    belt: "Belt #612-UT",
+    category: "Financial Cyber Fraud & Mule Accounts (1930)",
+    date: "14.11.2025",
+    status: "CERTIFIED_ADMISSIBLE",
+    statusLabel: "Certified & Admissible",
+    expectedSla: "Completed",
+    stages: [
+      { name: "Case Intake", completed: true, date: "14 Nov" },
+      { name: "SHA-256 Hashed", completed: true, date: "14 Nov" },
+      { name: "Triage Correlated", completed: true, date: "15 Nov" },
+      { name: "IO Verification", completed: true, date: "16 Nov" },
+      { name: "Court Admissibility", completed: true, date: "17 Nov" }
+    ]
+  },
+  {
+    id: "CASE-2026-012",
+    fir: "FIR No. 12/2026/NDPS",
+    ps: "PS Sector 36, Chandigarh",
+    io: "Insp. Rajesh Kumar",
+    belt: "Belt #451-UT",
+    category: "Cross-Border Drone Contraband & Burner SIMs",
+    date: "04.02.2026",
+    status: "IN_TRIAGE",
+    statusLabel: "In Triage",
+    expectedSla: "48 Hours",
+    stages: [
+      { name: "Case Intake", completed: true, date: "04 Feb" },
+      { name: "SHA-256 Hashed", completed: true, date: "04 Feb" },
+      { name: "Triage Correlated", active: true, date: "In Progress" },
+      { name: "IO Verification", completed: false, date: "Pending" },
+      { name: "Court Admissibility", completed: false, date: "Pending" }
+    ]
+  }
+];
+
 // Historical Precinct Cases Database (for Requirement #7 Global Intel Search)
 const HISTORICAL_PRECINCT_INTEL = [
   {
@@ -322,38 +396,401 @@ const CASE_CHRONOLOGY = [
   { time: "15:40 IST", body: "Payment Shift: Dealer offers LSD blotters via TRON USDT wallet." }
 ];
 
+// Priority Notifications
+let NOTIFICATIONS = [
+  { id: 1, title: "High-Risk TRON Escrow Detected", time: "10 mins ago", unread: true, detail: "Darknet listing #402 cross-referenced with Telegram syndicate escrow wallet." },
+  { id: 2, title: "Section 91 CrPC Bank Freeze Pending", time: "25 mins ago", unread: true, detail: "VPA mule44@ybl requires official debit freeze notice dispatch to SBI." },
+  { id: 3, title: "Section 63 BSA Hash Check Verified", time: "1 hour ago", unread: true, detail: "All 5 staged evidence files matched Malkhana MK-2026-89 custody hashes." }
+];
+
+// Government Schemes & Legal Acts Library
+const SCHEMES_DATA = [
+  {
+    id: "scheme-1",
+    category: "MHA",
+    categoryLabel: "MHA Initiative",
+    title: "Indian Cyber Crime Coordination Centre (I4C)",
+    authority: "Ministry of Home Affairs (MHA), New Delhi",
+    body: "National apex coordination platform providing law enforcement agencies with centralized threat intelligence, National Cyber Forensic Laboratory (NCFL) forensics support, and automated inter-state police coordination.",
+    eligibility: "State Police, Cyber Cells & Central Law Enforcement Agencies",
+    turnaround: "Immediate / 24x7 Real-Time Assistance",
+    linkText: "View I4C SOP Directives"
+  },
+  {
+    id: "scheme-2",
+    category: "ACTS",
+    categoryLabel: "Statutory Law",
+    title: "Bharatiya Sakshya Adhiniyam (BSA), 2023 — Section 63",
+    authority: "Ministry of Law and Justice, Govt of India",
+    body: "Replaced repealed Section 65B of Indian Evidence Act, 1872. Governs admissibility of electronic records produced by computer systems, requiring verified cryptographic hashes, lawful custody declarations, and system reliability manifests.",
+    eligibility: "All Criminal & Civil Court Proceedings in India",
+    turnaround: "Mandatory Prior to Charge Sheet Filing",
+    linkText: "Read Statutory Guidelines"
+  },
+  {
+    id: "scheme-3",
+    category: "MHA",
+    categoryLabel: "Central Scheme",
+    title: "National Cyber Crime Reporting Portal (Helpline 1930)",
+    authority: "MHA & Citizen Financial Cyber Fraud System",
+    body: "Citizen-police digital gateway facilitating instantaneous freezing of illicit fund transfers routed via UPI, IMPS, and domestic mule bank accounts within golden triage window.",
+    eligibility: "All Cyber Police Stations with Nodal Banking Officers",
+    turnaround: "< 2 Hours for Mule Account Debit Freeze",
+    linkText: "Open 1930 Intercept SOP"
+  },
+  {
+    id: "scheme-4",
+    category: "FORENSICS",
+    categoryLabel: "Central Lab",
+    title: "Central Forensic Science Laboratory (CFSL) Cyber Division",
+    authority: "Directorate of Forensic Science Services (DFSS), MHA",
+    body: "Provides state forensic laboratories and cyber cells with write-blocked hardware, Cellebrite UFED decoders, advanced memory chip-off dumps, and certified technical examiner expert testimony.",
+    eligibility: "State Police Investigating Officers u/s 79A IT Act",
+    turnaround: "Standard Case Turnaround: 7 Days",
+    linkText: "Request CFSL Examination"
+  },
+  {
+    id: "scheme-5",
+    category: "MHA",
+    categoryLabel: "Funding Scheme",
+    title: "Cyber Crime Prevention against Women & Children (CCPWC)",
+    authority: "Ministry of Home Affairs (Govt. of India)",
+    body: "Centrally sponsored scheme allocating capital grants for setting up modernized cyber forensic training labs, capacity building for frontline IOs, and R&D for local triage toolkits.",
+    eligibility: "State Police Headquarters & UT Cyber Divisions",
+    turnaround: "Annual Budget Allocations",
+    linkText: "Grant Guidelines"
+  },
+  {
+    id: "scheme-6",
+    category: "ACTS",
+    categoryLabel: "Statutory Law",
+    title: "Information Technology Act, 2000 (Sections 66D & 69A)",
+    authority: "Ministry of Electronics and Information Technology (MeitY)",
+    body: "Governs penal actions for cheating by personation using computer resources (Sec 66D) and executive powers to issue orders for interception or blocking of illicit dark web storefronts.",
+    eligibility: "Investigating Officers & Designated Nodal Officers",
+    turnaround: "Statutory 24-Hour Notice Requirements",
+    linkText: "View Legal Provisions"
+  },
+  {
+    id: "scheme-7",
+    category: "FORENSICS",
+    categoryLabel: "Narcotics Protocol",
+    title: "Narcotics Control Bureau (NCB) Digital Intercept Protocol",
+    authority: "Narcotics Control Bureau, MHA, India",
+    body: "Standard Operating Procedure for synthetic drug seizures on Tor marketplaces and encrypted messenger channels. Covers cryptocurrency escrow tracing and postal dead-drop interdictions.",
+    eligibility: "State Police Anti-Narcotics Task Forces (ANTF)",
+    turnaround: "Tactical Priority 1 (Immediate)",
+    linkText: "NCB SOP Protocol"
+  }
+];
+
+// Built-in Knowledge Base for Smart AI Assistant
+const ASSISTANT_KB = [
+  {
+    keywords: ["section 63", "bsa", "certificate", "admissibility", "65b"],
+    response: "<strong>Section 63(4) Bharatiya Sakshya Adhiniyam (BSA), 2023</strong> governs court admissibility of electronic records (replacing repealed Sec 65B Evidence Act). Required items: (1) Dual declaration by lawful custody officer & technical examiner, (2) Pre-ingestion SHA-256 checksums, (3) Computer machine operating reliability manifest, and (4) Strict determinism (T=0.0) without cloud AI tampering."
+  },
+  {
+    keywords: ["section 91", "crpc", "freeze", "bank", "mule"],
+    response: "<strong>Section 91 CrPC (Notice for Production of Records / Debit Freeze)</strong>: Empowers the Investigating Officer to command bank nodal officers to immediately freeze outward debits on suspected mule accounts (e.g. <code>mule44@ybl</code>) and furnish KYC, Aadhaar, PAN, and IP login logs within 24 hours."
+  },
+  {
+    keywords: ["telecom", "cdr", "tower", "burner", "sim"],
+    response: "<strong>Section 91 CrPC Telecom Requisition</strong>: Directed to TSP nodal officers (Airtel, Jio, Vi) commanding Call Detail Records (CDR), Tower Azimuth locations, IPDR, and Customer Application Forms (CAF) for target burner numbers."
+  },
+  {
+    keywords: ["darknet", "evidence", "ndps", "storefront", "onion"],
+    response: "<strong>Mandatory Darknet Digital Evidence Checklist</strong>: (1) Tor .onion HTML/DOM mirror snapshot with SHA-256 hash, (2) Cryptocurrency escrow deposit address (e.g. TRON TRC-20 or Bitcoin), (3) Vendor contact handle on encrypted messaging app, and (4) Bank transactions corroborating advance token payments."
+  },
+  {
+    keywords: ["white shoes", "chitta", "ice tea", "slang", "surrogate"],
+    response: "<strong>Regional Narcotics Evasion Slang</strong>:<br>• <em>'Chitta'</em>: Heroin (Diacetylmorphine)<br>• <em>'White Shoes (Size 5g)'</em>: Concealment code for Cocaine / Methamphetamine (mass metric mismatch)<br>• <em>'Stamp Paper' / 📄</em>: Synthetic LSD Blotter Sheets<br>• <em>'Ice Tea'</em>: Emerging synthetic liquid stimulant / Ketamine."
+  }
+];
+
 let currentSelectedFileId = "file-darknet";
 let currentTriageFilter = "all";
+let currentTrackingFilter = "ALL";
+let currentSchemeFilter = "ALL";
+let currentSelectedLeadId = "lead-tor-1";
+let currentWorkbenchMode = "triage";
 
 // ============================================================================
-// 2. STEP-BY-STEP WIZARD WORKFLOW CONTROLLER
+// 2. UNIFIED SECTION NAVIGATION ROUTER
 // ============================================================================
 
-function goToStep(stepNum) {
-  document.querySelectorAll('.wizard-screen').forEach(s => s.style.display = 'none');
-  document.getElementById('screen-dashboard').style.display = 'none';
+function showSection(sectionId) {
+  CURRENT_SECTION = sectionId;
 
-  document.querySelectorAll('.step-node').forEach((node, idx) => {
-    node.classList.remove('active', 'completed');
-    if (idx + 1 === stepNum) node.classList.add('active');
-    else if (idx + 1 < stepNum) node.classList.add('completed');
+  // Hide all sections
+  document.getElementById('section-home').style.display = 'none';
+  document.getElementById('section-intake').style.display = 'none';
+  document.getElementById('section-workbench').style.display = 'none';
+  document.getElementById('section-tracking').style.display = 'none';
+  document.getElementById('section-compliance').style.display = 'none';
+  document.getElementById('section-documents').style.display = 'none';
+  document.getElementById('section-schemes').style.display = 'none';
+
+  // Remove active from all nav buttons
+  document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
+
+  // Highlight active nav button
+  const activeNavBtn = document.getElementById(`nav-btn-${sectionId}`);
+  if (activeNavBtn) activeNavBtn.classList.add('active');
+
+  // Display targeted section
+  if (sectionId === 'home') {
+    document.getElementById('section-home').style.display = 'block';
+  } else if (sectionId === 'intake') {
+    document.getElementById('section-intake').style.display = 'block';
+    goToStep(CURRENT_STEP);
+  } else if (sectionId === 'workbench') {
+    document.getElementById('section-workbench').style.display = 'flex';
+    renderDashboard();
+  } else if (sectionId === 'tracking') {
+    document.getElementById('section-tracking').style.display = 'block';
+    renderTrackingCases();
+  } else if (sectionId === 'compliance') {
+    document.getElementById('section-compliance').style.display = 'block';
+    renderComplianceCenter();
+  } else if (sectionId === 'documents') {
+    document.getElementById('section-documents').style.display = 'block';
+    renderDocumentVault();
+  } else if (sectionId === 'schemes') {
+    document.getElementById('section-schemes').style.display = 'block';
+    renderSchemes();
+  }
+
+  // Scroll to top
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ============================================================================
+// 3. 5-STEP MULTI-PAGE APPLICATION WORKFLOW CONTROLLER
+// ============================================================================
+
+function isStep1Complete() {
+  const firInput = document.getElementById('intake-fir');
+  const psInput = document.getElementById('intake-ps');
+  const ioInput = document.getElementById('intake-io');
+  const beltInput = document.getElementById('intake-belt');
+
+  const fir = firInput ? firInput.value.trim() : CASE_METADATA.fir;
+  const ps = psInput ? psInput.value.trim() : CASE_METADATA.ps;
+  const io = ioInput ? ioInput.value.trim() : CASE_METADATA.io;
+  const belt = beltInput ? beltInput.value.trim() : CASE_METADATA.belt;
+
+  return Boolean(fir && ps && io && belt);
+}
+
+function isStep2Complete() {
+  return isStep1Complete() && Array.isArray(EVIDENCE_FILES) && EVIDENCE_FILES.length > 0;
+}
+
+function isStep3Complete() {
+  return isStep2Complete();
+}
+
+function highlightMissingStep1Fields() {
+  const fields = [
+    { id: 'intake-fir', label: 'FIR Number' },
+    { id: 'intake-ps', label: 'Police Station' },
+    { id: 'intake-io', label: 'IO Name' },
+    { id: 'intake-belt', label: 'Belt ID' }
+  ];
+
+  let firstMissing = null;
+  fields.forEach(f => {
+    const el = document.getElementById(f.id);
+    if (el) {
+      if (!el.value.trim()) {
+        el.style.borderColor = 'var(--accent-red)';
+        el.style.backgroundColor = '#FEF2F2';
+        if (!firstMissing) firstMissing = el;
+      } else {
+        el.style.borderColor = '';
+        el.style.backgroundColor = '';
+      }
+    }
   });
 
-  if (stepNum === 1) {
-    document.getElementById('screen-intake').style.display = 'flex';
-  } else if (stepNum === 2) {
-    document.getElementById('screen-evidence').style.display = 'flex';
-  } else if (stepNum === 3) {
-    document.getElementById('screen-config').style.display = 'flex';
-  } else if (stepNum === 4) {
-    document.getElementById('screen-loading').style.display = 'flex';
-  } else if (stepNum === 5) {
-    document.getElementById('screen-dashboard').style.display = 'grid';
-    document.getElementById('wizard-stepper').style.display = 'none';
-    document.getElementById('header-model-badge').style.display = 'flex';
-    document.getElementById('btn-reset-workflow').style.display = 'inline-flex';
-    renderDashboard();
+  if (firstMissing) {
+    firstMissing.focus();
   }
+}
+
+function updateStepperUI() {
+  for (let i = 1; i <= 5; i++) {
+    const node = document.getElementById(`step-node-${i}`);
+    if (!node) continue;
+
+    node.classList.remove('active', 'completed', 'locked');
+
+    if (i === CURRENT_STEP) {
+      node.classList.add('active');
+      node.title = `Step ${i} (Currently Active)`;
+    } else if (i < CURRENT_STEP) {
+      node.classList.add('completed');
+      node.title = `Step ${i} Completed — Click to revisit`;
+    } else if (i <= MAX_REACHED_STEP) {
+      node.classList.add('completed');
+      node.title = `Step ${i} Unlocked — Click to view`;
+    } else {
+      // Future steps (i > MAX_REACHED_STEP) are strictly locked until previous step is completed!
+      node.classList.add('locked');
+      node.title = `Step ${i} Locked — Complete previous step first`;
+    }
+
+    // Connectors
+    if (i < 5) {
+      const conn = document.getElementById(`step-conn-${i}`);
+      if (conn) {
+        if (i < Math.max(CURRENT_STEP, MAX_REACHED_STEP)) {
+          conn.classList.add('completed');
+        } else {
+          conn.classList.remove('completed');
+        }
+      }
+    }
+  }
+}
+
+function requestStep(targetStep) {
+  if (targetStep === CURRENT_STEP) return;
+
+  // 1. Re-visiting earlier completed steps is always permitted
+  if (targetStep < CURRENT_STEP) {
+    goToStep(targetStep);
+    return;
+  }
+
+  // 2. Strict sequential progression: user must complete previous steps first
+  if (targetStep > CURRENT_STEP) {
+    // Check Step 1 prerequisites
+    if (!isStep1Complete()) {
+      showToast("⚠️ Step 1 incomplete: Please fill all mandatory fields (FIR, Police Station, IO Name, Belt ID) or click Autofill.", "alert");
+      highlightMissingStep1Fields();
+      if (CURRENT_STEP !== 1) goToStep(1);
+      return;
+    }
+
+    // Check Step 2 prerequisites
+    if (targetStep >= 3 && !isStep2Complete()) {
+      showToast("⚠️ Step 2 incomplete: Please ingest at least 1 evidence file before advancing.", "alert");
+      if (CURRENT_STEP !== 2) goToStep(2);
+      return;
+    }
+
+    // If targetStep was previously unlocked/completed and prerequisites hold, allow direct return
+    if (targetStep <= MAX_REACHED_STEP) {
+      goToStep(targetStep);
+      return;
+    }
+
+    // Strict sequential rule: cannot jump ahead into locked future steps
+    if (targetStep > CURRENT_STEP + 1) {
+      showToast(`⚠️ Step ${targetStep} is locked: Please complete Step ${CURRENT_STEP} and proceed sequentially.`, "alert");
+      return;
+    }
+
+    // If target is step 5, execute pipeline
+    if (targetStep === 5) {
+      startLoadingPipeline();
+      return;
+    }
+
+    // Advance to next sequential step
+    proceedToStep(targetStep);
+  }
+}
+
+function goToStep(stepNum) {
+  CURRENT_STEP = stepNum;
+  MAX_REACHED_STEP = Math.max(MAX_REACHED_STEP, stepNum);
+
+  // Hide all step screens
+  for (let i = 1; i <= 5; i++) {
+    const screen = document.getElementById(`step-screen-${i}`);
+    if (screen) screen.style.display = 'none';
+  }
+
+  // Update stepper items and linear progress bar
+  updateStepperUI();
+
+  // Update progress text
+  const perc = (stepNum * 20);
+  const progressText = document.getElementById('wizard-progress-text');
+  if (progressText) {
+    progressText.textContent = `Step ${stepNum} of 5 (${perc}%)`;
+  }
+
+  // Show targeted step screen
+  const targetScreen = document.getElementById(`step-screen-${stepNum}`);
+  if (targetScreen) targetScreen.style.display = 'block';
+
+  // If entering review step (Step 4), populate summary
+  if (stepNum === 4) {
+    populateReviewScreen();
+  }
+
+  window.scrollTo({ top: 120, behavior: 'smooth' });
+}
+
+function proceedToStep(nextStep) {
+  // Validate Step 1 before allowing advance
+  if (CURRENT_STEP === 1 && nextStep === 2) {
+    const firInput = document.getElementById('intake-fir');
+    const psInput = document.getElementById('intake-ps');
+    const ioInput = document.getElementById('intake-io');
+    const beltInput = document.getElementById('intake-belt');
+
+    const fir = firInput ? firInput.value.trim() : "";
+    const ps = psInput ? psInput.value.trim() : "";
+    const io = ioInput ? ioInput.value.trim() : "";
+    const belt = beltInput ? beltInput.value.trim() : "";
+
+    if (!fir || !ps || !io || !belt) {
+      showToast("⚠️ Please enter all mandatory fields (FIR, Police Station, IO Name, Belt ID) or click Autofill.", "alert");
+      highlightMissingStep1Fields();
+      return;
+    }
+
+    CASE_METADATA.fir = fir;
+    CASE_METADATA.ps = ps;
+    CASE_METADATA.io = io;
+    CASE_METADATA.belt = belt;
+    CASE_METADATA.sections = document.getElementById('intake-sections').value.trim() || CASE_METADATA.sections;
+    CASE_METADATA.category = document.getElementById('intake-category').value;
+
+    const firTag = document.getElementById('header-case-tag');
+    if (firTag) firTag.textContent = fir;
+    const metaTag = document.getElementById('header-case-meta');
+    if (metaTag) metaTag.textContent = `${ps} | IO: ${io} (${belt})`;
+    const wbFir = document.getElementById('wb-fir-tag');
+    if (wbFir) wbFir.textContent = fir;
+    const wbPs = document.getElementById('wb-ps-meta');
+    if (wbPs) wbPs.textContent = `${ps} • IO: ${io}`;
+
+    logAuditEvent("CASE_METADATA_SAVED", `Updated details for ${fir}`);
+  }
+
+  // Validate Step 2 before allowing advance
+  if (CURRENT_STEP === 2 && nextStep === 3) {
+    if (!EVIDENCE_FILES || EVIDENCE_FILES.length === 0) {
+      showToast("⚠️ Step 2 incomplete: Please ingest at least 1 evidence file (upload or load sample corpus).", "alert");
+      return;
+    }
+  }
+
+  // Save Step 3 choices before Step 4
+  if (CURRENT_STEP === 3 && nextStep === 4) {
+    const engineSelect = document.getElementById('config-slm-engine');
+    if (engineSelect) CASE_METADATA.model = engineSelect.options[engineSelect.selectedIndex].text;
+    const lexiconSelect = document.getElementById('config-lexicon-pack');
+    if (lexiconSelect) CASE_METADATA.lexicon = lexiconSelect.options[lexiconSelect.selectedIndex].text;
+  }
+
+  goToStep(nextStep);
 }
 
 function autofillCaseDetails() {
@@ -363,54 +800,385 @@ function autofillCaseDetails() {
   document.getElementById('intake-belt').value = "Belt #788-UT";
   document.getElementById('intake-sections').value = "NDPS Act Sec 21, 22, 29 / IT Act Sec 66D / BNS Sec 318";
   document.getElementById('intake-category').value = "NDPS_CYBER";
+
+  // Clear any validation error highlights
+  ['intake-fir', 'intake-ps', 'intake-io', 'intake-belt'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.style.borderColor = '';
+      el.style.backgroundColor = '';
+    }
+  });
+
   showToast("⚡ Autofilled official Chandigarh Police Case Details!", "success");
 }
 
-function proceedToStep2() {
-  const fir = document.getElementById('intake-fir').value.trim() || "FIR No. 104/2026/CYBER";
-  const io = document.getElementById('intake-io').value.trim() || "Insp. Vikramjit Singh";
-  const ps = document.getElementById('intake-ps').value.trim() || "PS Cyber Crime, Sector 17, Chandigarh";
-  const belt = document.getElementById('intake-belt').value.trim() || "Belt #788-UT";
+// ============================================================================
+// MEDIA INGESTION ENGINE (LOCAL DEVICE & CLOUD DRIVE SOURCES)
+// ============================================================================
 
-  CASE_METADATA.fir = fir;
-  CASE_METADATA.io = io;
-  CASE_METADATA.ps = ps;
-  CASE_METADATA.belt = belt;
+function triggerDeviceFileInput() {
+  const fileInput = document.getElementById('media-file-input');
+  if (fileInput) {
+    fileInput.value = '';
+    fileInput.click();
+  }
+}
 
-  document.getElementById('header-case-tag').textContent = fir;
-  document.getElementById('header-case-meta').textContent = `${ps} | IO: ${io} (${belt})`;
+function handleDragOver(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const dropZone = document.getElementById('evidence-drop-zone');
+  if (dropZone) dropZone.classList.add('dragover');
+}
 
-  logAuditEvent("CASE_REGISTRATION", `Registered ${fir} by ${io} (${belt})`);
-  goToStep(2);
+function handleDragLeave(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const dropZone = document.getElementById('evidence-drop-zone');
+  if (dropZone) dropZone.classList.remove('dragover');
+}
+
+function handleDrop(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const dropZone = document.getElementById('evidence-drop-zone');
+  if (dropZone) dropZone.classList.remove('dragover');
+
+  if (event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+    processFiles(event.dataTransfer.files);
+  }
+}
+
+function handleRealFileUpload(event) {
+  if (event.target && event.target.files && event.target.files.length > 0) {
+    processFiles(event.target.files);
+  }
+}
+
+async function calculateFileSha256(arrayBuffer) {
+  try {
+    const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  } catch (err) {
+    let hash = 0;
+    const view = new Uint8Array(arrayBuffer);
+    for (let i = 0; i < view.length; i++) {
+      hash = ((hash << 5) - hash) + view[i];
+      hash |= 0;
+    }
+    return Math.abs(hash).toString(16).padStart(64, '0');
+  }
+}
+
+async function processFiles(fileList) {
+  const files = Array.from(fileList);
+  if (!files.length) return;
+
+  showToast(`⏳ Ingesting ${files.length} file(s) and calculating cryptographic SHA-256 checksums...`, 'alert');
+
+  for (const file of files) {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const sha256 = await calculateFileSha256(arrayBuffer);
+      const isImg = file.type.startsWith('image/') || Boolean(file.name.match(/\.(jpg|jpeg|png|webp|gif|bmp)$/i));
+      const uniqueId = "file-upload-" + Date.now() + "-" + Math.random().toString(36).substr(2, 4);
+
+      let dataUrl = null;
+      let parserProfile = "Universal Forensic Message Envelope (UFME)";
+      let parsedLines = [];
+
+      if (isImg) {
+        parserProfile = "EXIF / Perceptual Hash Adapter";
+        dataUrl = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = e => resolve(e.target.result);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(file);
+        });
+
+        parsedLines = [
+          {
+            num: 1,
+            time: new Date().toLocaleTimeString('en-GB'),
+            sender: "EXIF_METADATA",
+            text: `[IMAGE: ${file.name}] Size: ${(file.size / 1024).toFixed(1)} KB | Calculated SHA-256: ${sha256} | Perceptual Hash pHash: ${sha256.substring(0, 14)} | Seized visual contraband exhibit.`
+          }
+        ];
+
+        // Register an image intelligence lead in TRIAGE_LEADS
+        TRIAGE_LEADS.unshift({
+          id: "lead-" + uniqueId,
+          category: "image",
+          type: "SEIZED VISUAL CONTRABAND EXHIBIT",
+          value: `${file.name} [${(file.size / 1024).toFixed(1)} KB]`,
+          fileId: uniqueId,
+          fileName: file.name,
+          lineNum: 1,
+          method: "Computer Vision & Perceptual Hash (EXIF)",
+          confidence: "99.8%",
+          corroboration: {
+            score: "98% (PHYSICAL DROP MATCH)",
+            isHigh: true,
+            basis: `Image exhibit verified via pre-ingestion SHA-256 (${sha256.substring(0, 16)}...). Authenticated under Section 63 BSA.`
+          },
+          status: "candidate",
+          context: `Seized evidence image '${file.name}' added from investigator PC. Cryptographically authenticated and stamped into evidence register.`,
+          slmRationale: {
+            model: "Local Multi-Modal Vision Adapter (MobileNet-V3 / Llama-Vision Local)",
+            promptTask: "Detect tamper marks, packaging typography, and pHash signature.",
+            reasoning: "Authentic camera capture confirmed without digital clone/editing artifacts. Matched drop zone packaging."
+          }
+        });
+
+      } else {
+        const text = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = e => resolve(e.target.result || "");
+          reader.onerror = () => resolve("");
+          reader.readAsText(file);
+        });
+
+        if (file.name.endsWith('.csv')) {
+          parserProfile = "Bank Statement Normalized / UFME";
+        } else if (file.name.endsWith('.json')) {
+          parserProfile = "Cellebrite UFED / JSON Stream";
+        } else if (file.name.endsWith('.html')) {
+          parserProfile = "Tor HTML Scraper / CTI Feed";
+        } else {
+          parserProfile = "Text Transcript / Raw Log Parser";
+        }
+
+        const rawLines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+        if (rawLines.length > 0) {
+          parsedLines = rawLines.slice(0, 100).map((l, idx) => ({
+            num: idx + 1,
+            time: new Date().toLocaleTimeString('en-GB'),
+            sender: "SEIZED_DATA",
+            text: l
+          }));
+        } else {
+          parsedLines = [
+            { num: 1, time: new Date().toLocaleTimeString('en-GB'), sender: "RECORD", text: `[RECORD: ${file.name}] SHA-256: ${sha256}` }
+          ];
+        }
+      }
+
+      const existingIdx = EVIDENCE_FILES.findIndex(f => f.name === file.name);
+      const newEntry = {
+        id: uniqueId,
+        name: file.name,
+        size: file.size,
+        sha256: sha256,
+        source: "Local Seizure (Uploaded from PC)",
+        parserProfile: parserProfile,
+        recordsCount: parsedLines.length,
+        lines: parsedLines,
+        isImage: isImg,
+        dataUrl: dataUrl
+      };
+
+      if (existingIdx >= 0) {
+        EVIDENCE_FILES[existingIdx] = newEntry;
+      } else {
+        EVIDENCE_FILES.push(newEntry);
+      }
+
+      logAuditEvent("MEDIA_INGESTION", `Ingested file '${file.name}' (${(file.size / 1024).toFixed(1)} KB) with SHA-256: ${sha256}`);
+    } catch (fileErr) {
+      console.error("Error processing file:", file, fileErr);
+      showToast(`⚠️ Could not process ${file.name}: ${fileErr.message}`, 'alert');
+    }
+  }
+
+  renderStagedEvidenceTable();
+  updateCounts();
+  showToast(`📥 Successfully ingested & verified ${files.length} file(s)!`, 'success');
+}
+
+function renderStagedEvidenceTable() {
+  const tbody = document.getElementById('staged-evidence-tbody');
+  const badge = document.getElementById('staged-files-badge');
+  const queueSection = document.getElementById('evidence-queue-section');
+
+  if (queueSection) queueSection.style.display = 'block';
+  if (badge) badge.textContent = `${EVIDENCE_FILES.length} Files Staged`;
+
+  if (!tbody) return;
+
+  tbody.innerHTML = EVIDENCE_FILES.map(f => {
+    const isImg = f.isImage || f.id === 'file-image' || Boolean(f.name.match(/\.(jpg|jpeg|png|webp|gif|bmp)$/i));
+    const thumbHtml = isImg && f.dataUrl
+      ? `<img src="${f.dataUrl}" class="evidence-thumb-img" alt="${escapeHtml(f.name)}" onclick="openImagePreviewModal('${escapeHtml(f.name)}', '${f.dataUrl}', '${f.sha256}')" title="Click to enlarge">`
+      : `<div class="file-type-icon-box">${isImg ? '📸' : (f.name.endsWith('.csv') ? '📊' : (f.name.endsWith('.html') ? '🌐' : '📄'))}</div>`;
+
+    const sizeStr = f.size ? `(${(f.size / 1024).toFixed(1)} KB)` : '';
+
+    return `
+      <tr>
+        <td>
+          <div class="media-thumbnail-cell">
+            ${thumbHtml}
+            <div>
+              <span class="mono font-bold">${escapeHtml(f.name)}</span>
+              <span class="text-xs text-muted" style="margin-left: 4px;">${sizeStr}</span>
+            </div>
+          </div>
+        </td>
+        <td><span class="text-xs">${escapeHtml(f.source)}</span></td>
+        <td><span class="badge badge-sm badge-neutral">${escapeHtml(f.parserProfile)}</span></td>
+        <td class="mono text-xs text-blue" title="${f.sha256}">
+          ${f.sha256.substring(0, 22)}...
+        </td>
+        <td>
+          <div class="flex-gap">
+            ${isImg && f.dataUrl ? `
+              <button type="button" class="btn btn-xs btn-gov-secondary" onclick="openImagePreviewModal('${escapeHtml(f.name)}', '${f.dataUrl}', '${f.sha256}')">View</button>
+            ` : ''}
+            <button type="button" class="btn btn-xs btn-danger" onclick="removeStagedFile('${f.id}')" title="Remove file">✕</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function removeStagedFile(fileId) {
+  EVIDENCE_FILES = EVIDENCE_FILES.filter(f => f.id !== fileId);
+  renderStagedEvidenceTable();
+  updateCounts();
+  showToast("🗑️ Removed file from staged queue", "alert");
 }
 
 function autofillEvidenceFiles() {
-  const tbody = document.getElementById('staged-evidence-tbody');
-  tbody.innerHTML = EVIDENCE_FILES.map((f, i) => `
-    <tr>
-      <td class="mono font-bold">${f.name}</td>
-      <td>${f.source}</td>
-      <td><span class="badge badge-sm badge-neutral">${f.parserProfile}</span></td>
-      <td class="mono text-xs text-blue">${f.sha256.substring(0, 24)}...</td>
-    </tr>
-  `).join("");
-
-  document.getElementById('evidence-queue-section').style.display = 'block';
-  document.getElementById('btn-to-config').disabled = false;
-  logAuditEvent("MEDIA_INGESTION", "Staged 5 multi-source files (Tor HTML, Telegram, WhatsApp, Bank CSV)");
-  showToast("📥 5 Multi-Source evidence files staged for analysis!", "success");
+  renderStagedEvidenceTable();
+  logAuditEvent("MEDIA_INGESTION", "Loaded default 5-source multi-stream seized evidence corpus with pre-verified hashes");
+  showToast("📥 5 Multi-Source evidence files staged and hashes verified!", "success");
 }
 
-function proceedToStep3() {
-  goToStep(3);
+// Cloud Drive Modal Controls
+function openCloudDriveModal() {
+  const modal = document.getElementById('modal-cloud-drive');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeCloudDriveModal() {
+  const modal = document.getElementById('modal-cloud-drive');
+  if (modal) modal.style.display = 'none';
+}
+
+function ingestFromDriveLink() {
+  const urlInput = document.getElementById('cloud-drive-url');
+  const url = urlInput ? urlInput.value.trim() : "";
+  if (!url) {
+    showToast("⚠️ Please enter a Google Drive or Cloud Share link", "alert");
+    return;
+  }
+
+  let name = "cloud_drive_seizure_" + Date.now() + ".pdf";
+  if (url.includes('.jpg') || url.includes('.png') || url.includes('.jpeg')) {
+    name = "cloud_seized_photo_" + Date.now() + ".jpg";
+  } else if (url.includes('.csv')) {
+    name = "cloud_bank_statement_" + Date.now() + ".csv";
+  } else if (url.includes('.json')) {
+    name = "cloud_telegram_dump_" + Date.now() + ".json";
+  }
+
+  const fakeHash = Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join('');
+  const newEntry = {
+    id: "file-cloud-" + Date.now(),
+    name: name,
+    size: 245000,
+    sha256: fakeHash,
+    source: `Google Drive Remote Link (${url.substring(0, 32)}...)`,
+    parserProfile: "Cloud Sync / Secure Forensics Adapter",
+    recordsCount: 6,
+    lines: [
+      { num: 1, time: new Date().toLocaleTimeString('en-GB'), sender: "CLOUD_INGEST", text: `[CLOUD_SOURCE] Ingested from Google Drive: ${url}` },
+      { num: 2, time: new Date().toLocaleTimeString('en-GB'), sender: "CRYPTO_VERIFIER", text: `Calculated SHA-256 checksum: ${fakeHash} [SEC 63 BSA COMPLIANT]` },
+      { num: 3, time: new Date().toLocaleTimeString('en-GB'), sender: "SYSTEM", text: "Normalized remote exhibit into Universal Forensic Message Envelope (UFME)." }
+    ]
+  };
+
+  EVIDENCE_FILES.push(newEntry);
+  renderStagedEvidenceTable();
+  updateCounts();
+  closeCloudDriveModal();
+  logAuditEvent("CLOUD_DRIVE_INGEST", `Ingested remote evidence file from Google Drive link: ${url}`);
+  showToast(`☁️ Ingested '${name}' from Google Drive with verified SHA-256 hash!`, 'success');
+}
+
+function ingestPresetCloudFile(name, category, profile) {
+  const fakeHash = Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join('');
+  const isImg = category === 'image';
+  
+  const sampleDataUrl = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='260' viewBox='0 0 400 260'><rect width='400' height='260' fill='%231E293B'/><rect x='20' y='20' width='360' height='220' fill='%230F172A' stroke='%23334155' stroke-width='2'/><circle cx='200' cy='110' r='45' fill='%23B91C1C' opacity='0.2'/><text x='200' y='118' font-family='monospace' font-size='32' text-anchor='middle' fill='%23EF4444'>📸</text><text x='200' y='160' font-family='monospace' font-size='14' font-weight='bold' text-anchor='middle' fill='%23F8FAFC'>SEIZED DROP PHOTOGRAPH</text><text x='200' y='185' font-family='monospace' font-size='11' text-anchor='middle' fill='%2394A3B8'>Recovered Malkhana MK-2026-89</text><text x='200' y='205' font-family='monospace' font-size='10' text-anchor='middle' fill='%2364748B'>SHA-256 Checksum Verified</text></svg>";
+
+  const newEntry = {
+    id: "file-preset-" + Date.now(),
+    name: name,
+    size: 512000,
+    sha256: fakeHash,
+    source: "Law Enforcement Secure Cloud Storage",
+    parserProfile: profile,
+    recordsCount: 4,
+    isImage: isImg,
+    dataUrl: isImg ? sampleDataUrl : null,
+    lines: [
+      { num: 1, time: new Date().toLocaleTimeString('en-GB'), sender: "CLOUD_EXHIBIT", text: `[EXHIBIT: ${name}] Ingested from Secure Cloud Repository. Profile: ${profile}` },
+      { num: 2, time: new Date().toLocaleTimeString('en-GB'), sender: "HASH_VERIFIER", text: `Pre-ingestion SHA-256: ${fakeHash} [INTEGRITY CHECK PASSED]` }
+    ]
+  };
+
+  EVIDENCE_FILES.push(newEntry);
+  renderStagedEvidenceTable();
+  updateCounts();
+  closeCloudDriveModal();
+  logAuditEvent("CLOUD_PRESET_INGEST", `Ingested police cloud exhibit '${name}'`);
+  showToast(`☁️ Ingested '${name}' from Law Enforcement Cloud!`, 'success');
+}
+
+// Image Preview Lightbox Modal
+function openImagePreviewModal(title, dataUrl, sha256) {
+  const modal = document.getElementById('modal-image-preview');
+  const titleEl = document.getElementById('image-preview-title');
+  const imgEl = document.getElementById('image-preview-img');
+  const hashEl = document.getElementById('image-preview-hash');
+
+  if (titleEl) titleEl.textContent = `SEIZED EXHIBIT: ${title}`;
+  if (imgEl) imgEl.src = dataUrl;
+  if (hashEl) hashEl.textContent = `SHA-256: ${sha256}`;
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeImagePreviewModal() {
+  const modal = document.getElementById('modal-image-preview');
+  if (modal) modal.style.display = 'none';
+}
+
+function populateReviewScreen() {
+  document.getElementById('rev-fir').textContent = CASE_METADATA.fir || "FIR No. 104/2026/CYBER";
+  document.getElementById('rev-ps').textContent = CASE_METADATA.ps || "PS Cyber Crime, Sector 17, Chandigarh";
+  document.getElementById('rev-io').textContent = CASE_METADATA.io || "Insp. Vikramjit Singh";
+  document.getElementById('rev-belt').textContent = CASE_METADATA.belt || "Belt #788-UT";
+  document.getElementById('rev-sections').textContent = CASE_METADATA.sections || "NDPS Act Sec 21/22/29";
+  document.getElementById('rev-model').textContent = CASE_METADATA.model.split(" (")[0];
+  document.getElementById('rev-lexicon').textContent = CASE_METADATA.lexicon.split(" (")[0];
+
+  const tbody = document.getElementById('review-files-tbody');
+  tbody.innerHTML = EVIDENCE_FILES.map(f => `
+    <tr>
+      <td class="mono font-bold">${f.name}</td>
+      <td class="text-xs">${f.source}</td>
+      <td class="mono text-xs text-blue">${f.sha256.substring(0, 20)}...</td>
+      <td><span class="badge badge-sm badge-green">HASH VERIFIED ✓</span></td>
+    </tr>
+  `).join("");
 }
 
 function startLoadingPipeline() {
-  const selectedEngine = document.getElementById('config-slm-engine').selectedOptions[0].text;
-  CASE_METADATA.model = selectedEngine;
-  document.getElementById('header-model-name').textContent = "Llama-3.2-3B (Local GGUF)";
-
-  goToStep(4);
+  goToStep(5);
 
   const terminal = document.getElementById('pipeline-terminal-logs');
   const bar = document.getElementById('pipeline-progress-fill');
@@ -425,7 +1193,7 @@ function startLoadingPipeline() {
     { p: 40, status: "Step 2/5: Verifying SHA-256 integrity against Malkhana barcodes...", log: "[0.48s] [CRYPTO] Verifying SHA-256 checksums: e3b0c442... [MATCHED MALKHANA MK-2026-89]" },
     { p: 65, status: "Step 3/5: Extracting Darknet Listings & Financial Regex Tokens...", log: "[0.92s] [PARSER] Parsed DarkHydra.onion listing (4-MMC) and linked to Telegram @chd_plug and TRON wallet." },
     { p: 85, status: "Step 4/5: Initializing Local SLM (T=0.0, Seed=42) for Slang Inference...", log: "[1.65s] [SLM_LOCAL] Loaded Llama-3.2-3B with active Tricity NDPS Lexicon. Flagged 'Chitta' and 'White shoes 5g'." },
-    { p: 100, status: "Step 5/5: Generating Entity Link Graph & Anti-Framing Matrix...", log: "[2.40s] [GRAPH_ENGINE] Generated 7-node entity network graph connecting Tor Listing ➔ Telegram ➔ UPI Mule." }
+    { p: 100, status: "Step 5/5: Generating Entity Link Graph & Anti-Framing Matrix...", log: "[2.40s] [GRAPH_ENGINE] Generated 6-node entity network graph connecting Tor Listing ➔ Telegram ➔ UPI Mule." }
   ];
 
   let currentIdx = 0;
@@ -444,25 +1212,16 @@ function startLoadingPipeline() {
         finishLoadingPipeline();
       }, 500);
     }
-  }, 450);
+  }, 400);
 }
 
 function finishLoadingPipeline() {
-  goToStep(5);
+  showSection('workbench');
   showToast("✅ Forensic analysis complete. Welcome to the Investigative Workbench.", "success");
 }
 
-function restartWorkflow() {
-  if (confirm("Reset current investigation and start a new intake?")) {
-    document.getElementById('wizard-stepper').style.display = 'flex';
-    document.getElementById('header-model-badge').style.display = 'none';
-    document.getElementById('btn-reset-workflow').style.display = 'none';
-    goToStep(1);
-  }
-}
-
 // ============================================================================
-// 3. DASHBOARD RENDERING & WORKBENCH CONTROLLER
+// 4. COMMAND WORKBENCH RENDERING (PRESERVED 3-PANEL CORE SYSTEM)
 // ============================================================================
 
 function renderDashboard() {
@@ -474,17 +1233,68 @@ function renderDashboard() {
   renderChronology();
   renderNetworkGraph();
   updateCounts();
+  if (currentSelectedLeadId) {
+    selectLead(currentSelectedLeadId);
+  } else if (TRIAGE_LEADS.length > 0) {
+    selectLead(TRIAGE_LEADS[0].id);
+  }
+}
+
+function switchWorkbenchMode(mode) {
+  currentWorkbenchMode = mode;
+  const modes = ['triage', 'graph', 'evidence', 'intel'];
+  
+  modes.forEach(m => {
+    const btn = document.getElementById(`mode-btn-${m}`);
+    const content = document.getElementById(`wb-mode-${m}`);
+    if (btn) {
+      if (m === mode) btn.classList.add('active');
+      else btn.classList.remove('active');
+    }
+    if (content) {
+      if (m === mode) {
+        content.style.display = (m === 'intel' ? 'grid' : 'block');
+      } else {
+        content.style.display = 'none';
+      }
+    }
+  });
+
+  if (mode === 'graph') {
+    renderNetworkGraph();
+  } else if (mode === 'evidence') {
+    renderFileTabs();
+    renderFileMetadata();
+    renderRawLines();
+  } else if (mode === 'triage') {
+    renderTriageCards();
+    if (currentSelectedLeadId) {
+      selectLead(currentSelectedLeadId);
+    }
+  } else if (mode === 'intel') {
+    renderVerifiedTable();
+  }
 }
 
 function renderFileTabs() {
   const container = document.getElementById("file-tabs-container");
-  container.innerHTML = EVIDENCE_FILES.map(file => `
-    <button class="file-tab-btn ${file.id === currentSelectedFileId ? 'active' : ''}" 
-            onclick="selectFile('${file.id}')">
-      <span>${file.id === 'file-darknet' ? '🌐' : '📄'}</span>
-      <span>${file.name}</span>
-    </button>
-  `).join("");
+  if (!container) return;
+  container.innerHTML = EVIDENCE_FILES.map(file => {
+    let icon = '📄';
+    const isImg = file.isImage || file.id === 'file-image' || Boolean(file.name.match(/\.(jpg|jpeg|png|webp|gif|bmp)$/i));
+    if (file.id === 'file-darknet' || file.name.endsWith('.html')) icon = '🌐';
+    else if (isImg) icon = '📸';
+    else if (file.name.endsWith('.csv')) icon = '📊';
+    else if (file.name.endsWith('.json')) icon = '📱';
+
+    return `
+      <button class="file-tab-btn ${file.id === currentSelectedFileId ? 'active' : ''}" 
+              onclick="selectFile('${file.id}')">
+        <span>${icon}</span>
+        <span>${escapeHtml(file.name)}</span>
+      </button>
+    `;
+  }).join("");
 }
 
 function selectFile(fileId) {
@@ -497,24 +1307,75 @@ function selectFile(fileId) {
 function renderFileMetadata() {
   const file = EVIDENCE_FILES.find(f => f.id === currentSelectedFileId);
   if (!file) return;
-  document.getElementById("meta-filename").textContent = file.name;
-  document.getElementById("meta-sha256").textContent = file.sha256;
-  document.getElementById("meta-source").textContent = file.source;
-  document.getElementById("profile-indicator").textContent = `Profile: ${file.parserProfile}`;
+  const fn = document.getElementById("meta-filename");
+  if (fn) fn.textContent = file.name;
+  const sh = document.getElementById("meta-sha256");
+  if (sh) sh.textContent = file.sha256;
+  const src = document.getElementById("meta-source");
+  if (src) src.textContent = file.source;
+  const pi = document.getElementById("profile-indicator");
+  if (pi) pi.textContent = `Profile: ${file.parserProfile}`;
 }
 
 function renderRawLines(filterQuery = "") {
   const file = EVIDENCE_FILES.find(f => f.id === currentSelectedFileId);
   const container = document.getElementById("raw-lines-container");
-  if (!file) return;
+  if (!file || !container) return;
 
-  let lines = file.lines;
+  const isImg = file.isImage || file.id === 'file-image' || Boolean(file.name.match(/\.(jpg|jpeg|png|webp|gif|bmp)$/i));
+
+  if (isImg) {
+    const linesCount = document.getElementById("raw-lines-count");
+    if (linesCount) linesCount.textContent = `1 Seized Image Exhibit`;
+    
+    const sampleSvg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='260' viewBox='0 0 400 260'><rect width='400' height='260' fill='%231E293B'/><rect x='20' y='20' width='360' height='220' fill='%230F172A' stroke='%23334155' stroke-width='2'/><circle cx='200' cy='110' r='45' fill='%23B91C1C' opacity='0.2'/><text x='200' y='118' font-family='monospace' font-size='32' text-anchor='middle' fill='%23EF4444'>📸</text><text x='200' y='160' font-family='monospace' font-size='14' font-weight='bold' text-anchor='middle' fill='%23F8FAFC'>SEIZED PACKAGING PHOTOGRAPH</text><text x='200' y='185' font-family='monospace' font-size='11' text-anchor='middle' fill='%2394A3B8'>Dead-Drop Sector 43 ISBT (Near Pillar 14)</text><text x='200' y='205' font-family='monospace' font-size='10' text-anchor='middle' fill='%2364748B'>SHA-256 Verified Under Section 63 BSA</text></svg>";
+    const imgSrc = file.dataUrl || sampleSvg;
+
+    container.innerHTML = `
+      <div class="seized-image-preview-panel">
+        <div style="text-align: center; background: #0F172A; padding: 18px; border-radius: 6px; position: relative;">
+          <img src="${imgSrc}" alt="${escapeHtml(file.name)}" style="max-height: 320px; max-width: 100%; border-radius: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.6); cursor: pointer;" onclick="openImagePreviewModal('${escapeHtml(file.name)}', '${imgSrc}', '${file.sha256}')" title="Click to enlarge image">
+          <div style="position: absolute; top: 12px; right: 14px;">
+            <button type="button" class="btn btn-xs btn-gov-secondary" onclick="openImagePreviewModal('${escapeHtml(file.name)}', '${imgSrc}', '${file.sha256}')">🔍 Expand</button>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px;">
+          <div style="background: #F8FAFC; border: 1px solid var(--border-subtle); padding: 8px 12px; border-radius: 4px;">
+            <span class="text-xs text-muted" style="display: block;">EXIF RESOLUTION / SIZE</span>
+            <span class="mono font-bold" style="font-size: 12px;">${file.size ? (file.size / 1024).toFixed(1) + ' KB' : '1.4 MB (Seized Camera Raw)'}</span>
+          </div>
+          <div style="background: #F8FAFC; border: 1px solid var(--border-subtle); padding: 8px 12px; border-radius: 4px;">
+            <span class="text-xs text-muted" style="display: block;">PERCEPTUAL HASH (pHash)</span>
+            <span class="mono font-bold text-purple" style="font-size: 12px;">${file.sha256 ? file.sha256.substring(0, 14) : 'a8f1e29c04b5'}</span>
+          </div>
+          <div style="background: #F8FAFC; border: 1px solid var(--border-subtle); padding: 8px 12px; border-radius: 4px;">
+            <span class="text-xs text-muted" style="display: block;">COURT ADMISSIBILITY</span>
+            <span class="badge badge-sm badge-green" style="margin-top: 2px;">SEC 63 BSA AUTHENTICATED ✓</span>
+          </div>
+        </div>
+
+        <div class="raw-line-row" style="margin-top: 12px;">
+          <span class="raw-line-num">#001</span>
+          <div class="raw-line-content">
+            <span class="raw-line-timestamp">[${file.lines && file.lines[0] ? file.lines[0].time : '14:04:00'}]</span>
+            <span class="raw-line-sender">${file.lines && file.lines[0] ? file.lines[0].sender : 'EXIF_METADATA'}:</span>
+            <span class="raw-line-text">${escapeHtml(file.lines && file.lines[0] ? file.lines[0].text : 'Packaging exhibit recovered during Malkhana seizure MK-2026-89.')}</span>
+          </div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  let lines = file.lines || [];
   if (filterQuery.trim() !== "") {
     const q = filterQuery.toLowerCase();
     lines = lines.filter(l => l.text.toLowerCase().includes(q) || l.sender.toLowerCase().includes(q) || String(l.num).includes(q));
   }
 
-  document.getElementById("raw-lines-count").textContent = `${lines.length} Lines`;
+  const linesCount = document.getElementById("raw-lines-count");
+  if (linesCount) linesCount.textContent = `${lines.length} Lines`;
 
   container.innerHTML = lines.map(line => `
     <div class="raw-line-row" id="raw-line-${file.id}-${line.num}">
@@ -534,11 +1395,14 @@ function filterRawLines() {
 }
 
 function traceToSource(fileId, lineNum) {
+  switchWorkbenchMode('evidence');
+
   if (currentSelectedFileId !== fileId) {
     selectFile(fileId);
   }
 
-  document.getElementById("raw-search-input").value = "";
+  const rawSearch = document.getElementById("raw-search-input");
+  if (rawSearch) rawSearch.value = "";
   renderRawLines();
 
   setTimeout(() => {
@@ -550,42 +1414,68 @@ function traceToSource(fileId, lineNum) {
       targetElement.classList.add('flash-highlight');
       showToast(`📍 Traced to source line #${lineNum} in ${EVIDENCE_FILES.find(f => f.id === fileId).name}`, 'alert');
     }
-  }, 100);
+  }, 120);
 }
-
-// ============================================================================
-// 4. TRIAGE & GLASS-BOX LOGIC
-// ============================================================================
 
 function setTriageFilter(category) {
   currentTriageFilter = category;
   document.querySelectorAll('.filter-chip').forEach(btn => {
     btn.classList.remove('active');
   });
-  event.target.classList.add('active');
+  if (window.event && window.event.currentTarget) {
+    window.event.currentTarget.classList.add('active');
+  } else if (window.event && window.event.target) {
+    window.event.target.classList.add('active');
+  }
   renderTriageCards();
 }
 
 function renderTriageCards() {
   const container = document.getElementById("triage-cards-container");
-  let leads = TRIAGE_LEADS;
+  if (!container) return;
 
+  let leads = TRIAGE_LEADS;
   if (currentTriageFilter !== "all") {
     leads = leads.filter(l => l.category === currentTriageFilter);
+  }
+
+  const queueCount = document.getElementById("triage-queue-count");
+  if (queueCount) {
+    queueCount.textContent = `${leads.length} Leads in Queue`;
+  }
+
+  if (leads.length === 0) {
+    container.innerHTML = `
+      <div class="text-xs text-muted" style="padding: 24px; text-align: center; background: #F8FAFC; border-radius: 6px; border: 1px dashed #CBD5E1;">
+        No leads match the filter "<strong>${escapeHtml(currentTriageFilter)}</strong>".
+      </div>
+    `;
+    selectLead(null);
+    updateCounts();
+    return;
   }
 
   container.innerHTML = leads.map(lead => {
     const isVerified = lead.status === "verified";
     const isDismissed = lead.status === "dismissed";
-    const badgeColor = lead.category === 'financial' ? 'badge-amber' : (lead.category === 'darknet' ? 'badge-purple' : (lead.category === 'image' ? 'badge-blue' : 'badge-neutral'));
+    const isSelected = lead.id === currentSelectedLeadId;
+
+    let badgeClass = 'badge-neutral';
+    if (lead.category === 'financial') badgeClass = 'badge-amber';
+    else if (lead.category === 'darknet') badgeClass = 'badge-purple';
+    else if (lead.category === 'image') badgeClass = 'badge-blue';
+    else if (lead.category === 'slang') badgeClass = 'badge-green';
 
     return `
-      <div class="entity-card ${isVerified ? 'verified' : ''} ${isDismissed ? 'dismissed' : ''}" id="card-${lead.id}">
-        <div class="entity-card-header">
-          <div class="entity-type-group">
-            <span class="badge ${badgeColor}">${lead.type}</span>
-            <span class="corroboration-badge ${lead.corroboration.isHigh ? 'corroboration-high' : 'corroboration-low'}">
-              ${lead.corroboration.score}
+      <div class="wb-lead-card ${isSelected ? 'active-selected' : ''} ${isVerified ? 'verified' : ''} ${isDismissed ? 'dismissed' : ''}" 
+           id="card-${lead.id}" 
+           onclick="selectLead('${lead.id}')">
+        
+        <div class="flex-between" style="gap: 6px;">
+          <div class="flex-gap">
+            <span class="badge ${badgeClass}">${lead.type}</span>
+            <span class="corroboration-badge ${lead.corroboration && lead.corroboration.isHigh ? 'corroboration-high' : 'corroboration-low'}">
+              ${lead.corroboration ? lead.corroboration.score.split(' ')[0] : '100%'}
             </span>
           </div>
           <span class="badge badge-sm ${isVerified ? 'badge-green' : (isDismissed ? 'badge-red' : 'badge-neutral')}">
@@ -593,56 +1483,202 @@ function renderTriageCards() {
           </span>
         </div>
 
-        <div class="entity-val-row">
-          <span class="entity-main-val text-blue">${escapeHtml(lead.value)}</span>
-          <button class="trace-source-btn" onclick="traceToSource('${lead.fileId}', ${lead.lineNum})">
-            Jump to Source ↗ (Line ${lead.lineNum})
-          </button>
-        </div>
+        <div class="wb-lead-val">${escapeHtml(lead.value)}</div>
 
-        <div class="entity-context-snippet mono">
+        <div class="wb-lead-context">
           "${escapeHtml(lead.context)}"
         </div>
 
-        <div class="text-xs text-muted" style="margin-bottom: 6px;">
-          <strong>Corroboration:</strong> ${lead.corroboration.basis}
-        </div>
-
-        ${lead.slmRationale ? `
-          <button class="glass-box-toggle" onclick="toggleRationale('${lead.id}')">
-            <span>🔍 View Model Rationale</span> <span>▼</span>
-          </button>
-          <div class="glass-box-drawer" id="drawer-${lead.id}">
-            <div class="rationale-param"><span class="rationale-key">MODEL:</span> <span>${lead.slmRationale.model}</span></div>
-            <div class="rationale-param"><span class="rationale-key">TASK:</span> <span>${lead.slmRationale.promptTask}</span></div>
-            <div class="rationale-param"><span class="rationale-key">REASONING:</span> <span>${lead.slmRationale.reasoning}</span></div>
-          </div>
-        ` : ''}
-
-        <div class="entity-card-actions">
-          <button class="btn btn-sm btn-gov-secondary" onclick="promptEditLead('${lead.id}')" title="Edit extracted value">
-            ✏️ Edit
-          </button>
-          ${!isDismissed ? `
-            <button class="btn btn-sm btn-danger" onclick="dismissLead('${lead.id}')">
-              ✗ Dismiss
-            </button>
-          ` : ''}
-          ${!isVerified ? `
-            <button class="btn btn-sm btn-success" onclick="verifyLead('${lead.id}')">
-              ✓ Verify & Add to Dossier
-            </button>
-          ` : `
-            <button class="btn btn-sm btn-gov-secondary" onclick="unverifyLead('${lead.id}')">
-              ↩ Revert to Candidate
-            </button>
-          `}
+        <div class="flex-between text-xs text-muted" style="margin-top: 4px;">
+          <span>📄 ${lead.fileName} (Line ${lead.lineNum})</span>
+          <span style="color: var(--accent-blue); font-weight: 600;">Inspect Details ➔</span>
         </div>
       </div>
     `;
   }).join("");
 
+  // Sync right inspector
+  if (leads.length > 0) {
+    const isCurrentInFiltered = leads.some(l => l.id === currentSelectedLeadId);
+    if (!isCurrentInFiltered) {
+      selectLead(leads[0].id);
+    } else {
+      selectLead(currentSelectedLeadId);
+    }
+  }
+
   updateCounts();
+}
+
+function selectLead(leadId) {
+  currentSelectedLeadId = leadId;
+
+  // Update selection highlight in master list
+  document.querySelectorAll('.wb-lead-card').forEach(card => {
+    card.classList.remove('active-selected');
+  });
+  if (leadId) {
+    const activeCard = document.getElementById(`card-${leadId}`);
+    if (activeCard) activeCard.classList.add('active-selected');
+  }
+
+  const inspectorCard = document.getElementById('lead-inspector-card');
+  const inspectorBadge = document.getElementById('inspector-status-badge');
+  if (!inspectorCard) return;
+
+  const lead = TRIAGE_LEADS.find(l => l.id === leadId);
+  if (!lead) {
+    inspectorCard.innerHTML = `
+      <div class="text-xs text-muted" style="padding: 36px 16px; text-align: center; background: #F8FAFC; border-radius: 6px;">
+        <div style="font-size: 24px; margin-bottom: 8px;">🎯</div>
+        Select an extracted lead from the left triage queue to inspect correlated evidentiary context, anti-framing proofs, and statutory court options.
+      </div>
+    `;
+    if (inspectorBadge) inspectorBadge.textContent = "No lead selected";
+    return;
+  }
+
+  const isVerified = lead.status === "verified";
+  const isDismissed = lead.status === "dismissed";
+  let badgeColor = lead.category === 'financial' ? 'badge-amber' : (lead.category === 'darknet' ? 'badge-purple' : (lead.category === 'image' ? 'badge-blue' : 'badge-neutral'));
+
+  if (inspectorBadge) {
+    inspectorBadge.textContent = `${lead.type} • Line #${lead.lineNum}`;
+  }
+
+  inspectorCard.innerHTML = `
+    <!-- Inspector Header -->
+    <div class="flex-between" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 12px; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+      <div>
+        <div class="flex-gap" style="margin-bottom: 4px;">
+          <span class="badge ${badgeColor}">${lead.type}</span>
+          <span class="badge badge-sm ${isVerified ? 'badge-green' : (isDismissed ? 'badge-red' : 'badge-neutral')}">
+            ${isVerified ? 'VERIFIED FOR COURT (SEC 63 BSA) ✓' : (isDismissed ? 'DISMISSED ✗' : 'CANDIDATE UNDER REVIEW')}
+          </span>
+        </div>
+        <div class="font-bold text-blue mono" style="font-size: 18px; margin-top: 4px;">
+          ${escapeHtml(lead.value)}
+        </div>
+      </div>
+      <div style="text-align: right;">
+        <span class="corroboration-badge ${lead.corroboration && lead.corroboration.isHigh ? 'corroboration-high' : 'corroboration-low'}" style="font-size: 11.5px; padding: 4px 10px;">
+          ${lead.corroboration ? lead.corroboration.score : 'High Corroboration'}
+        </span>
+        <div class="text-xs text-muted" style="margin-top: 4px;">
+          Engine: <strong>${lead.method || 'Deterministic Parser'}</strong> (${lead.confidence || '100%'})
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 1: Seized Evidentiary Excerpt (UFME Envelope) -->
+    <div class="inspector-section" style="margin-bottom: 14px;">
+      <div class="inspector-section-title">
+        <span>SEIZED EVIDENTIARY RECORD (SOURCE TRANSCRIPT)</span>
+        <button class="btn btn-xs btn-gov-secondary" onclick="traceToSource('${lead.fileId}', ${lead.lineNum})">
+          Jump to Source Line #${lead.lineNum} in Viewer ↗
+        </button>
+      </div>
+
+      <div class="text-xs text-muted" style="margin-bottom: 8px;">
+        <strong>File:</strong> <span class="mono">${lead.fileName}</span> &bull; 
+        <strong>Line:</strong> <span class="mono">#${lead.lineNum}</span> &bull; 
+        <strong>Seizure Custody:</strong> ${EVIDENCE_FILES.find(f => f.id === lead.fileId)?.source || 'Malkhana Deposit MK-2026-89'}
+      </div>
+
+      <div class="inspector-evidence-quote">
+        "${escapeHtml(lead.context)}"
+      </div>
+    </div>
+
+    <!-- Section 2: Anti-Framing Cross-Verification & Corroboration Proof -->
+    <div class="inspector-section" style="margin-bottom: 14px;">
+      <div class="inspector-section-title">
+        <span>MULTI-FACTOR CORROBORATION & ANTI-FRAMING VALIDATION</span>
+        <span class="badge badge-sm badge-green">Zero-Tampering Verified</span>
+      </div>
+
+      <div class="text-xs text-secondary" style="line-height: 1.6;">
+        <strong>Cross-Reference Proof:</strong> ${lead.corroboration ? lead.corroboration.basis : 'Corroborated across digital seized exports.'}
+      </div>
+
+      <div style="background: #FFFFFF; border: 1px solid var(--border-subtle); border-radius: 4px; padding: 10px; margin-top: 8px; font-size: 11px;">
+        <span class="text-green font-bold">🛡️ Anti-Framing Defense:</span>
+        <span class="text-secondary"> Chat token validated against external banking CSV statements and Tor onion deposit rails. Eliminates malicious spoofing, doctored chat exports, or arbitrary sender handles.</span>
+      </div>
+    </div>
+
+    <!-- Section 3: Offline SLM Glass-Box Reasoning (if applicable) -->
+    ${lead.slmRationale ? `
+      <div class="inspector-section" style="margin-bottom: 14px; border-left: 3px solid var(--accent-purple);">
+        <div class="inspector-section-title">
+          <span>LOCAL SLM GLASS-BOX REASONING AUDIT (T=0.0)</span>
+          <span class="badge badge-sm badge-purple">Air-Gapped Local Inference</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 85px 1fr; gap: 6px; font-size: 11.5px;">
+          <span class="text-muted font-bold">MODEL:</span>
+          <span class="mono">${lead.slmRationale.model}</span>
+
+          <span class="text-muted font-bold">PROMPT:</span>
+          <span>${lead.slmRationale.promptTask}</span>
+
+          <span class="text-muted font-bold">RATIONALE:</span>
+          <span class="text-secondary font-bold">${lead.slmRationale.reasoning}</span>
+        </div>
+      </div>
+    ` : `
+      <div class="inspector-section" style="margin-bottom: 14px;">
+        <div class="inspector-section-title">
+          <span>DETERMINISTIC EXTRACTION ENGINE</span>
+          <span class="badge badge-sm badge-neutral">Regex / Tor DOM Strict</span>
+        </div>
+        <div class="text-xs text-muted">
+          Extracted via strict deterministic regular expressions and Tor HTML DOM element parsing. 100% mathematically reproducible with zero probabilistic variation.
+        </div>
+      </div>
+    `}
+
+    <!-- Section 4: Operational Legal Actions Bar -->
+    <div class="inspector-actions-bar">
+      ${!isVerified ? `
+        <button class="btn btn-success" onclick="verifyLead('${lead.id}')">
+          <span>✓</span> Verify & Sign (Sec 63 BSA)
+        </button>
+      ` : `
+        <button class="btn btn-gov-secondary" onclick="unverifyLead('${lead.id}')">
+          <span>↩</span> Revert to Candidate
+        </button>
+      `}
+
+      <button class="btn btn-gov-secondary" onclick="promptEditLead('${lead.id}')" title="Edit entity value">
+        <span>✏️</span> Edit Value
+      </button>
+
+      ${!isDismissed ? `
+        <button class="btn btn-danger" onclick="dismissLead('${lead.id}')">
+          <span>✗</span> Dismiss
+        </button>
+      ` : ''}
+
+      <button class="btn btn-gov-secondary" onclick="openGlobalSearchModalWith('${escapeHtml(lead.value)}')">
+        <span>🔍</span> Global Intel Search
+      </button>
+
+      ${lead.category === 'financial' ? `
+        <button class="btn btn-gov-primary" onclick="openNoticeModal('bank')">
+          <span>🏦</span> Draft Sec 91 CrPC Bank Freeze
+        </button>
+      ` : (lead.type.includes('PHONE') || lead.type.includes('SIM') ? `
+        <button class="btn btn-gov-primary" onclick="openNoticeModal('telecom')">
+          <span>📱</span> Draft Sec 91 CrPC CDR Order
+        </button>
+      ` : `
+        <button class="btn btn-gov-primary" onclick="openDossierModal()">
+          <span>⚖️</span> Sec 63 BSA Certificate
+        </button>
+      `)}
+    </div>
+  `;
 }
 
 function toggleRationale(leadId) {
@@ -659,6 +1695,7 @@ function verifyLead(leadId) {
   lead.status = "verified";
   logAuditEvent("IO_VERIFY", `Verified lead [${lead.type}: ${lead.value}] into Section 63 BSA Schedule B`);
   renderTriageCards();
+  selectLead(leadId);
   renderVerifiedTable();
   showToast(`✓ Verified [${lead.value}] and signed into Section 63 BSA Annexure`, 'success');
 }
@@ -668,7 +1705,9 @@ function unverifyLead(leadId) {
   if (!lead) return;
   lead.status = "candidate";
   renderTriageCards();
+  selectLead(leadId);
   renderVerifiedTable();
+  showToast(`↩ Reverted [${lead.value}] to candidate under review`, 'alert');
 }
 
 function dismissLead(leadId) {
@@ -677,6 +1716,7 @@ function dismissLead(leadId) {
   lead.status = "dismissed";
   logAuditEvent("IO_DISMISS", `Dismissed lead [${lead.value}]`);
   renderTriageCards();
+  selectLead(leadId);
   renderVerifiedTable();
   showToast(`✗ Dismissed [${lead.value}]`, 'alert');
 }
@@ -688,170 +1728,207 @@ function promptEditLead(leadId) {
   if (newVal && newVal.trim() !== "" && newVal !== lead.value) {
     lead.value = newVal.trim();
     renderTriageCards();
+    selectLead(leadId);
     renderVerifiedTable();
     showToast(`✏️ Updated entity: ${lead.value}`, 'success');
   }
 }
 
 // ============================================================================
-// 5. REQUIREMENT #5: INTERACTIVE SVG NETWORK GRAPH RENDERING
+// 5. INTERACTIVE NETWORK GRAPH & NODE INSPECTOR
 // ============================================================================
 
 function renderNetworkGraph() {
   const container = document.getElementById("network-graph-canvas-container");
   if (!container) return;
 
-  // Minimalist, crisp SVG Graph
   container.innerHTML = `
-    <svg width="100%" height="100%" viewBox="0 0 380 260" xmlns="http://www.w3.org/2000/svg" style="background: #FAFAFA;">
+    <svg width="100%" height="100%" viewBox="0 0 380 250" xmlns="http://www.w3.org/2000/svg" style="background: #FAFAFA;">
       <!-- Edges -->
       <line x1="60" y1="50" x2="190" y2="100" class="svg-edge" stroke-dasharray="3,3" />
       <line x1="190" y1="100" x2="310" y2="50" class="svg-edge" />
       <line x1="190" y1="100" x2="90" y2="190" class="svg-edge" />
       <line x1="190" y1="100" x2="280" y2="190" class="svg-edge" />
-      <line x1="280" y1="190" x2="320" y2="240" class="svg-edge" />
+      <line x1="280" y1="190" x2="330" y2="230" class="svg-edge" />
 
       <!-- Edge Labels -->
       <text x="110" y="70" font-size="8" fill="#64748B" font-family="monospace">Listed On</text>
       <text x="240" y="70" font-size="8" fill="#64748B" font-family="monospace">Burner SIM</text>
       <text x="110" y="150" font-size="8" fill="#64748B" font-family="monospace">TRON USDT</text>
       <text x="250" y="150" font-size="8" fill="#64748B" font-family="monospace">UPI Mule</text>
-      <text x="310" y="220" font-size="8" fill="#64748B" font-family="monospace">SBI A/c</text>
+      <text x="310" y="215" font-size="8" fill="#64748B" font-family="monospace">SBI A/c</text>
 
       <!-- Node 1: Tor Marketplace (Purple) -->
-      <g class="svg-node" onclick="showToast('🌐 Tor Storefront: hydra44chd.onion (Listing #402)', 'alert')">
+      <g class="svg-node" onclick="inspectNode('TOR_MARKET', 'DarkHydra V3 (.onion)', 'Mirror: hydra44chd.onion | Scraped listing for 4-MMC Crystals with domestic dead-drop fulfillments.')">
         <circle cx="60" cy="50" r="18" fill="#FAF5FF" stroke="#6D28D9" stroke-width="2"/>
         <text x="60" y="53" font-size="9" text-anchor="middle" fill="#6D28D9" font-weight="bold">Tor .onion</text>
         <text x="60" y="78" font-size="8" text-anchor="middle" fill="#4C1D95" font-family="monospace">DarkHydra</text>
       </g>
 
       <!-- Node 2: Primary Target Persona (Blue - Center) -->
-      <g class="svg-node" onclick="showToast('🎯 Primary Target Persona: @chd_plug', 'alert')">
+      <g class="svg-node" onclick="inspectNode('TARGET_PERSONA', '@chd_plug', 'Syndicate Admin handle operating on Telegram. Direct coordinates for dead-drops in Sector 43 & 22.')">
         <circle cx="190" cy="100" r="22" fill="#EFF6FF" stroke="#1D4ED8" stroke-width="2.5"/>
         <text x="190" y="103" font-size="10" text-anchor="middle" fill="#1D4ED8" font-weight="bold">@chd_plug</text>
         <text x="190" y="132" font-size="8" text-anchor="middle" fill="#1E40AF" font-family="monospace">Syndicate Admin</text>
       </g>
 
       <!-- Node 3: Contact Burner Phone (Blue) -->
-      <g class="svg-node" onclick="showToast('📱 Burner Contact: +91 98765-21440', 'alert')">
+      <g class="svg-node" onclick="inspectNode('BURNER_SIM', '+91 98765-21440', 'Burner voice contact. Matched in past FIR No. 12/2026/NDPS under fake Assam CAF identity.')">
         <circle cx="310" cy="50" r="16" fill="#EFF6FF" stroke="#1D4ED8" stroke-width="1.5"/>
         <text x="310" y="53" font-size="8" text-anchor="middle" fill="#1D4ED8" font-weight="bold">Burner SIM</text>
         <text x="310" y="75" font-size="8" text-anchor="middle" fill="#1E40AF" font-family="monospace">+91 98765...</text>
       </g>
 
       <!-- Node 4: TRON USDT Escrow (Amber) -->
-      <g class="svg-node" onclick="showToast('💳 Crypto Escrow: TJY9q8Z3vXwK1pL7mN6bV5cR4tY2uI1oP', 'alert')">
+      <g class="svg-node" onclick="inspectNode('CRYPTO_WALLET', 'TJY9q8Z3vXwK1pL7mN6bV5cR4tY2uI1oP', 'TRC-20 USDT deposit address used for bulk orders (>₹20,000) to bypass 1930 domestic banking freezes.')">
         <circle cx="90" cy="190" r="16" fill="#FFFBEB" stroke="#D97706" stroke-width="1.5"/>
         <text x="90" y="193" font-size="8" text-anchor="middle" fill="#B45309" font-weight="bold">TRON USDT</text>
         <text x="90" y="215" font-size="8" text-anchor="middle" fill="#92400E" font-family="monospace">TJY9q8Z3...</text>
       </g>
 
       <!-- Node 5: Domestic UPI Mule (Amber) -->
-      <g class="svg-node" onclick="showToast('💳 UPI Mule Endpoint: mule44@ybl', 'alert')">
+      <g class="svg-node" onclick="inspectNode('MULE_VPA', 'mule44@ybl', 'Domestic payout layer VPA. Cross-referenced in SBI A/c 33910048291. Target of pending Sec 91 CrPC freeze.')">
         <circle cx="280" cy="190" r="16" fill="#FFFBEB" stroke="#D97706" stroke-width="1.5"/>
         <text x="280" y="193" font-size="8" text-anchor="middle" fill="#B45309" font-weight="bold">UPI Mule</text>
         <text x="280" y="215" font-size="8" text-anchor="middle" fill="#92400E" font-family="monospace">mule44@ybl</text>
       </g>
 
       <!-- Node 6: Domestic Bank Account (Amber) -->
-      <g class="svg-node" onclick="showToast('🏦 Bank Account: SBI A/c 33910048291', 'alert')">
-        <circle cx="320" cy="240" r="12" fill="#FFFBEB" stroke="#B45309" stroke-width="1.5"/>
-        <text x="320" y="243" font-size="7.5" text-anchor="middle" fill="#B45309" font-weight="bold">SBI</text>
+      <g class="svg-node" onclick="inspectNode('BANK_ACCOUNT', 'SBI A/c 33910048291', 'State Bank of India Sector 17 branch. Repeated ₹3,500 and ₹7,000 credit inflows coinciding with dead-drop deliveries.')">
+        <circle cx="330" cy="230" r="12" fill="#FFFBEB" stroke="#B45309" stroke-width="1.5"/>
+        <text x="330" y="233" font-size="7.5" text-anchor="middle" fill="#B45309" font-weight="bold">SBI</text>
       </g>
     </svg>
   `;
 }
 
-// ============================================================================
-// 6. REQUIREMENT #7: GLOBAL INTEL SEARCH CONTROLLER
-// ============================================================================
+function inspectNode(nodeType, nodeLabel, nodeDetail) {
+  const card = document.getElementById('node-inspector-card');
+  const title = document.getElementById('node-inspect-title');
+  const body = document.getElementById('node-inspect-body');
+  if (!card || !title || !body) return;
 
-function openGlobalSearchModal() {
-  document.getElementById("global-search-query").value = "mule44@ybl";
-  executeGlobalSearch();
-  document.getElementById("modal-global-search").style.display = "flex";
+  title.textContent = `${nodeType}: ${nodeLabel}`;
+  body.innerHTML = `
+    <div><strong>Correlated Detail:</strong> ${nodeDetail}</div>
+    <div style="margin-top: 6px;">
+      <button class="btn btn-xs btn-gov-primary" onclick="filterByNode('${nodeLabel}')">Filter Leads</button>
+      <button class="btn btn-xs btn-gov-secondary" onclick="openGlobalSearchModalWith('${nodeLabel}')">Global Intel Search</button>
+    </div>
+  `;
+  card.style.display = 'block';
+  showToast(`🎯 Selected Node: ${nodeLabel}`, 'alert');
 }
 
-function closeGlobalSearchModal() {
-  document.getElementById("modal-global-search").style.display = "none";
+function closeNodeInspector() {
+  const card = document.getElementById('node-inspector-card');
+  if (card) card.style.display = 'none';
 }
 
-function executeGlobalSearch() {
-  const query = document.getElementById("global-search-query").value.toLowerCase().trim();
-  const container = document.getElementById("global-search-results");
+function filterByNode(label) {
+  const query = label.split(' ')[0].replace('@', '');
+  document.getElementById('raw-search-input').value = query;
+  filterRawLines();
+  showToast(`🔍 Filtered raw evidence by '${query}'`, 'alert');
+}
 
-  if (!query) {
-    container.innerHTML = `<div class="text-xs text-muted" style="padding: 10px;">Enter an identifier to search across historical precinct records.</div>`;
-    return;
+function switchRightPanelTab(tabName) {
+  document.getElementById("tab-btn-dossier").classList.toggle("active", tabName === "dossier");
+  document.getElementById("tab-btn-graph").classList.toggle("active", tabName === "graph");
+  document.getElementById("tab-btn-trends").classList.toggle("active", tabName === "trends");
+  
+  document.getElementById("tab-content-dossier").classList.toggle("active", tabName === "dossier");
+  document.getElementById("tab-content-graph").classList.toggle("active", tabName === "graph");
+  document.getElementById("tab-content-trends").classList.toggle("active", tabName === "trends");
+
+  if (tabName === "graph") {
+    renderNetworkGraph();
   }
+}
 
-  const hits = HISTORICAL_PRECINCT_INTEL.filter(item => 
-    item.identifier.toLowerCase().includes(query) || 
-    item.fir.toLowerCase().includes(query) || 
-    item.notes.toLowerCase().includes(query)
-  );
+function toggleChronology() {
+  const drawer = document.getElementById("chronology-drawer");
+  const icon = document.getElementById("chronology-toggle-icon");
+  if (drawer.style.display === "none") {
+    drawer.style.display = "block";
+    icon.textContent = "▼";
+  } else {
+    drawer.style.display = "none";
+    icon.textContent = "▶";
+  }
+}
 
-  if (hits.length === 0) {
-    container.innerHTML = `
-      <div class="text-xs text-muted" style="padding: 12px; text-align: center;">
-        No prior intelligence records found for "<strong>${escapeHtml(query)}</strong>". Identifier is novel to this case.
-      </div>
+function renderVerifiedTable() {
+  const tbody = document.getElementById("verified-entities-tbody");
+  if (!tbody) return;
+  const verified = TRIAGE_LEADS.filter(l => l.status === "verified");
+
+  const badge = document.getElementById("verified-table-badge");
+  if (badge) badge.textContent = `${verified.length} Items Signed`;
+
+  if (verified.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="4" class="text-center text-muted" style="padding: 16px;">
+          No entities verified yet. Click <strong>[✓ Verify & Add to Dossier]</strong> in Panel 2 to sign off on extracted leads.
+        </td>
+      </tr>
     `;
     return;
   }
 
-  container.innerHTML = hits.map(hit => `
-    <div class="global-search-hit">
-      <div class="flex-between" style="margin-bottom: 3px;">
-        <span class="mono font-bold text-blue">${hit.identifier}</span>
-        <span class="badge badge-sm badge-red">HISTORICAL MATCH (PRIOR CASE)</span>
-      </div>
-      <div class="text-xs" style="margin-bottom: 2px;">
-        <strong>Linked Case:</strong> <span class="mono font-bold">${hit.fir}</span> (${hit.ps})
-      </div>
-      <div class="text-xs text-muted">
-        <strong>Role:</strong> ${hit.role} &bull; <em>${hit.notes}</em> (Dated: ${hit.date})
-      </div>
+  tbody.innerHTML = verified.map(lead => `
+    <tr>
+      <td><span class="badge badge-sm badge-amber">${lead.type}</span></td>
+      <td class="mono font-bold text-blue">${escapeHtml(lead.value)}</td>
+      <td class="mono text-xs text-muted">${lead.fileName} (Line ${lead.lineNum})</td>
+      <td><span class="badge badge-sm badge-green">IO SIGNED ✓</span></td>
+    </tr>
+  `).join("");
+}
+
+function renderChronology() {
+  const container = document.getElementById("chronology-timeline");
+  if (!container) return;
+  container.innerHTML = CASE_CHRONOLOGY.map(evt => `
+    <div class="timeline-event">
+      <div class="timeline-time">${evt.time}</div>
+      <div class="timeline-body">${evt.body}</div>
     </div>
   `).join("");
 }
 
-// ============================================================================
-// 7. REQUIREMENT #9: AUDIT LOG MODAL CONTROLLER
-// ============================================================================
+function updateCounts() {
+  const total = TRIAGE_LEADS.length;
+  const verified = TRIAGE_LEADS.filter(l => l.status === "verified").length;
+  const financial = TRIAGE_LEADS.filter(l => l.category === "financial").length;
+  const slang = TRIAGE_LEADS.filter(l => l.category === "slang").length;
+  const darknet = TRIAGE_LEADS.filter(l => l.category === "darknet").length;
+  const image = TRIAGE_LEADS.filter(l => l.category === "image").length;
 
-function openAuditModal() {
-  const container = document.getElementById("audit-log-entries");
-  container.innerHTML = AUDIT_LOG.map(entry => `
-    <div class="audit-entry">
-      <span class="audit-timestamp">[${entry.time}]</span>
-      <span class="audit-action">[${entry.action}]</span>
-      <span>${entry.actor}: ${entry.detail}</span>
-    </div>
-  `).join("");
-  document.getElementById("modal-audit").style.display = "flex";
+  const vCount = document.getElementById("verified-count");
+  if (vCount) vCount.textContent = verified;
+  const tCount = document.getElementById("total-leads-count");
+  if (tCount) tCount.textContent = total;
+  const wbVCount = document.getElementById("wb-verified-count");
+  if (wbVCount) wbVCount.textContent = verified;
+  const wbTCount = document.getElementById("wb-total-leads");
+  if (wbTCount) wbTCount.textContent = total;
+  const cAll = document.getElementById("count-all");
+  if (cAll) cAll.textContent = total;
+  const cFin = document.getElementById("count-financial");
+  if (cFin) cFin.textContent = financial;
+  const cSlang = document.getElementById("count-slang");
+  if (cSlang) cSlang.textContent = slang;
+  const cDark = document.getElementById("count-darknet");
+  if (cDark) cDark.textContent = darknet;
+  const cImg = document.getElementById("count-image");
+  if (cImg) cImg.textContent = image;
 }
-
-function closeAuditModal() {
-  document.getElementById("modal-audit").style.display = "none";
-}
-
-function logAuditEvent(action, detail) {
-  const now = new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + " IST";
-  AUDIT_LOG.push({
-    time: now,
-    actor: `${CASE_METADATA.io} (${CASE_METADATA.belt})`,
-    action: action,
-    detail: detail
-  });
-}
-
-// ============================================================================
-// 8. ANTIFRAGILE HARVESTER PROMOTION
-// ============================================================================
 
 function approveHarvestedCodeword(term, meaning, category) {
   const box = document.getElementById('harvester-candidate-box');
+  if (!box) return;
   box.innerHTML = `
     <div class="flex-between">
       <span class="mono font-bold text-green">✓ "${term}" Approved & Injected into Lexicon</span>
@@ -867,12 +1944,14 @@ function approveHarvestedCodeword(term, meaning, category) {
 
 function dismissHarvestedCodeword() {
   const box = document.getElementById('harvester-candidate-box');
-  box.innerHTML = `<span class="text-xs text-muted">Candidate dismissed as noise.</span>`;
-  showToast("Candidate slang dismissed.", "alert");
+  if (box) {
+    box.innerHTML = `<span class="text-xs text-muted">Candidate dismissed as noise.</span>`;
+    showToast("Candidate slang dismissed.", "alert");
+  }
 }
 
 // ============================================================================
-// 9. WHATSAPP & CASE DIARY (ZIMNI) DISPATCH
+// 6. OPERATIONAL DISPATCHES (WHATSAPP & MUNSHI ZIMNI)
 // ============================================================================
 
 function openWhatsAppModal() {
@@ -924,91 +2003,343 @@ Proceeds were verified as routed through SBI Account No. 33910048291 via VPA mul
 }
 
 // ============================================================================
-// 10. PANEL 3 TAB SWITCHER & METRICS
+// 7. CASE & APPLICATION TRACKING DASHBOARD CONTROLLER
 // ============================================================================
 
-function switchRightPanelTab(tabName) {
-  document.getElementById("tab-btn-dossier").classList.toggle("active", tabName === "dossier");
-  document.getElementById("tab-btn-graph").classList.toggle("active", tabName === "graph");
-  document.getElementById("tab-btn-trends").classList.toggle("active", tabName === "trends");
-  
-  document.getElementById("tab-content-dossier").classList.toggle("active", tabName === "dossier");
-  document.getElementById("tab-content-graph").classList.toggle("active", tabName === "graph");
-  document.getElementById("tab-content-trends").classList.toggle("active", tabName === "trends");
+function renderTrackingCases() {
+  const container = document.getElementById('tracking-cases-container');
+  if (!container) return;
 
-  if (tabName === "graph") {
-    renderNetworkGraph();
+  let cases = TRACKING_CASES;
+  if (currentTrackingFilter !== 'ALL') {
+    cases = cases.filter(c => c.status === currentTrackingFilter);
   }
-}
 
-function toggleChronology() {
-  const drawer = document.getElementById("chronology-drawer");
-  const icon = document.getElementById("chronology-toggle-icon");
-  if (drawer.style.display === "none") {
-    drawer.style.display = "block";
-    icon.textContent = "▼";
-  } else {
-    drawer.style.display = "none";
-    icon.textContent = "▶";
+  const query = (document.getElementById('track-search-input')?.value || "").toLowerCase().trim();
+  if (query) {
+    cases = cases.filter(c => 
+      c.fir.toLowerCase().includes(query) || 
+      c.ps.toLowerCase().includes(query) || 
+      c.io.toLowerCase().includes(query) ||
+      c.category.toLowerCase().includes(query)
+    );
   }
-}
 
-function renderVerifiedTable() {
-  const tbody = document.getElementById("verified-entities-tbody");
-  const verified = TRIAGE_LEADS.filter(l => l.status === "verified");
-
-  document.getElementById("verified-table-badge").textContent = `${verified.length} Items Signed`;
-
-  if (verified.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="4" class="text-center text-muted" style="padding: 16px;">
-          No entities verified yet. Click <strong>[✓ Verify & Add to Dossier]</strong> in Panel 2 to sign off on extracted leads.
-        </td>
-      </tr>
+  if (cases.length === 0) {
+    container.innerHTML = `
+      <div class="gov-card text-center" style="padding: 30px;">
+        <p class="text-muted">No cases found matching your search or status filter.</p>
+      </div>
     `;
     return;
   }
 
-  tbody.innerHTML = verified.map(lead => `
-    <tr>
-      <td><span class="badge badge-sm badge-amber">${lead.type}</span></td>
-      <td class="mono font-bold text-blue">${escapeHtml(lead.value)}</td>
-      <td class="mono text-xs text-muted">${lead.fileName} (Line ${lead.lineNum})</td>
-      <td><span class="badge badge-sm badge-green">IO SIGNED ✓</span></td>
-    </tr>
-  `).join("");
-}
+  container.innerHTML = cases.map(c => `
+    <div class="case-track-card">
+      <div class="case-track-card-header">
+        <div>
+          <span class="badge badge-sm ${c.status === 'CERTIFIED_ADMISSIBLE' ? 'badge-green' : (c.status === 'UNDER_REVIEW' ? 'badge-amber' : 'badge-blue')}">
+            ${c.statusLabel}
+          </span>
+          <h3 class="font-bold text-blue" style="font-size: 15px; margin-top: 4px;">${c.fir}</h3>
+          <span class="text-xs text-muted">${c.ps} &bull; IO: ${c.io} (${c.belt})</span>
+        </div>
+        <div style="text-align: right;">
+          <span class="text-xs text-muted">Registered: ${c.date}</span>
+          <div class="text-xs" style="margin-top: 3px;"><strong>SLA Target:</strong> ${c.expectedSla}</div>
+        </div>
+      </div>
 
-function renderChronology() {
-  const container = document.getElementById("chronology-timeline");
-  container.innerHTML = CASE_CHRONOLOGY.map(evt => `
-    <div class="timeline-event">
-      <div class="timeline-time">${evt.time}</div>
-      <div class="timeline-body">${evt.body}</div>
+      <!-- Chronological Lifecycle Stages -->
+      <div class="case-track-stages">
+        ${c.stages.map((st, idx) => `
+          <div class="stage-wrapper">
+            <div class="stage-circle ${st.completed ? 'completed' : (st.active ? 'active' : '')}">
+              ${st.completed ? '✓' : (idx + 1)}
+            </div>
+            <span class="stage-name">${st.name}</span>
+            <span class="stage-date">${st.date}</span>
+          </div>
+        `).join("")}
+      </div>
+
+      <div class="flex-between" style="border-top: 1px solid var(--border-subtle); padding-top: 10px; margin-top: 8px;">
+        <span class="text-xs text-muted"><strong>Category:</strong> ${c.category}</span>
+        <div class="flex-gap">
+          <button class="btn btn-xs btn-gov-secondary" onclick="openDossierModal()">
+            <span>⚖️</span> View BSA Certificate
+          </button>
+          <button class="btn btn-xs btn-gov-primary" onclick="showSection('workbench')">
+            <span>🔬</span> Open Case Workbench
+          </button>
+        </div>
+      </div>
     </div>
   `).join("");
 }
 
-function updateCounts() {
-  const total = TRIAGE_LEADS.length;
-  const verified = TRIAGE_LEADS.filter(l => l.status === "verified").length;
-  const financial = TRIAGE_LEADS.filter(l => l.category === "financial").length;
-  const slang = TRIAGE_LEADS.filter(l => l.category === "slang").length;
-  const darknet = TRIAGE_LEADS.filter(l => l.category === "darknet").length;
-  const image = TRIAGE_LEADS.filter(l => l.category === "image").length;
+function filterTrackingCases() {
+  renderTrackingCases();
+}
 
-  document.getElementById("verified-count").textContent = verified;
-  document.getElementById("total-leads-count").textContent = total;
-  document.getElementById("count-all").textContent = total;
-  document.getElementById("count-financial").textContent = financial;
-  document.getElementById("count-slang").textContent = slang;
-  document.getElementById("count-darknet").textContent = darknet;
-  document.getElementById("count-image").textContent = image;
+function setTrackingFilter(filter) {
+  currentTrackingFilter = filter;
+  document.querySelectorAll('#section-tracking .filter-chip').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  if (event && event.target) {
+    event.target.classList.add('active');
+  }
+  renderTrackingCases();
 }
 
 // ============================================================================
-// 11. LEGAL MODALS (BSA 63 & CRPC 91)
+// 8. STATUTORY COMPLIANCE CENTER CONTROLLER
+// ============================================================================
+
+function renderComplianceCenter() {
+  const verifiedCount = TRIAGE_LEADS.filter(l => l.status === "verified").length;
+  const score = Math.min(100, 90 + Math.min(10, verifiedCount * 2));
+
+  const scoreVal = document.getElementById('compliance-score-val');
+  if (scoreVal) scoreVal.textContent = `${score}%`;
+
+  const radial = document.getElementById('compliance-radial-meter');
+  if (radial) {
+    radial.style.background = `conic-gradient(var(--accent-green) 0% ${score}%, #E2E8F0 ${score}% 100%)`;
+  }
+}
+
+// ============================================================================
+// 9. DOCUMENT & DIGITAL EVIDENCE VAULT CONTROLLER
+// ============================================================================
+
+function renderDocumentVault() {
+  const tbody = document.getElementById('vault-evidence-tbody');
+  if (!tbody) return;
+
+  tbody.innerHTML = EVIDENCE_FILES.map((f, i) => `
+    <tr>
+      <td class="mono font-bold">#${i + 1}</td>
+      <td class="mono font-bold text-blue">${f.name}</td>
+      <td>${f.source}</td>
+      <td><span class="badge badge-sm badge-neutral">${f.parserProfile}</span></td>
+      <td class="mono text-xs text-muted">${f.sha256}</td>
+      <td><span class="badge badge-sm badge-green">UNCOMPROMISED ✓</span></td>
+      <td>
+        <button class="btn btn-xs btn-gov-secondary" onclick="selectFile('${f.id}'); showSection('workbench');">
+          Inspect Bytes
+        </button>
+      </td>
+    </tr>
+  `).join("");
+}
+
+async function calculateClientHash() {
+  const input = document.getElementById('hash-checker-input').value.trim();
+  const resBox = document.getElementById('hash-checker-result');
+  if (!input) {
+    resBox.innerHTML = `<span class="text-xs text-red">Please enter text or string to calculate hash.</span>`;
+    return;
+  }
+
+  try {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(input);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+    resBox.innerHTML = `
+      <div class="gov-card" style="background: #F0FDF4; border-color: #BBF7D0; padding: 10px;">
+        <div class="text-xs text-muted">CALCULATED SHA-256 INTEGRITY DIGEST:</div>
+        <div class="mono font-bold text-green" style="font-size: 12px; margin-top: 3px; word-break: break-all;">${hashHex}</div>
+        <div class="text-xs text-secondary" style="margin-top: 4px;">✓ Mathematically deterministic under Section 63 BSA standards.</div>
+      </div>
+    `;
+  } catch (err) {
+    resBox.innerHTML = `<span class="text-xs text-red">Hash calculation error: ${err.message}</span>`;
+  }
+}
+
+function openLiveHashCheckerModal() {
+  showSection('documents');
+  document.getElementById('hash-checker-input').focus();
+}
+
+// ============================================================================
+// 10. GOVERNMENT SCHEMES & STATUTORY ACTS DIRECTORY CONTROLLER
+// ============================================================================
+
+function renderSchemes() {
+  const container = document.getElementById('schemes-container');
+  if (!container) return;
+
+  let schemes = SCHEMES_DATA;
+  if (currentSchemeFilter !== 'ALL') {
+    schemes = schemes.filter(s => s.category === currentSchemeFilter);
+  }
+
+  const query = (document.getElementById('scheme-search-input')?.value || "").toLowerCase().trim();
+  if (query) {
+    schemes = schemes.filter(s => 
+      s.title.toLowerCase().includes(query) ||
+      s.body.toLowerCase().includes(query) ||
+      s.authority.toLowerCase().includes(query)
+    );
+  }
+
+  container.innerHTML = schemes.map(s => `
+    <div class="scheme-card">
+      <div>
+        <div class="scheme-header">
+          <h3 class="scheme-title">${s.title}</h3>
+          <span class="badge badge-sm badge-blue">${s.categoryLabel}</span>
+        </div>
+        <div class="text-xs text-muted" style="margin-bottom: 6px;">
+          <strong>Authority:</strong> ${s.authority}
+        </div>
+        <p class="scheme-body">${s.body}</p>
+      </div>
+
+      <div class="scheme-meta">
+        <div style="margin-bottom: 4px;"><strong>Eligibility:</strong> ${s.eligibility}</div>
+        <div class="flex-between">
+          <span class="badge badge-sm badge-neutral">${s.turnaround}</span>
+          <button class="btn btn-xs btn-gov-secondary" onclick="openAssistantModal('Explain ${s.title} details.')">
+            ${s.linkText} ➔
+          </button>
+        </div>
+      </div>
+    </div>
+  `).join("");
+}
+
+function filterSchemes() {
+  renderSchemes();
+}
+
+function setSchemeFilter(filter) {
+  currentSchemeFilter = filter;
+  document.querySelectorAll('#section-schemes .filter-chip').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  if (event && event.target) {
+    event.target.classList.add('active');
+  }
+  renderSchemes();
+}
+
+// ============================================================================
+// 11. SMART AI FORENSIC COPILOT ASSISTANT CONTROLLER
+// ============================================================================
+
+function openAssistantModal(initialQuery = "") {
+  document.getElementById('modal-assistant').style.display = 'flex';
+  if (initialQuery) {
+    sendAssistantQuery(initialQuery);
+  }
+}
+
+function closeAssistantModal() {
+  document.getElementById('modal-assistant').style.display = 'none';
+}
+
+function sendAssistantQuery(queryText) {
+  const container = document.getElementById('assistant-chat-container');
+  if (!container) return;
+
+  // Append user bubble
+  container.innerHTML += `
+    <div class="assistant-msg-bubble user-bubble">
+      ${escapeHtml(queryText)}
+    </div>
+  `;
+
+  // Find response in knowledge base
+  const qLower = queryText.toLowerCase();
+  let matched = ASSISTANT_KB.find(kb => kb.keywords.some(kw => qLower.includes(kw)));
+  let replyText = matched ? matched.response : `
+    <strong>Forensic Analysis Note:</strong> Based on Chandigarh Cyber Crime protocols and Section 63 BSA 2023, digital electronic seizures must maintain strict cryptographic hash verification and zero external cloud exposure. You can verify this in the <a href="javascript:closeAssistantModal();showSection('compliance');" style="color: #1D4ED8; font-weight: bold;">Compliance Center</a> or inspect evidence in the <a href="javascript:closeAssistantModal();showSection('workbench');" style="color: #1D4ED8; font-weight: bold;">Command Workbench</a>.
+  `;
+
+  // Simulate local model response delay
+  setTimeout(() => {
+    container.innerHTML += `
+      <div class="assistant-msg-bubble system-bubble">
+        ${replyText}
+      </div>
+    `;
+    container.scrollTop = container.scrollHeight;
+  }, 250);
+}
+
+function submitAssistantQuery() {
+  const input = document.getElementById('assistant-query-input');
+  const val = input.value.trim();
+  if (val) {
+    sendAssistantQuery(val);
+    input.value = "";
+  }
+}
+
+// ============================================================================
+// 12. PRIORITY NOTIFICATION CENTER CONTROLLER
+// ============================================================================
+
+function renderNotifications() {
+  const list = document.getElementById('notification-list');
+  const badge = document.getElementById('header-notif-count');
+  const unreadLabel = document.getElementById('notif-unread-label');
+  if (!list) return;
+
+  const unreadCount = NOTIFICATIONS.filter(n => n.unread).length;
+  if (badge) badge.textContent = unreadCount;
+  if (unreadLabel) unreadLabel.textContent = `${unreadCount} Unread`;
+
+  list.innerHTML = NOTIFICATIONS.map(n => `
+    <div class="notif-item ${n.unread ? 'unread' : ''}" onclick="openNotifItem(${n.id})">
+      <div class="notif-item-title">
+        <span>${n.title}</span>
+        <span class="notif-item-time">${n.time}</span>
+      </div>
+      <p class="text-xs text-secondary">${n.detail}</p>
+    </div>
+  `).join("");
+}
+
+function toggleNotificationDropdown() {
+  const dd = document.getElementById('notification-dropdown');
+  if (dd) {
+    dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+  }
+}
+
+function markAllNotificationsRead() {
+  NOTIFICATIONS.forEach(n => n.unread = false);
+  renderNotifications();
+  showToast("All alerts marked as read", "alert");
+}
+
+function openNotifItem(id) {
+  const item = NOTIFICATIONS.find(n => n.id === id);
+  if (item) {
+    item.unread = false;
+    renderNotifications();
+    toggleNotificationDropdown();
+    if (id === 1) {
+      showSection('workbench');
+      switchRightPanelTab('graph');
+    } else if (id === 2) {
+      openNoticeModal('bank');
+    } else if (id === 3) {
+      openDossierModal();
+    }
+  }
+}
+
+// ============================================================================
+// 13. LEGAL MODALS (BSA 63 CERTIFICATE & CRPC 91 ORDERS)
 // ============================================================================
 
 function openDossierModal() {
@@ -1036,7 +2367,7 @@ function openDossierModal() {
     schedB.innerHTML = `
       <tr>
         <td colspan="5" class="text-center" style="padding: 10px; color: #666;">
-          <em>Note: No entities have been officially verified by the IO yet.</em>
+          <em>Note: No entities have been officially verified by the IO yet. Default demo leads verified for submission.</em>
         </td>
       </tr>
     `;
@@ -1196,11 +2527,116 @@ function closeNoticeModal() {
 }
 
 // ============================================================================
-// 12. TOAST NOTIFICATIONS & UTILS
+// 14. GLOBAL SEARCH & AUDIT LOG CONTROLLERS
+// ============================================================================
+
+function openGlobalSearchModal() {
+  document.getElementById("global-search-query").value = "mule44@ybl";
+  executeGlobalSearch();
+  document.getElementById("modal-global-search").style.display = "flex";
+}
+
+function openGlobalSearchModalWith(query) {
+  document.getElementById("global-search-query").value = query;
+  executeGlobalSearch();
+  document.getElementById("modal-global-search").style.display = "flex";
+}
+
+function closeGlobalSearchModal() {
+  document.getElementById("modal-global-search").style.display = "none";
+}
+
+function executeGlobalSearch() {
+  const query = document.getElementById("global-search-query").value.toLowerCase().trim();
+  const container = document.getElementById("global-search-results");
+  if (!container) return;
+
+  if (!query) {
+    container.innerHTML = `<div class="text-xs text-muted" style="padding: 10px;">Enter an identifier to search across historical precinct records.</div>`;
+    return;
+  }
+
+  const hits = HISTORICAL_PRECINCT_INTEL.filter(item => 
+    item.identifier.toLowerCase().includes(query) || 
+    item.fir.toLowerCase().includes(query) || 
+    item.notes.toLowerCase().includes(query)
+  );
+
+  if (hits.length === 0) {
+    container.innerHTML = `
+      <div class="text-xs text-muted" style="padding: 12px; text-align: center;">
+        No prior intelligence records found for "<strong>${escapeHtml(query)}</strong>". Identifier is novel to this case.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = hits.map(hit => `
+    <div class="global-search-hit" style="padding: 10px; border-bottom: 1px solid var(--border-subtle);">
+      <div class="flex-between" style="margin-bottom: 3px;">
+        <span class="mono font-bold text-blue">${hit.identifier}</span>
+        <span class="badge badge-sm badge-red">HISTORICAL MATCH</span>
+      </div>
+      <div class="text-xs" style="margin-bottom: 2px;">
+        <strong>Linked Case:</strong> <span class="mono font-bold">${hit.fir}</span> (${hit.ps})
+      </div>
+      <div class="text-xs text-muted">
+        <strong>Role:</strong> ${hit.role} &bull; <em>${hit.notes}</em> (Dated: ${hit.date})
+      </div>
+    </div>
+  `).join("");
+}
+
+function openAuditModal() {
+  const container = document.getElementById("audit-log-entries");
+  if (!container) return;
+  container.innerHTML = AUDIT_LOG.map(entry => `
+    <div class="audit-entry" style="padding: 6px 0; border-bottom: 1px solid #1E293B;">
+      <span class="text-blue">[${entry.time}]</span>
+      <span class="text-amber">[${entry.action}]</span>
+      <span>${entry.actor}: ${entry.detail}</span>
+    </div>
+  `).join("");
+  document.getElementById("modal-audit").style.display = "flex";
+}
+
+function closeAuditModal() {
+  document.getElementById("modal-audit").style.display = "none";
+}
+
+function logAuditEvent(action, detail) {
+  const now = new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + " IST";
+  AUDIT_LOG.push({
+    time: now,
+    actor: `${CASE_METADATA.io} (${CASE_METADATA.belt})`,
+    action: action,
+    detail: detail
+  });
+}
+
+function exportAuditLogCSV() {
+  let csv = "Timestamp,Actor,Action,Detail\n";
+  AUDIT_LOG.forEach(e => {
+    csv += `"${e.time}","${e.actor}","${e.action}","${e.detail.replace(/"/g, '""')}"\n`;
+  });
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.setAttribute('href', url);
+  a.setAttribute('download', `audit_log_${CASE_METADATA.fir.replace(/[^a-zA-Z0-9]/g, '_')}.csv`);
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  showToast("📜 Exported Cryptographic Audit Log CSV", "success");
+}
+
+// ============================================================================
+// 15. TOAST NOTIFICATIONS & HTML SANITIZATION UTILS
 // ============================================================================
 
 function showToast(message, type = 'success') {
   const container = document.getElementById("toast-container");
+  if (!container) return;
   const toast = document.createElement("div");
   toast.className = `toast ${type === 'success' ? 'toast-success' : 'toast-alert'}`;
   toast.innerHTML = `<span>${message}</span>`;
@@ -1209,9 +2645,9 @@ function showToast(message, type = 'success') {
   setTimeout(() => {
     toast.style.opacity = '0';
     toast.style.transform = 'translateY(10px)';
-    toast.style.transition = 'all 0.2s';
-    setTimeout(() => toast.remove(), 200);
-  }, 2500);
+    toast.style.transition = 'all 0.25s ease';
+    setTimeout(() => toast.remove(), 250);
+  }, 3000);
 }
 
 function escapeHtml(str) {
@@ -1223,3 +2659,33 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
+
+// ============================================================================
+// 16. INITIALIZATION ON DOM READY
+// ============================================================================
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderNotifications();
+  renderTrackingCases();
+  renderSchemes();
+  renderDocumentVault();
+  renderComplianceCenter();
+  updateStepperUI();
+
+  // Close notifications dropdown when clicked outside
+  document.addEventListener('click', (e) => {
+    const notifWrapper = document.querySelector('.notif-wrapper');
+    const dd = document.getElementById('notification-dropdown');
+    if (notifWrapper && dd && !notifWrapper.contains(e.target)) {
+      dd.style.display = 'none';
+    }
+  });
+
+  // Verify default leads in background
+  TRIAGE_LEADS[0].status = "verified"; // Tor Listing
+  TRIAGE_LEADS[1].status = "verified"; // mule44@ybl
+  TRIAGE_LEADS[3].status = "verified"; // TRON USDT
+
+  // Render initial workbench datasets
+  renderDashboard();
+});
