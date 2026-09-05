@@ -3,668 +3,1256 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chandigarh Police - Cyber Crime Forensic Workbench (BSA Sec 63)</title>
+  <title>Chandigarh Police - Cyber Crime Forensic Workbench & Statutory Compliance Gateway (BSA Sec 63)</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <div id="app" class="app-container">
 
-    <!-- TOP PERMANENT HEADER (Gov-Tech Navy & Gold) -->
+    <!-- ===================================================================== -->
+    <!-- TOP PERMANENT GOVERNMENT HEADER & PRIMARY NAVIGATION -->
+    <!-- ===================================================================== -->
     <header class="gov-header">
       <div class="header-left">
-        <div class="gov-crest-box">
+        <div class="gov-crest-box" onclick="showSection('home')" title="Return to Portal Overview">
           <span class="crest-icon">🛡️</span>
         </div>
         <div>
           <div class="gov-dept-name">CHANDIGARH POLICE &bull; CYBER CRIME INVESTIGATION DIVISION</div>
           <div class="gov-case-info">
-            <span class="case-tag" id="header-case-tag">NEW CASE FILE</span>
-            <span class="case-detail" id="header-case-meta">Air-Gapped Forensic Triage System (BSA 2023 Compliant)</span>
+            <span class="case-tag" id="header-case-tag">FIR-104/2026/CYBER</span>
+            <span class="case-detail" id="header-case-meta">Air-Gapped Forensic Platform (BSA Sec 63 Compliant)</span>
           </div>
         </div>
       </div>
 
-      <div class="header-center">
-        <!-- Step Indicator Wizard -->
-        <div class="wizard-stepper" id="wizard-stepper">
-          <div class="step-node active" id="step-node-1"><span class="step-circle">1</span> Intake</div>
-          <span class="step-divider">→</span>
-          <div class="step-node" id="step-node-2"><span class="step-circle">2</span> Media</div>
-          <span class="step-divider">→</span>
-          <div class="step-node" id="step-node-3"><span class="step-circle">3</span> Engine</div>
-          <span class="step-divider">→</span>
-          <div class="step-node" id="step-node-4"><span class="step-circle">4</span> Triage</div>
-        </div>
-      </div>
+      <!-- Center Primary Navigation -->
+      <nav class="gov-nav" id="main-gov-nav">
+        <button class="nav-item active" id="nav-btn-home" onclick="showSection('home')">
+          <span>🏛️</span> Home
+        </button>
+        <button class="nav-item" id="nav-btn-intake" onclick="showSection('intake')">
+          <span>📋</span> New Intake
+        </button>
+        <button class="nav-item" id="nav-btn-workbench" onclick="showSection('workbench')">
+          <span>🔬</span> Workbench
+        </button>
+        <button class="nav-item" id="nav-btn-tracking" onclick="showSection('tracking')">
+          <span>📊</span> Track Cases
+        </button>
+        <button class="nav-item" id="nav-btn-compliance" onclick="showSection('compliance')">
+          <span>⚖️</span> Compliance
+        </button>
+        <button class="nav-item" id="nav-btn-documents" onclick="showSection('documents')">
+          <span>📁</span> Document Vault
+        </button>
+        <button class="nav-item" id="nav-btn-schemes" onclick="showSection('schemes')">
+          <span>📜</span> Schemes & Laws
+        </button>
+      </nav>
 
+      <!-- Right Utility Actions -->
       <div class="header-right">
-        <!-- Role Badge (Requirement #9) -->
+        <!-- AI Copilot Assistant -->
+        <button class="btn btn-gov-secondary btn-sm" onclick="openAssistantModal()" title="AI Statutory & Forensic Copilot">
+          <span>🤖</span> Copilot
+        </button>
+
+        <!-- Global Search -->
+        <button class="btn btn-gov-secondary btn-sm" onclick="openGlobalSearchModal()" title="Cross-Case Global Intel Search">
+          <span>🔍</span> Global Intel
+        </button>
+
+        <!-- Audit Trail -->
+        <button class="btn btn-gov-secondary btn-sm" onclick="openAuditModal()" title="Tamper-Evident SHA-256 Audit Trail">
+          <span>📜</span> Audit
+        </button>
+
+        <!-- Notification Bell -->
+        <div class="notif-wrapper">
+          <button class="btn btn-gov-secondary btn-sm btn-icon" onclick="toggleNotificationDropdown()" title="View Priority Alerts">
+            <span>🔔</span>
+            <span class="notif-badge" id="header-notif-count">3</span>
+          </button>
+          <div class="notif-dropdown" id="notification-dropdown" style="display: none;">
+            <div class="notif-header">
+              <span class="font-bold">INVESTIGATIVE ALERTS</span>
+              <span class="badge badge-sm badge-neutral" id="notif-unread-label">3 Unread</span>
+            </div>
+            <div class="notif-list" id="notification-list">
+              <!-- Populated by JS -->
+            </div>
+            <div class="notif-footer">
+              <button class="btn btn-xs btn-gov-secondary" onclick="markAllNotificationsRead()">Mark all as read</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Role Badge -->
         <div class="role-badge" id="header-role-badge">
           <span>👮</span>
           <span>IO (Level-2)</span>
         </div>
-
-        <!-- Global Search Button (Requirement #7) -->
-        <button class="btn btn-gov-secondary btn-sm" onclick="openGlobalSearchModal()" title="Search across all historical precinct cases">
-          <span>🔍</span> Global Intel
-        </button>
-
-        <!-- Audit Trail Button (Requirement #9) -->
-        <button class="btn btn-gov-secondary btn-sm" onclick="openAuditModal()" title="View immutable forensic event log">
-          <span>📜</span> Audit Log
-        </button>
-
-        <div class="model-badge" id="header-model-badge" style="display: none;">
-          <span class="model-icon">⚙️</span>
-          <span class="mono" id="header-model-name">Llama-3.2-3B (Local GGUF)</span>
-        </div>
-
-        <button id="btn-reset-workflow" class="btn btn-gov-secondary btn-sm" onclick="restartWorkflow()" style="display: none;">
-          <span>↺</span> Switch Case
-        </button>
       </div>
     </header>
 
     <!-- ===================================================================== -->
-    <!-- WIZARD STEP 1: CASE DETAILS & OFFICER INTAKE -->
+    <!-- VIEW 1: GOVERNMENT PORTAL HOMEPAGE (HERO & CORE MODULES) -->
     <!-- ===================================================================== -->
-    <section class="wizard-screen active" id="screen-intake">
-      <div class="wizard-card-centered">
-        <div class="wizard-card-header">
-          <span class="wizard-step-label">STEP 1 OF 4</span>
-          <h1 class="wizard-card-title">Case Registration & Officer Intake</h1>
-          <p class="wizard-card-sub">Enter statutory case details for Section 63 BSA legal chain of custody.</p>
+    <section class="portal-section" id="section-home">
+      <!-- Hero Banner -->
+      <div class="hero-container">
+        <div class="hero-badge">
+          <span>🇮🇳</span> OFFICIAL LAW ENFORCEMENT & STATUTORY COMPLIANCE PLATFORM
+        </div>
+        <h1 class="hero-title">One Platform. Every Approval & Digital Forensics.</h1>
+        <p class="hero-subtitle">
+          Unified, air-gapped forensic copilot for darknet drug triage, multi-source financial correlation, and court-admissible <strong>Section 63 Bharatiya Sakshya Adhiniyam (BSA), 2023</strong> certification.
+        </p>
+
+        <!-- Quick CTAs -->
+        <div class="hero-cta-group">
+          <button class="btn btn-gov-primary btn-lg" onclick="showSection('intake')">
+            <span>⚡</span> Start New Case Intake
+          </button>
+          <button class="btn btn-gov-secondary btn-lg" onclick="showSection('workbench')">
+            <span>🔬</span> Launch Forensic Workbench
+          </button>
+          <button class="btn btn-gov-secondary btn-lg" onclick="showSection('tracking')">
+            <span>📊</span> Track Existing Case Status
+          </button>
+          <button class="btn btn-gov-secondary btn-lg" onclick="showSection('compliance')">
+            <span>⚖️</span> View Statutory Compliance
+          </button>
         </div>
 
-        <div class="wizard-form-body">
-          <div class="form-grid-2col">
-            <div class="form-group">
-              <label class="form-label">FIR / Case Reference Number *</label>
-              <input type="text" id="intake-fir" class="gov-input" placeholder="e.g. FIR No. 104/2026/CYBER">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Police Station / Unit *</label>
-              <input type="text" id="intake-ps" class="gov-input" placeholder="e.g. PS Cyber Crime, Sector 17, Chandigarh">
-            </div>
+        <!-- Key Impact Statistics -->
+        <div class="stats-counter-grid">
+          <div class="stat-counter-card">
+            <span class="stat-number text-blue">100%</span>
+            <span class="stat-label">Air-Gapped & Offline</span>
+            <span class="stat-sub">Zero Cloud AI Dependency</span>
           </div>
-
-          <div class="form-grid-2col">
-            <div class="form-group">
-              <label class="form-label">Investigating Officer (IO) Name & Rank *</label>
-              <input type="text" id="intake-io" class="gov-input" placeholder="e.g. Insp. Vikramjit Singh">
-            </div>
-            <div class="form-group">
-              <label class="form-label">IO Belt / Identification No. *</label>
-              <input type="text" id="intake-belt" class="gov-input" placeholder="e.g. Belt #788-UT">
-            </div>
+          <div class="stat-counter-card">
+            <span class="stat-number text-green">142</span>
+            <span class="stat-label">Historical Cases Triaged</span>
+            <span class="stat-sub">Chandigarh Cyber Precincts</span>
           </div>
-
-          <div class="form-group">
-            <label class="form-label">Statutory Charges / Sections Applied</label>
-            <input type="text" id="intake-sections" class="gov-input" placeholder="e.g. NDPS Act Sec 21, 22, 29 / IT Act Sec 66D / BNS Sec 318">
+          <div class="stat-counter-card">
+            <span class="stat-number text-amber">94%</span>
+            <span class="stat-label">Statutory Compliance</span>
+            <span class="stat-sub">BSA 2023 Admissibility Grade A+</span>
           </div>
-
-          <div class="form-group">
-            <label class="form-label">Case Classification</label>
-            <select id="intake-category" class="gov-input">
-              <option value="NDPS_CYBER">Illicit Narcotics Distribution on Encrypted Storefronts (NDPS)</option>
-              <option value="FINANCIAL_1930">Financial Cyber Fraud & Mule Network (1930)</option>
-              <option value="GENERAL_EXTORTION">Cyber Extortion & Blackmail</option>
-            </select>
+          <div class="stat-counter-card">
+            <span class="stat-number text-purple">&lt; 3.5s</span>
+            <span class="stat-label">Deterministic NER & Triage</span>
+            <span class="stat-sub">High-Speed Local Processing</span>
           </div>
         </div>
+      </div>
 
-        <div class="wizard-card-footer flex-between">
-          <button class="btn btn-autofill btn-sm" onclick="autofillCaseDetails()">
-            <span>⚡</span> Autofill Demo Case (FIR-104 Sector 17)
-          </button>
-          <button class="btn btn-gov-primary" onclick="proceedToStep2()">
-            Proceed to Evidence Media Intake ➔
-          </button>
+      <!-- Problem vs Solution & Hackathon Value Architecture -->
+      <div class="portal-grid-3col" style="margin-top: 24px;">
+        <div class="gov-card info-card">
+          <div class="info-card-header">
+            <span class="info-card-icon">⚠️</span>
+            <h3 class="info-card-title">THE FRONTLINE PROBLEM</h3>
+          </div>
+          <p class="text-sm text-secondary">
+            Frontline officers seize heterogeneous unstructured evidence (Tor mirrors, Telegram chats, bank CSVs, burner SIM dumps). Manual triage causes severe evidence fatigue and Section 63 BSA inadmissibility in court.
+          </p>
+          <ul class="check-list text-xs text-muted" style="margin-top: 10px;">
+            <li>• Evasive regional slang (Chitta, White Shoes, Stamp Paper)</li>
+            <li>• Rapid mule account dispersal across UPI & TRON crypto</li>
+            <li>• Risk of forensic evidence tampering without SHA-256 chains</li>
+          </ul>
+        </div>
+
+        <div class="gov-card info-card">
+          <div class="info-card-header">
+            <span class="info-card-icon">🛡️</span>
+            <h3 class="info-card-title">OUR UNIFIED SOLUTION</h3>
+          </div>
+          <p class="text-sm text-secondary">
+            A two-speed forensic copilot combining microsecond deterministic regex entity extraction with an offline, local Small Language Model (SLM) for contextual slang disambiguation and automatic cross-correlation.
+          </p>
+          <ul class="check-list text-xs text-muted" style="margin-top: 10px;">
+            <li>• Instant trace-to-source byte jumping to exact evidence lines</li>
+            <li>• Glass-box explainability with temperature T=0.0 determinism</li>
+            <li>• Anti-framing corroboration against bank statements</li>
+          </ul>
+        </div>
+
+        <div class="gov-card info-card">
+          <div class="info-card-header">
+            <span class="info-card-icon">⚖️</span>
+            <h3 class="info-card-title">STATUTORY VALUE DELIVERED</h3>
+          </div>
+          <p class="text-sm text-secondary">
+            Generates 1-click court-admissible Section 63(4) BSA Digital Evidence Certificates, Section 91 CrPC Bank Freezing and Telecom CDR requisitions, and immediate tactical PCR field alerts.
+          </p>
+          <ul class="check-list text-xs text-muted" style="margin-top: 10px;">
+            <li>• Replaces repealed Section 65B Indian Evidence Act</li>
+            <li>• Cryptographic SHA-256 chaining across all seized files</li>
+            <li>• Munshi Case Diary (Zimni) automated exports</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Quick Modules Access Grid -->
+      <div class="portal-section-header" style="margin-top: 32px;">
+        <h2 class="portal-section-title">CORE PLATFORM SERVICES & WORKFLOWS</h2>
+        <p class="portal-section-sub">Select an operational module to initiate triage, verify compliance, or review case files.</p>
+      </div>
+
+      <div class="portal-modules-grid">
+        <div class="module-card" onclick="showSection('intake')">
+          <div class="module-card-icon">📋</div>
+          <div class="module-card-body">
+            <h4 class="module-card-title">Case Registration & Media Intake</h4>
+            <p class="module-card-desc">Multi-step structured onboarding for FIRs, Malkhana evidence staging, and SHA-256 verification.</p>
+          </div>
+          <div class="module-card-action">Start Flow ➔</div>
+        </div>
+
+        <div class="module-card" onclick="showSection('workbench')">
+          <div class="module-card-icon">🔬</div>
+          <div class="module-card-body">
+            <h4 class="module-card-title">Investigative Workbench</h4>
+            <p class="module-card-desc">3-panel command dashboard with raw line inspector, corroborated triage cards, and entity link graphs.</p>
+          </div>
+          <div class="module-card-action">Open Workbench ➔</div>
+        </div>
+
+        <div class="module-card" onclick="showSection('tracking')">
+          <div class="module-card-icon">📊</div>
+          <div class="module-card-body">
+            <h4 class="module-card-title">Case & Application Tracking</h4>
+            <p class="module-card-desc">Monitor historical and active FIR cases across Chandigarh cyber police stations with lifecycle timelines.</p>
+          </div>
+          <div class="module-card-action">Track Status ➔</div>
+        </div>
+
+        <div class="module-card" onclick="showSection('compliance')">
+          <div class="module-card-icon">⚖️</div>
+          <div class="module-card-body">
+            <h4 class="module-card-title">Statutory Compliance Center</h4>
+            <p class="module-card-desc">Section 63 BSA legal checklist, Section 91 CrPC notice generation, and chain-of-custody scorecards.</p>
+          </div>
+          <div class="module-card-action">View Compliance ➔</div>
+        </div>
+
+        <div class="module-card" onclick="showSection('documents')">
+          <div class="module-card-icon">📁</div>
+          <div class="module-card-body">
+            <h4 class="module-card-title">Document & Evidence Vault</h4>
+            <p class="module-card-desc">Immutable evidence repository with SHA-256 verification checker and Malkhana deposit records.</p>
+          </div>
+          <div class="module-card-action">Browse Vault ➔</div>
+        </div>
+
+        <div class="module-card" onclick="showSection('schemes')">
+          <div class="module-card-icon">🏛️</div>
+          <div class="module-card-body">
+            <h4 class="module-card-title">Government Schemes & Legal Acts</h4>
+            <p class="module-card-desc">Searchable directory of MHA cyber grants, I4C initiatives, NDPS statutory provisions, and CFSL SOPs.</p>
+          </div>
+          <div class="module-card-action">Explore Directory ➔</div>
         </div>
       </div>
     </section>
 
     <!-- ===================================================================== -->
-    <!-- WIZARD STEP 2: EVIDENCE INGESTION & MALKHANA SEIZURE UPLOAD -->
+    <!-- VIEW 2: 5-STEP MULTI-PAGE APPLICATION WORKFLOW (PREVIOUS / NEXT) -->
     <!-- ===================================================================== -->
-    <section class="wizard-screen" id="screen-evidence" style="display: none;">
-      <div class="wizard-card-centered wizard-card-wide">
-        <div class="wizard-card-header">
-          <span class="wizard-step-label">STEP 2 OF 4</span>
-          <h1 class="wizard-card-title">Multi-Source Media Ingestion & Hashing</h1>
-          <p class="wizard-card-sub">Ingests Darknet .onion marketplace listings, Telegram dumps, WhatsApp exports, and Bank CSVs.</p>
+    <section class="portal-section" id="section-intake" style="display: none;">
+      <!-- Wizard Progress & Breadcrumb Header -->
+      <div class="wizard-header-container">
+        <div class="flex-between">
+          <div>
+            <h2 class="wizard-main-title">Digital Evidence Case Registration & Triage Intake</h2>
+            <p class="wizard-main-sub">Complete all steps to initiate local forensic triage and generate Section 63 BSA court records.</p>
+          </div>
+          <div class="wizard-step-badge" id="wizard-progress-text">Step 1 of 5 (20%)</div>
         </div>
 
-        <div class="wizard-form-body">
-          <div class="drop-zone-large" onclick="autofillEvidenceFiles()">
-            <div class="drop-zone-icon">📥</div>
-            <div class="drop-zone-title font-bold">Select or Drop Seized Evidence & Darknet Feeds</div>
-            <div class="drop-zone-desc text-muted">Supports Tor .onion HTML/JSON, Cellebrite UFED XML, WhatsApp exports, and Bank CSVs</div>
-            <button class="btn btn-gov-secondary btn-sm" style="margin-top: 10px;" onclick="event.stopPropagation(); autofillEvidenceFiles();">
-              <span>⚡</span> Load Multi-Source Case Files (5 Evidence Items inc. Tor Listing)
+        <!-- Linear Stepper Bar -->
+        <div class="stepper-horizontal" id="stepper-bar">
+          <div class="step-item active" id="step-node-1" onclick="goToStep(1)">
+            <span class="step-num">1</span>
+            <span class="step-name">Case Intake</span>
+          </div>
+          <div class="step-connector"></div>
+          <div class="step-item" id="step-node-2" onclick="goToStep(2)">
+            <span class="step-num">2</span>
+            <span class="step-name">Media Ingestion</span>
+          </div>
+          <div class="step-connector"></div>
+          <div class="step-item" id="step-node-3" onclick="goToStep(3)">
+            <span class="step-num">3</span>
+            <span class="step-name">Engine Config</span>
+          </div>
+          <div class="step-connector"></div>
+          <div class="step-item" id="step-node-4" onclick="goToStep(4)">
+            <span class="step-num">4</span>
+            <span class="step-name">Review Manifest</span>
+          </div>
+          <div class="step-connector"></div>
+          <div class="step-item" id="step-node-5">
+            <span class="step-num">5</span>
+            <span class="step-name">Pipeline Execution</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 1: Case Details & Officer Intake -->
+      <div class="wizard-card-step active" id="step-screen-1">
+        <div class="gov-card">
+          <div class="wizard-card-header">
+            <span class="step-sublabel">STEP 1 &bull; REGISTRATION</span>
+            <h3 class="step-title">Statutory Case Details & Investigating Officer (IO) Credentials</h3>
+            <p class="text-sm text-muted">Mandatory identifiers required for Section 63 Bharatiya Sakshya Adhiniyam court admissibility.</p>
+          </div>
+
+          <div class="form-body">
+            <div class="form-grid-2col">
+              <div class="form-group">
+                <label class="form-label" for="intake-fir">FIR / Case Reference Number *</label>
+                <input type="text" id="intake-fir" class="gov-input" placeholder="e.g. FIR No. 104/2026/CYBER">
+                <span class="field-hint">Format: FIR No. [ID]/[YEAR]/[UNIT]</span>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="intake-ps">Police Station / Precinct Unit *</label>
+                <input type="text" id="intake-ps" class="gov-input" placeholder="e.g. PS Cyber Crime, Sector 17, Chandigarh">
+                <span class="field-hint">Jurisdictional police station handling the case</span>
+              </div>
+            </div>
+
+            <div class="form-grid-2col">
+              <div class="form-group">
+                <label class="form-label" for="intake-io">Investigating Officer (IO) Name & Rank *</label>
+                <input type="text" id="intake-io" class="gov-input" placeholder="e.g. Insp. Vikramjit Singh">
+                <span class="field-hint">Officer certifying electronic record under oath</span>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="intake-belt">IO Belt / Identification No. *</label>
+                <input type="text" id="intake-belt" class="gov-input" placeholder="e.g. Belt #788-UT">
+                <span class="field-hint">Official departmental identification number</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="intake-sections">Statutory Penal Sections Applied *</label>
+              <input type="text" id="intake-sections" class="gov-input" placeholder="e.g. NDPS Act Sec 21, 22, 29 / IT Act Sec 66D / BNS Sec 318">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="intake-category">Case Classification</label>
+              <select id="intake-category" class="gov-input">
+                <option value="NDPS_CYBER">Illicit Narcotics Distribution on Encrypted Storefronts (NDPS)</option>
+                <option value="FINANCIAL_1930">Financial Cyber Fraud & Mule Network (1930)</option>
+                <option value="GENERAL_EXTORTION">Cyber Extortion & Darknet Contraband</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Footer with Previous / Next Navigation -->
+          <div class="wizard-nav-footer flex-between">
+            <button class="btn btn-autofill btn-sm" onclick="autofillCaseDetails()">
+              <span>⚡</span> Autofill Demo Case (FIR-104 Sector 17)
             </button>
-          </div>
-
-          <div class="evidence-queue-section" id="evidence-queue-section" style="margin-top: 14px; display: none;">
-            <div class="section-subhead">
-              <span>INGESTED EVIDENCE MANIFEST (CALCULATED SHA-256 HASHES)</span>
-              <span class="badge badge-sm badge-green" id="staged-files-badge">5 Files Staged</span>
-            </div>
-            <table class="gov-table" style="font-size: 11px;">
-              <thead>
-                <tr>
-                  <th>FILENAME</th>
-                  <th>SOURCE & IDENTIFIER</th>
-                  <th>PARSER PROFILE</th>
-                  <th>IMMUTABLE SHA-256 CHECKSUM</th>
-                </tr>
-              </thead>
-              <tbody id="staged-evidence-tbody">
-                <!-- Populated by JS -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="wizard-card-footer flex-between">
-          <button class="btn btn-gov-secondary" onclick="goToStep(1)">
-            ← Back to Case Intake
-          </button>
-          <button class="btn btn-gov-primary" id="btn-to-config" onclick="proceedToStep3()" disabled>
-            Proceed to Engine Configuration ➔
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <!-- ===================================================================== -->
-    <!-- WIZARD STEP 3: ENGINE & MODALITIES CONFIGURATION -->
-    <!-- ===================================================================== -->
-    <section class="wizard-screen" id="screen-config" style="display: none;">
-      <div class="wizard-card-centered">
-        <div class="wizard-card-header">
-          <span class="wizard-step-label">STEP 3 OF 4</span>
-          <h1 class="wizard-card-title">Inference Engine & Modality Settings</h1>
-          <p class="wizard-card-sub">Select local offline Small Language Model (SLM) and jurisdictional lexicon pack.</p>
-        </div>
-
-        <div class="wizard-form-body">
-          <div class="form-group">
-            <label class="form-label">Select Offline SLM Inference Engine *</label>
-            <select id="config-slm-engine" class="gov-input">
-              <option value="llama32" selected>Llama-3.2-3B-Instruct (Local 4-bit GGUF via llama.cpp / On-Device) [Recommended]</option>
-              <option value="qwen25">Qwen-2.5-7B-Instruct (Local Quantized / On-Premise Cyber GPU)</option>
-              <option value="phi35">Phi-3.5-mini-Instruct (Ultra-low VRAM CPU Mode)</option>
-              <option value="custom_local_api">Local Air-Gapped Precinct Endpoint (http://10.0.4.12:8000/v1 - IT Cell Server)</option>
-            </select>
-            <span class="text-xs text-muted" style="margin-top: 3px; display: block;">
-              🔒 Zero cloud dependency. Model runs 100% offline on local precinct hardware with temperature T=0.0.
-            </span>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Active Regional Lexicon Pack *</label>
-            <select id="config-lexicon-pack" class="gov-input">
-              <option value="chandigarh" selected>Chandigarh Tricity NDPS (Heroin/Chitta, White Shoes, Stamp Paper, Pudiya)</option>
-              <option value="border">Punjab Border Sector (Drone Contraband, Heron, Cross-wire, Khokha)</option>
-              <option value="fraud">Financial Cyber Fraud 1930 (AnyDesk, APK Payloads, Fastag Recharge)</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Forensic Pipeline Modules Enabled</label>
-            <div class="checkbox-group-grid">
-              <label class="checkbox-label">
-                <input type="checkbox" id="mod-regex" checked disabled>
-                <span>Deterministic Financial NER & Tor Listing Link Extractor</span>
-              </label>
-              <label class="checkbox-label">
-                <input type="checkbox" id="mod-slm" checked>
-                <span>Local SLM Slang & Intent Disambiguation (T=0.0)</span>
-              </label>
-              <label class="checkbox-label">
-                <input type="checkbox" id="mod-antifragile" checked>
-                <span>Antifragile Emerging Codeword & Landmark Harvester</span>
-              </label>
-              <label class="checkbox-label">
-                <input type="checkbox" id="mod-bsa" checked>
-                <span>Section 63 BSA Digital Evidence Certificate & Link Graph</span>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <div class="wizard-card-footer flex-between">
-          <button class="btn btn-gov-secondary" onclick="goToStep(2)">
-            ← Back to Media Ingestion
-          </button>
-          <button class="btn btn-gov-primary" onclick="startLoadingPipeline()">
-            ⚡ Start Forensic Pipeline & Triage ➔
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <!-- ===================================================================== -->
-    <!-- WIZARD STEP 4: REALISTIC FORENSIC INGESTION PIPELINE (LOADING SCREEN) -->
-    <!-- ===================================================================== -->
-    <section class="wizard-screen" id="screen-loading" style="display: none;">
-      <div class="wizard-card-centered">
-        <div class="wizard-card-header">
-          <span class="wizard-step-label">PIPELINE EXECUTION</span>
-          <h1 class="wizard-card-title">Processing Multi-Source Corpus...</h1>
-          <p class="wizard-card-sub">Correlating Tor .onion listings, chat dumps, and banking records.</p>
-        </div>
-
-        <div class="wizard-form-body">
-          <div class="pipeline-progress-bar-wrapper">
-            <div class="flex-between text-xs mono" style="margin-bottom: 5px;">
-              <span id="pipeline-status-text">Step 1/5: Verifying SHA-256 Checksums...</span>
-              <span id="pipeline-percentage">20%</span>
-            </div>
-            <div class="bar-track">
-              <div class="bar-fill bar-blue" id="pipeline-progress-fill" style="width: 20%;"></div>
-            </div>
-          </div>
-
-          <div class="pipeline-terminal-box mono" id="pipeline-terminal-logs">
-            <div class="log-line">[0.01s] [INGEST] Ingested 5 multi-source files into Universal Forensic Message Envelope (UFME).</div>
-            <div class="log-line">[0.04s] [CRYPTO] Calculated SHA-256 hash: e3b0c44298fc1c14... [VERIFIED]</div>
-          </div>
-        </div>
-
-        <div class="wizard-card-footer flex-between">
-          <span class="text-xs text-muted">Estimated processing time: ~3 seconds</span>
-          <button class="btn btn-gov-primary btn-sm" id="btn-skip-loading" onclick="finishLoadingPipeline()" style="display: none;">
-            Enter Investigative Workbench ➔
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <!-- ===================================================================== -->
-    <!-- MAIN WORKBENCH: THE CLEAN OFFICER COMMAND CENTER -->
-    <!-- ===================================================================== -->
-    <main class="workbench-layout" id="screen-dashboard" style="display: none;">
-
-      <!-- ================================================================= -->
-      <!-- PANEL 1: EVIDENCE EXPLORER & LINE INSPECTOR (LEFT) -->
-      <!-- ================================================================= -->
-      <section class="panel panel-left" id="panel-evidence">
-        <div class="panel-header">
-          <div class="panel-title-group">
-            <span class="panel-num">1</span>
-            <h2 class="panel-title">MULTI-SOURCE EVIDENCE (UFME)</h2>
-          </div>
-          <span class="record-counter" id="evidence-files-count">5 Files Loaded</span>
-        </div>
-
-        <div class="evidence-file-selector">
-          <div class="flex-between" style="margin-bottom: 4px;">
-            <label class="control-label">SELECT EVIDENCE STREAM:</label>
-            <span class="badge badge-sm badge-neutral" id="profile-indicator">Profile: Cellebrite / UFME</span>
-          </div>
-          <div class="file-tabs" id="file-tabs-container">
-            <!-- Rendered by JS -->
-          </div>
-        </div>
-
-        <div class="file-meta-card" id="file-meta-card">
-          <div class="meta-row">
-            <span class="meta-key">FILENAME:</span>
-            <span class="meta-val mono" id="meta-filename">telegram_chd_syndicate_dump.json</span>
-          </div>
-          <div class="meta-row">
-            <span class="meta-key">SHA-256:</span>
-            <span class="meta-val mono text-blue truncate" id="meta-sha256">e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</span>
-          </div>
-          <div class="meta-row">
-            <span class="meta-key">SOURCE:</span>
-            <span class="meta-val" id="meta-source">Seized OnePlus 11 (Malkhana Barcode: MK-2026-89)</span>
-          </div>
-        </div>
-
-        <div class="raw-viewer-toolbar">
-          <div class="search-input-wrapper">
-            <span class="search-icon">🔍</span>
-            <input type="text" id="raw-search-input" placeholder="Search line text (UPI, phone, slang)..." oninput="filterRawLines()">
-          </div>
-          <span class="raw-line-counter mono" id="raw-lines-count">12 Lines</span>
-        </div>
-
-        <div class="raw-line-viewer" id="raw-lines-container">
-          <!-- Rendered by JS -->
-        </div>
-      </section>
-
-      <!-- ================================================================= -->
-      <!-- PANEL 2: EXTRACTION & GLASS-BOX ADVISORY TRIAGE (CENTER) -->
-      <!-- ================================================================= -->
-      <section class="panel panel-center" id="panel-triage">
-        <div class="panel-header">
-          <div class="panel-title-group">
-            <span class="panel-num">2</span>
-            <h2 class="panel-title">EXTRACTION & CORROBORATED TRIAGE</h2>
-          </div>
-          <div class="triage-status-pill">
-            <span>Verified:</span>
-            <span class="text-green mono font-bold" id="verified-count">0</span> / <span class="mono" id="total-leads-count">8</span>
-          </div>
-        </div>
-
-        <div class="triage-filters">
-          <button class="filter-chip active" onclick="setTriageFilter('all')">All Leads (<span id="count-all">8</span>)</button>
-          <button class="filter-chip" onclick="setTriageFilter('financial')">Financial / Wallets (<span id="count-financial">3</span>)</button>
-          <button class="filter-chip" onclick="setTriageFilter('slang')">Slang & Intent (<span id="count-slang">3</span>)</button>
-          <button class="filter-chip" onclick="setTriageFilter('darknet')">Tor Listings (<span id="count-darknet">1</span>)</button>
-          <button class="filter-chip" onclick="setTriageFilter('image')">Drop Point (<span id="count-image">1</span>)</button>
-        </div>
-
-        <div class="glass-box-notice">
-          <span>🛡️ <strong>Anti-Framing Guardrail:</strong> Multi-factor scoring cross-checks chat text against bank CSVs to prevent malicious false reporting.</span>
-        </div>
-
-        <div class="triage-cards-container" id="triage-cards-container">
-          <!-- Rendered by JS -->
-        </div>
-      </section>
-
-      <!-- ================================================================= -->
-      <!-- PANEL 3: OFFICER ACTIONS, GRAPH & INTELLIGENCE (RIGHT) -->
-      <!-- ================================================================= -->
-      <section class="panel panel-right" id="panel-insights">
-        <div class="panel-header">
-          <div class="panel-title-group">
-            <span class="panel-num">3</span>
-            <h2 class="panel-title">ACTIONS & INTELLIGENCE</h2>
-          </div>
-          <div class="view-switch-tabs">
-            <button class="view-tab active" id="tab-btn-dossier" onclick="switchRightPanelTab('dossier')">Target Summary</button>
-            <button class="view-tab" id="tab-btn-graph" onclick="switchRightPanelTab('graph')">Network Graph</button>
-            <button class="view-tab" id="tab-btn-trends" onclick="switchRightPanelTab('trends')">Corpus Trends</button>
-          </div>
-        </div>
-
-        <!-- VIEW A: STRUCTURED TARGET SUMMARY & FIELD NOTICES -->
-        <div class="tab-content active" id="tab-content-dossier">
-
-          <!-- Case Summary Metrics -->
-          <div class="metrics-grid">
-            <div class="metric-card">
-              <span class="metric-label">IDENTIFIED PERSONAS</span>
-              <span class="metric-value text-blue" id="metric-identities">4</span>
-              <span class="metric-foot">2 Telegram / 2 Phone</span>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">FINANCIAL ENDPOINTS</span>
-              <span class="metric-value text-amber" id="metric-financials">3</span>
-              <span class="metric-foot">2 UPI / 1 TRON USDT</span>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">SUSPECTED SUBSTANCES</span>
-              <span class="metric-value text-red" id="metric-substances">3</span>
-              <span class="metric-foot">Heroin, LSD, 4-MMC</span>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">DROP POINTS</span>
-              <span class="metric-value text-green" id="metric-drops">2</span>
-              <span class="metric-foot">Sector 43 / Sector 22</span>
-            </div>
-          </div>
-
-          <!-- ANTIFRAGILE NOVEL SLANG & LANDMARK HARVESTER CARD -->
-          <div class="dossier-section" style="border-left: 3px solid var(--accent-purple);">
-            <div class="section-subhead">
-              <span>⚡ EMERGING CODEWORD HARVESTER</span>
-              <span class="badge badge-sm badge-purple">In-Context Induction</span>
-            </div>
-            <div class="antifragile-candidate-card" id="harvester-candidate-box">
-              <div class="flex-between">
-                <div>
-                  <span class="mono font-bold text-purple" style="font-size: 12px;">Candidate: "Ice Tea"</span>
-                  <span class="badge badge-sm badge-neutral" style="margin-left: 6px;">Frequency: 3</span>
-                </div>
-                <span class="badge badge-sm badge-amber">Syntactic Anomaly (89%)</span>
-              </div>
-              <p class="text-xs text-muted" style="margin: 4px 0;">
-                Inferred: Liquid Synthetic Stimulant / Ketamine. Appeared in commodity slot with rate ₹1500 (Line 6).
-              </p>
-              <div class="flex-gap" style="margin-top: 6px;">
-                <button class="btn btn-sm btn-gov-primary" onclick="approveHarvestedCodeword('Ice Tea', 'Liquid Synthetic Stimulant / Ketamine', 'Stimulant / Synthetic')">
-                  ✓ Approve & Add to Lexicon
-                </button>
-                <button class="btn btn-sm btn-gov-secondary" onclick="dismissHarvestedCodeword()">
-                  ✗ Dismiss
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- TACTICAL FIELD DISPATCH & WHATSAPP MODALITY -->
-          <div class="dossier-section">
-            <div class="section-subhead">
-              <span>FIELD DISPATCH (WHATSAPP & MUNSHI EXPORT)</span>
-              <span class="badge badge-sm badge-green">Immediate Action</span>
-            </div>
-            <div class="requisition-buttons-grid">
-              <button class="btn btn-gov-primary btn-full" onclick="openWhatsAppModal()">
-                <span>📲</span> Copy WhatsApp Field Alert (PCR & Intercept Team)
+            <div class="flex-gap">
+              <button class="btn btn-gov-secondary" disabled title="First step">
+                ← Previous
               </button>
-              <button class="btn btn-gov-secondary btn-full" onclick="copyZimniSnippet()">
-                <span>📝</span> Copy Munshi Case Diary (Zimni) Text
+              <button class="btn btn-gov-primary" onclick="proceedToStep(2)">
+                Next: Media Ingestion ➔
               </button>
             </div>
           </div>
+        </div>
+      </div>
 
-          <!-- Verified Entities Table -->
-          <div class="dossier-section">
-            <div class="section-subhead">
-              <span>VERIFIED EVIDENCE ITEMS (BSA SEC 63 ANNEXURE)</span>
-              <span class="badge badge-sm badge-green" id="verified-table-badge">0 Items Signed</span>
+      <!-- STEP 2: Media Ingestion & Malkhana Seizure Upload -->
+      <div class="wizard-card-step" id="step-screen-2" style="display: none;">
+        <div class="gov-card">
+          <div class="wizard-card-header">
+            <span class="step-sublabel">STEP 2 &bull; EVIDENCE INGESTION</span>
+            <h3 class="step-title">Multi-Source Digital Evidence Ingestion & Cryptographic Hashing</h3>
+            <p class="text-sm text-muted">Supports Tor .onion HTML mirrors, Cellebrite dumps, WhatsApp exports, Bank CSVs, and Malkhana seizures.</p>
+          </div>
+
+          <div class="form-body">
+            <div class="drop-zone-large" onclick="autofillEvidenceFiles()">
+              <div class="drop-zone-icon">📥</div>
+              <div class="drop-zone-title font-bold">Select or Drop Seized Evidence & Darknet Feeds</div>
+              <div class="drop-zone-desc text-muted">Supports Tor .onion HTML/JSON, Cellebrite UFED, WhatsApp exports, and Bank CSVs</div>
+              <button class="btn btn-gov-secondary btn-sm" style="margin-top: 10px;" onclick="event.stopPropagation(); autofillEvidenceFiles();">
+                <span>⚡</span> Load Multi-Source Case Files (5 Evidence Items inc. Tor Listing)
+              </button>
             </div>
-            <div class="verified-table-wrapper">
-              <table class="gov-table" id="verified-entities-table">
+
+            <div class="evidence-queue-section" id="evidence-queue-section" style="margin-top: 14px; display: none;">
+              <div class="section-subhead flex-between">
+                <span>INGESTED EVIDENCE MANIFEST (CALCULATED SHA-256 HASHES)</span>
+                <span class="badge badge-sm badge-green" id="staged-files-badge">5 Files Staged</span>
+              </div>
+              <table class="gov-table" style="font-size: 11.5px;">
                 <thead>
                   <tr>
-                    <th>TYPE</th>
-                    <th>IDENTIFIER / VALUE</th>
-                    <th>SOURCE LINE</th>
-                    <th>STATUS</th>
+                    <th>FILENAME</th>
+                    <th>SOURCE & IDENTIFIER</th>
+                    <th>PARSER PROFILE</th>
+                    <th>IMMUTABLE SHA-256 CHECKSUM</th>
                   </tr>
                 </thead>
-                <tbody id="verified-entities-tbody">
-                  <!-- Rendered by JS -->
+                <tbody id="staged-evidence-tbody">
+                  <!-- Populated by JS -->
                 </tbody>
               </table>
             </div>
           </div>
 
-          <!-- 1-Click Actionable Field Requisitions (Section 91 CrPC) -->
-          <div class="dossier-section">
-            <div class="section-subhead">
-              <span>STATUTORY REQUISITIONS (SECTION 91 CrPC)</span>
-              <span class="badge badge-sm badge-blue">Official Orders</span>
-            </div>
-            <div class="requisition-buttons-grid">
-              <button class="btn btn-gov-secondary btn-full" onclick="openNoticeModal('bank')">
-                <span>🏦</span> Draft Sec 91 CrPC Bank Freeze Notice (mule44@ybl)
-              </button>
-              <button class="btn btn-gov-secondary btn-full" onclick="openNoticeModal('telecom')">
-                <span>📡</span> Draft Sec 91 CrPC Telecom CDR Order (+91 98765-21440)
-              </button>
-            </div>
-          </div>
-
-          <!-- Inferred Sequence of Events (Accordion) -->
-          <div class="dossier-section">
-            <button class="accordion-toggle-btn" onclick="toggleChronology()">
-              <span id="chronology-toggle-icon">▶</span>
-              <span><strong>Inferred Sequence of Events (Experimental / Partial)</strong></span>
+          <!-- Footer with Previous / Next Navigation -->
+          <div class="wizard-nav-footer flex-between">
+            <button class="btn btn-gov-secondary" onclick="goToStep(1)">
+              ← Previous: Case Intake
             </button>
-            <div class="chronology-drawer" id="chronology-drawer" style="display: none;">
-              <p class="text-xs text-muted" style="margin-bottom: 8px;">
-                Note: Inferred sequence based on available timestamps in current seized batch. Incomplete data may omit intermediate handoffs.
-              </p>
-              <div class="chronology-timeline" id="chronology-timeline">
-                <!-- Rendered by JS -->
+            <button class="btn btn-gov-primary" id="btn-to-step3" onclick="proceedToStep(3)">
+              Next: Engine Configuration ➔
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 3: Engine & Modality Settings -->
+      <div class="wizard-card-step" id="step-screen-3" style="display: none;">
+        <div class="gov-card">
+          <div class="wizard-card-header">
+            <span class="step-sublabel">STEP 3 &bull; INFERENCE CONFIGURATION</span>
+            <h3 class="step-title">Offline Small Language Model (SLM) & Regional Lexicon Settings</h3>
+            <p class="text-sm text-muted">Configure local quantized model parameters and regional slang dictionary packs.</p>
+          </div>
+
+          <div class="form-body">
+            <div class="form-group">
+              <label class="form-label" for="config-slm-engine">Select Offline SLM Inference Engine *</label>
+              <select id="config-slm-engine" class="gov-input">
+                <option value="llama32" selected>Llama-3.2-3B-Instruct (Local 4-bit GGUF via llama.cpp / Air-Gapped) [Recommended]</option>
+                <option value="qwen25">Qwen-2.5-7B-Instruct (Local Quantized / On-Premise Cyber GPU)</option>
+                <option value="phi35">Phi-3.5-mini-Instruct (Ultra-low VRAM CPU Mode)</option>
+                <option value="custom_local_api">Local Air-Gapped Precinct Endpoint (http://localhost:8000/api)</option>
+              </select>
+              <span class="text-xs text-muted" style="margin-top: 4px; display: block;">
+                🔒 100% offline local inference. Deterministic temperature T=0.0, Seed=42 for legal court reproducibility.
+              </span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="config-lexicon-pack">Active Regional Lexicon Pack *</label>
+              <select id="config-lexicon-pack" class="gov-input">
+                <option value="chandigarh" selected>Chandigarh Tricity NDPS (Heroin/Chitta, White Shoes, Stamp Paper, Pudiya)</option>
+                <option value="border">Punjab Border Sector (Drone Contraband, Heron, Cross-wire, Khokha)</option>
+                <option value="fraud">Financial Cyber Fraud 1930 (AnyDesk, APK Payloads, Fastag Recharge)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Statutory Pipeline Modules Enabled</label>
+              <div class="checkbox-group-grid">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="mod-regex" checked disabled>
+                  <span>Deterministic Financial NER & Tor Listing Link Extractor (High-Recall)</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="mod-slm" checked>
+                  <span>Local SLM Slang & Commercial Intent Disambiguation (T=0.0)</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="mod-antifragile" checked>
+                  <span>Antifragile Emerging Codeword & Landmark Harvester</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="mod-bsa" checked>
+                  <span>Section 63 BSA Digital Evidence Certificate & Link Graph</span>
+                </label>
               </div>
             </div>
           </div>
 
+          <!-- Footer with Previous / Next Navigation -->
+          <div class="wizard-nav-footer flex-between">
+            <button class="btn btn-gov-secondary" onclick="goToStep(2)">
+              ← Previous: Media Ingestion
+            </button>
+            <button class="btn btn-gov-primary" onclick="proceedToStep(4)">
+              Next: Review Manifest ➔
+            </button>
+          </div>
         </div>
+      </div>
 
-        <!-- VIEW B: INTERACTIVE NETWORK GRAPH (Requirement #5) -->
-        <div class="tab-content" id="tab-content-graph">
-          <div class="graph-header-banner">
-            <div class="flex-between">
-              <span class="font-bold text-xs">ENTITY-RELATIONSHIP LINK GRAPH</span>
-              <span class="badge badge-sm badge-blue">6 Connected Nodes</span>
+      <!-- STEP 4: Review Manifest & Pre-Execution Confirmation -->
+      <div class="wizard-card-step" id="step-screen-4" style="display: none;">
+        <div class="gov-card">
+          <div class="wizard-card-header">
+            <span class="step-sublabel">STEP 4 &bull; REVIEW & VERIFICATION</span>
+            <h3 class="step-title">Review Case Registration & Evidence Manifest</h3>
+            <p class="text-sm text-muted">Verify statutory details, staged file integrity, and model settings before running the pipeline.</p>
+          </div>
+
+          <div class="form-body">
+            <!-- Review Summary Cards -->
+            <div class="review-grid">
+              <div class="review-card">
+                <h4 class="review-card-title">Case Metadata</h4>
+                <div class="review-item"><span class="review-key">FIR Number:</span> <span class="review-val mono" id="rev-fir">-</span></div>
+                <div class="review-item"><span class="review-key">Police Station:</span> <span class="review-val" id="rev-ps">-</span></div>
+                <div class="review-item"><span class="review-key">Investigating Officer:</span> <span class="review-val" id="rev-io">-</span></div>
+                <div class="review-item"><span class="review-key">Belt ID:</span> <span class="review-val mono" id="rev-belt">-</span></div>
+                <div class="review-item"><span class="review-key">Penal Sections:</span> <span class="review-val" id="rev-sections">-</span></div>
+              </div>
+
+              <div class="review-card">
+                <h4 class="review-card-title">Pipeline & Engine</h4>
+                <div class="review-item"><span class="review-key">Selected SLM:</span> <span class="review-val mono" id="rev-model">-</span></div>
+                <div class="review-item"><span class="review-key">Lexicon Pack:</span> <span class="review-val" id="rev-lexicon">-</span></div>
+                <div class="review-item"><span class="review-key">Temperature:</span> <span class="review-val mono">T=0.0 (Strict Determinism)</span></div>
+                <div class="review-item"><span class="review-key">Audit Ledger:</span> <span class="review-val text-green font-bold">SHA-256 Chained ✓</span></div>
+                <div class="review-item"><span class="review-key">Target Act:</span> <span class="review-val">BSA 2023 Sec 63(4)</span></div>
+              </div>
             </div>
-            <p class="text-xs text-muted" style="margin-top: 2px;">
-              Visual cross-correlation between Tor Darknet listings, Telegram syndicate handles, crypto wallets, and domestic bank accounts.
-            </p>
+
+            <!-- Staged Files Review Table -->
+            <div style="margin-top: 16px;">
+              <h4 class="review-card-title" style="margin-bottom: 6px;">Staged Evidence Files (Integrity Confirmed)</h4>
+              <table class="gov-table" style="font-size: 11px;">
+                <thead>
+                  <tr>
+                    <th>FILENAME</th>
+                    <th>SOURCE</th>
+                    <th>SHA-256 CHECKSUM</th>
+                    <th>STATUS</th>
+                  </tr>
+                </thead>
+                <tbody id="review-files-tbody">
+                  <!-- Populated by JS -->
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          <div class="network-graph-container" id="network-graph-canvas-container">
-            <!-- Minimalist Interactive SVG Graph Rendered by JS -->
+          <!-- Footer with Previous / Submit Navigation -->
+          <div class="wizard-nav-footer flex-between">
+            <button class="btn btn-gov-secondary" onclick="goToStep(3)">
+              ← Previous: Engine Config
+            </button>
+            <button class="btn btn-gov-primary btn-lg" onclick="startLoadingPipeline()">
+              <span>⚡</span> Submit & Run Forensic Pipeline ➔
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 5: Ingestion Pipeline Execution (Loading Screen) -->
+      <div class="wizard-card-step" id="step-screen-5" style="display: none;">
+        <div class="gov-card">
+          <div class="wizard-card-header">
+            <span class="step-sublabel">STEP 5 &bull; PIPELINE EXECUTION</span>
+            <h3 class="step-title">Processing Multi-Source Evidence Corpus...</h3>
+            <p class="text-sm text-muted">Air-gapped correlation across Tor .onion listings, chat dumps, and banking CSVs.</p>
           </div>
 
-          <div class="graph-legend-box">
-            <div class="legend-item"><span class="legend-dot dot-purple"></span> Tor Marketplace</div>
-            <div class="legend-item"><span class="legend-dot dot-blue"></span> Target Persona</div>
-            <div class="legend-item"><span class="legend-dot dot-amber"></span> Financial / Wallet</div>
-            <div class="legend-item"><span class="legend-dot dot-green"></span> Drop Coordinates</div>
+          <div class="form-body">
+            <div class="pipeline-progress-bar-wrapper">
+              <div class="flex-between text-xs mono" style="margin-bottom: 6px;">
+                <span id="pipeline-status-text">Step 1/5: Verifying SHA-256 Checksums...</span>
+                <span id="pipeline-percentage" class="font-bold">20%</span>
+              </div>
+              <div class="bar-track">
+                <div class="bar-fill bar-blue" id="pipeline-progress-fill" style="width: 20%;"></div>
+              </div>
+            </div>
+
+            <div class="pipeline-terminal-box mono" id="pipeline-terminal-logs">
+              <div class="log-line">[0.01s] [INGEST] Ingested 5 multi-source files into Universal Forensic Message Envelope (UFME).</div>
+              <div class="log-line">[0.04s] [CRYPTO] Calculated SHA-256 hash: e3b0c44298fc1c14... [VERIFIED]</div>
+            </div>
+          </div>
+
+          <div class="wizard-nav-footer flex-between">
+            <span class="text-xs text-muted">Estimated processing time: ~3 seconds (Offline Engine)</span>
+            <button class="btn btn-gov-primary btn-sm" id="btn-skip-loading" onclick="finishLoadingPipeline()" style="display: none;">
+              Enter Investigative Workbench ➔
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- VIEW 3: COMMAND WORKBENCH (MODERN INTERACTIVE WORKSPACE) -->
+    <!-- ===================================================================== -->
+    <main class="workbench-workspace" id="section-workbench" style="display: none;">
+
+      <!-- Top Workbench Command & Status Strip -->
+      <div class="wb-top-strip">
+        <div class="wb-case-badge-group">
+          <span class="case-tag font-bold" id="wb-fir-tag">FIR No. 104/2026/CYBER</span>
+          <span class="wb-case-location text-muted" id="wb-ps-meta">PS Cyber Crime, Sector 17 &bull; IO: Insp. Vikramjit Singh</span>
+        </div>
+
+        <!-- Key Metrics Pills -->
+        <div class="wb-stats-pills">
+          <div class="wb-pill" title="Ingested Evidence Files">
+            <span class="wb-pill-icon">📁</span>
+            <span class="wb-pill-label">Evidence:</span>
+            <span class="wb-pill-val" id="wb-pill-files">5 Streams</span>
+          </div>
+          <div class="wb-pill" title="Corroborated Intelligence Leads">
+            <span class="wb-pill-icon">⚡</span>
+            <span class="wb-pill-label">Leads:</span>
+            <span class="wb-pill-val"><span id="wb-verified-count" class="text-green font-bold">3</span> / <span id="wb-total-leads">8</span> Verified</span>
+          </div>
+          <div class="wb-pill" title="Primary Target Handle">
+            <span class="wb-pill-icon">🎯</span>
+            <span class="wb-pill-label">Target:</span>
+            <span class="wb-pill-val text-blue font-bold">@chd_plug</span>
+          </div>
+          <div class="wb-pill" title="Statutory Section 63 BSA Score">
+            <span class="wb-pill-icon">⚖️</span>
+            <span class="wb-pill-label">BSA Compliance:</span>
+            <span class="wb-pill-val text-green font-bold">94% (Admissible)</span>
           </div>
         </div>
 
-        <!-- VIEW C: EVOLVING TRENDS RADAR (CORPUS ANALYTICS) -->
-        <div class="tab-content" id="tab-content-trends">
-          <div class="trends-summary-banner">
+        <!-- Quick Action Buttons -->
+        <div class="wb-quick-actions">
+          <button class="btn btn-gov-primary btn-sm" onclick="openDossierModal()">
+            <span>⚖️</span> Section 63 BSA Certificate
+          </button>
+          <button class="btn btn-gov-secondary btn-sm" onclick="openWhatsAppModal()">
+            <span>📲</span> WhatsApp Alert
+          </button>
+          <button class="btn btn-gov-secondary btn-sm" onclick="openNoticeModal('bank')">
+            <span>🏦</span> Bank Freeze Notice
+          </button>
+        </div>
+      </div>
+
+      <!-- Workbench Interactive Mode Switcher -->
+      <div class="wb-mode-switcher-bar">
+        <div class="wb-mode-tabs">
+          <button class="wb-mode-tab active" id="mode-btn-triage" onclick="switchWorkbenchMode('triage')">
+            <span>🎯</span> Triage & Evidence Inspector
+          </button>
+          <button class="wb-mode-tab" id="mode-btn-graph" onclick="switchWorkbenchMode('graph')">
+            <span>🕸️</span> Interactive Link Graph
+          </button>
+          <button class="wb-mode-tab" id="mode-btn-evidence" onclick="switchWorkbenchMode('evidence')">
+            <span>📄</span> Raw Evidence Streams
+          </button>
+          <button class="wb-mode-tab" id="mode-btn-intel" onclick="switchWorkbenchMode('intel')">
+            <span>📊</span> Intelligence & Dossier
+          </button>
+        </div>
+
+        <div class="wb-mode-status text-xs text-muted">
+          <span>🔒 Air-Gapped Local Model: <strong>Llama-3.2-3B (T=0.0)</strong></span>
+        </div>
+      </div>
+
+      <!-- ================================================================= -->
+      <!-- MODE 1: MASTER-DETAIL TRIAGE & EVIDENCE INSPECTOR (DEFAULT) -->
+      <!-- ================================================================= -->
+      <div class="wb-mode-content active" id="wb-mode-triage">
+        <div class="wb-split-layout">
+
+          <!-- Left Column: Master Triage Leads List -->
+          <div class="wb-leads-master-col">
+            <div class="wb-col-header flex-between">
+              <div class="flex-gap">
+                <span class="panel-num">1</span>
+                <h3 class="panel-title">EXTRACTED LEADS & TRIAGE QUEUE</h3>
+              </div>
+              <span class="text-xs text-muted" id="triage-queue-count">8 Leads Found</span>
+            </div>
+
+            <!-- Category Filter Chips -->
+            <div class="triage-filters-strip">
+              <button class="filter-chip active" onclick="setTriageFilter('all')">All (<span id="count-all">8</span>)</button>
+              <button class="filter-chip" onclick="setTriageFilter('financial')">Financial / UPI (<span id="count-financial">3</span>)</button>
+              <button class="filter-chip" onclick="setTriageFilter('slang')">Slang & Intent (<span id="count-slang">3</span>)</button>
+              <button class="filter-chip" onclick="setTriageFilter('darknet')">Tor (.onion) (<span id="count-darknet">1</span>)</button>
+              <button class="filter-chip" onclick="setTriageFilter('image')">Drop Point (<span id="count-image">1</span>)</button>
+            </div>
+
+            <div class="glass-box-notice">
+              <span>🛡️ <strong>Anti-Framing Guardrail:</strong> Multi-factor scoring cross-checks chat text against bank CSV statements.</span>
+            </div>
+
+            <!-- Leads List Container -->
+            <div class="wb-leads-card-list" id="triage-cards-container">
+              <!-- Rendered by JS -->
+            </div>
+          </div>
+
+          <!-- Right Column: Interactive Lead Inspector & Evidence Context -->
+          <div class="wb-inspector-col">
+            <div class="wb-col-header flex-between">
+              <div class="flex-gap">
+                <span class="panel-num">2</span>
+                <h3 class="panel-title">LEAD INSPECTOR & CORROBORATED SOURCE CONTEXT</h3>
+              </div>
+              <span class="badge badge-sm badge-blue" id="inspector-status-badge">Select a lead to inspect</span>
+            </div>
+
+            <!-- Dynamic Inspector Card -->
+            <div class="wb-inspector-card" id="lead-inspector-card">
+              <!-- Rendered by JS when a lead is selected -->
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ================================================================= -->
+      <!-- MODE 2: INTERACTIVE NETWORK LINK GRAPH (FULL-WIDTH WORKSPACE) -->
+      <!-- ================================================================= -->
+      <div class="wb-mode-content" id="wb-mode-graph" style="display: none;">
+        <div class="wb-graph-stage">
+          <div class="wb-graph-header flex-between">
             <div>
-              <h3 class="trends-banner-title">CORPUS INTELLIGENCE: 1,870 CHATS ANALYZED</h3>
-              <p class="trends-banner-desc">Observed shifts in payment rails, surrogate slang terminology, and active time windows.</p>
+              <h3 class="panel-title">ENTITY-RELATIONSHIP LINK GRAPH (CROSS-CORRELATED)</h3>
+              <p class="text-xs text-muted">Click any node to reveal linked evidence channels, phone subscribers, and bank trails.</p>
+            </div>
+            <div class="graph-legend-pills">
+              <span class="legend-pill"><span class="legend-dot dot-purple"></span> Tor Marketplace</span>
+              <span class="legend-pill"><span class="legend-dot dot-blue"></span> Target Persona</span>
+              <span class="legend-pill"><span class="legend-dot dot-amber"></span> Financial / Wallet</span>
+              <span class="legend-pill"><span class="legend-dot dot-green"></span> Drop Coordinates</span>
             </div>
           </div>
 
-          <div class="dossier-section">
-            <div class="section-subhead">
-              <span>PAYMENT METHODS OBSERVED IN CORPUS</span>
+          <div class="wb-graph-canvas-box" id="network-graph-canvas-container">
+            <!-- Rendered by JS -->
+          </div>
+
+          <!-- Interactive Node Attributes Drawer -->
+          <div class="wb-node-attributes-drawer" id="node-inspector-card" style="display: none;">
+            <div class="flex-between">
+              <div class="flex-gap">
+                <span class="badge badge-sm badge-blue">NODE INSPECTION</span>
+                <span class="font-bold text-blue" id="node-inspect-title">Node Attributes</span>
+              </div>
+              <button class="btn btn-xs btn-gov-secondary" onclick="closeNodeInspector()">✕</button>
             </div>
-            <div class="trend-bars-container">
-              <div class="trend-bar-row">
-                <div class="trend-bar-meta">
-                  <span class="trend-name">UPI / Domestic Accounts</span>
-                  <span class="trend-val mono">52% (972 mentions)</span>
-                </div>
-                <div class="bar-track"><div class="bar-fill bar-blue" style="width: 52%;"></div></div>
-              </div>
-              <div class="trend-bar-row">
-                <div class="trend-bar-meta">
-                  <span class="trend-name">TRON USDT (TRC-20 Stablecoin)</span>
-                  <span class="trend-val mono text-blue">28% (523 mentions)</span>
-                </div>
-                <div class="bar-track"><div class="bar-fill bar-amber" style="width: 28%;"></div></div>
-              </div>
-              <div class="trend-bar-row">
-                <div class="trend-bar-meta">
-                  <span class="trend-name">E-Commerce Gift Cards (Amazon/Flipkart)</span>
-                  <span class="trend-val mono">14% (261 mentions)</span>
-                </div>
-                <div class="bar-track"><div class="bar-fill bar-purple" style="width: 14%;"></div></div>
-              </div>
-              <div class="trend-bar-row">
-                <div class="trend-bar-meta">
-                  <span class="trend-name">Cash on Dead-Drop</span>
-                  <span class="trend-val mono text-muted">6% (114 mentions)</span>
-                </div>
-                <div class="bar-track"><div class="bar-fill bar-muted" style="width: 6%;"></div></div>
-              </div>
+            <div class="text-xs" id="node-inspect-body" style="margin-top: 8px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================================================================= -->
+      <!-- MODE 3: RAW EVIDENCE STREAMS (FULL-WIDTH BROWSER) -->
+      <!-- ================================================================= -->
+      <div class="wb-mode-content" id="wb-mode-evidence" style="display: none;">
+        <div class="wb-evidence-stage">
+          <div class="wb-col-header flex-between">
+            <div>
+              <h3 class="panel-title">MULTI-SOURCE EVIDENCE EXPLORER (UFME STANDARD)</h3>
+              <p class="text-xs text-muted">Select an evidence stream to inspect raw line-by-line seized transcripts.</p>
             </div>
-            <div class="trend-insight-box">
-              <strong>Pattern Note:</strong> Bulk transactions (>₹15,000) consistently request TRON USDT or e-gift cards rather than direct UPI transfers to avoid 1930 freezing notices.
+            <span class="record-counter" id="evidence-files-count">5 Streams Loaded</span>
+          </div>
+
+          <!-- Stream Switcher Tabs -->
+          <div class="wb-stream-tabs" id="file-tabs-container">
+            <!-- Rendered by JS -->
+          </div>
+
+          <!-- Active File Metadata Banner -->
+          <div class="file-meta-banner flex-between" id="file-meta-card">
+            <div>
+              <span class="meta-key">FILE:</span> <span class="mono font-bold" id="meta-filename">telegram_chd_syndicate_dump.json</span> &bull; 
+              <span class="meta-key">SOURCE:</span> <span id="meta-source">Seized OnePlus 11 (Malkhana Barcode: MK-2026-89)</span> &bull;
+              <span class="badge badge-sm badge-neutral" id="profile-indicator">Profile: Cellebrite UFED</span>
+            </div>
+            <div>
+              <span class="meta-key">SHA-256:</span> <span class="mono text-blue text-xs" id="meta-sha256">e3b0c44298fc1c14...</span>
             </div>
           </div>
 
-          <div class="dossier-section">
-            <div class="section-subhead">
-              <span>SURROGATE CODEWORD & SLANG OCCURRENCES</span>
+          <!-- Search Toolbar -->
+          <div class="raw-viewer-toolbar">
+            <div class="search-input-wrapper">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="raw-search-input" placeholder="Search line text (e.g. UPI, phone number, Chitta, rate, drop location)..." oninput="filterRawLines()">
             </div>
-            <table class="gov-table">
-              <thead>
-                <tr>
-                  <th>CODEWORD / EMOJI</th>
-                  <th>RESOLVED MEANING</th>
-                  <th>COUNT</th>
-                  <th>STATUS</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><span class="mono font-bold">"Chitta" / "White"</span></td>
-                  <td>Heroin (Diacetylmorphine)</td>
-                  <td class="mono">412</td>
-                  <td><span class="badge badge-sm badge-red">High Volume</span></td>
-                </tr>
-                <tr>
-                  <td><span class="mono font-bold">"Stamp Paper" / 📄</span></td>
-                  <td>LSD Blotter Sheets</td>
-                  <td class="mono">189</td>
-                  <td><span class="badge badge-sm badge-amber">Active</span></td>
-                </tr>
-                <tr>
-                  <td><span class="mono font-bold">"White Shoes (Size 5g)"</span></td>
-                  <td>Cocaine / Meth Surrogate</td>
-                  <td class="mono">94</td>
-                  <td><span class="badge badge-sm badge-blue">New Code</span></td>
-                </tr>
-                <tr>
-                  <td><span class="mono font-bold">"Meow / 4-MMC"</span></td>
-                  <td>Mephedrone (Synthetic)</td>
-                  <td class="mono">76</td>
-                  <td><span class="badge badge-sm badge-neutral">Stable</span></td>
-                </tr>
-              </tbody>
-            </table>
+            <span class="raw-line-counter mono" id="raw-lines-count">12 Lines</span>
           </div>
 
-          <div class="dossier-section">
-            <div class="section-subhead">
-              <span>HOURLY ACTIVITY DISTRIBUTION (24-HOUR IST)</span>
-            </div>
-            <div class="temporal-chart-wrapper">
-              <div class="temporal-hour-bars">
-                <div class="hour-col"><div class="hour-fill" style="height: 80%;"></div><span>00h</span></div>
-                <div class="hour-col"><div class="hour-fill" style="height: 95%;"></div><span>02h</span></div>
-                <div class="hour-col"><div class="hour-fill" style="height: 60%;"></div><span>04h</span></div>
-                <div class="hour-col"><div class="hour-fill" style="height: 20%;"></div><span>06h</span></div>
-                <div class="hour-col"><div class="hour-fill" style="height: 10%;"></div><span>08h</span></div>
-                <div class="hour-col"><div class="hour-fill" style="height: 15%;"></div><span>10h</span></div>
-                <div class="hour-col"><div class="hour-fill" style="height: 25%;"></div><span>12h</span></div>
-                <div class="hour-col"><div class="hour-fill" style="height: 35%;"></div><span>14h</span></div>
-                <div class="hour-col"><div class="hour-fill" style="height: 45%;"></div><span>16h</span></div>
-                <div class="hour-col"><div class="hour-fill" style="height: 70%;"></div><span>18h</span></div>
-                <div class="hour-col"><div class="hour-fill" style="height: 85%;"></div><span>20h</span></div>
-                <div class="hour-col"><div class="hour-fill" style="height: 90%;"></div><span>22h</span></div>
+          <!-- Raw Line Content Viewer -->
+          <div class="raw-line-viewer" id="raw-lines-container" style="max-height: 520px;">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- ================================================================= -->
+      <!-- MODE 4: INTELLIGENCE & DOSSIER (METRICS, HARVESTER, TRENDS) -->
+      <!-- ================================================================= -->
+      <div class="wb-mode-content" id="wb-mode-intel" style="display: none;">
+        <div class="wb-intel-grid">
+
+          <!-- Left Column: Metrics & Emerging Slang -->
+          <div class="wb-intel-col">
+            <!-- Metrics Grid -->
+            <div class="metrics-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 16px;">
+              <div class="metric-card">
+                <span class="metric-label">IDENTIFIED PERSONAS</span>
+                <span class="metric-value text-blue" id="metric-identities">4</span>
+                <span class="metric-foot">2 Telegram / 2 Phone</span>
               </div>
-              <div class="temporal-label mono text-muted">
-                Peak transaction handoff window: <strong>22:00 – 03:30 IST</strong>
+              <div class="metric-card">
+                <span class="metric-label">FINANCIAL ENDPOINTS</span>
+                <span class="metric-value text-amber" id="metric-financials">3</span>
+                <span class="metric-foot">2 UPI / 1 TRON USDT</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">SUSPECTED SUBSTANCES</span>
+                <span class="metric-value text-red" id="metric-substances">3</span>
+                <span class="metric-foot">Heroin, LSD, 4-MMC</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">DROP COORDINATES</span>
+                <span class="metric-value text-green" id="metric-drops">2</span>
+                <span class="metric-foot">Sector 43 / Sector 22</span>
+              </div>
+            </div>
+
+            <!-- Novel Codeword Harvester -->
+            <div class="dossier-section" style="border-left: 4px solid var(--accent-purple); margin-bottom: 16px;">
+              <div class="section-subhead flex-between">
+                <span>⚡ EMERGING CODEWORD HARVESTER (IN-CONTEXT INDUCTION)</span>
+                <span class="badge badge-sm badge-purple">Candidate Detection</span>
+              </div>
+              <div class="antifragile-candidate-card" id="harvester-candidate-box">
+                <div class="flex-between">
+                  <div>
+                    <span class="mono font-bold text-purple" style="font-size: 13px;">Candidate: "Ice Tea"</span>
+                    <span class="badge badge-sm badge-neutral" style="margin-left: 6px;">Frequency: 3</span>
+                  </div>
+                  <span class="badge badge-sm badge-amber">Syntactic Anomaly (89%)</span>
+                </div>
+                <p class="text-xs text-secondary" style="margin: 6px 0;">
+                  Inferred: Liquid Synthetic Stimulant / Ketamine. Appeared in commodity slot with rate ₹1500 (Line 6).
+                </p>
+                <div class="flex-gap" style="margin-top: 8px;">
+                  <button class="btn btn-sm btn-gov-primary" onclick="approveHarvestedCodeword('Ice Tea', 'Liquid Synthetic Stimulant / Ketamine', 'Stimulant / Synthetic')">
+                    ✓ Approve & Add to Lexicon
+                  </button>
+                  <button class="btn btn-sm btn-gov-secondary" onclick="dismissHarvestedCodeword()">
+                    ✗ Dismiss
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Verified Entities Table (BSA Annexure) -->
+            <div class="dossier-section">
+              <div class="section-subhead flex-between">
+                <span>VERIFIED EVIDENCE ITEMS (BSA SEC 63 SCHEDULE 'B')</span>
+                <span class="badge badge-sm badge-green" id="verified-table-badge">0 Items Signed</span>
+              </div>
+              <div class="verified-table-wrapper" style="max-height: 220px;">
+                <table class="gov-table" id="verified-entities-table">
+                  <thead>
+                    <tr>
+                      <th>TYPE</th>
+                      <th>IDENTIFIER / VALUE</th>
+                      <th>SOURCE LINE</th>
+                      <th>STATUS</th>
+                    </tr>
+                  </thead>
+                  <tbody id="verified-entities-tbody">
+                    <!-- Rendered by JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Statutory Requisitions & Trends Radar -->
+          <div class="wb-intel-col">
+            <!-- Statutory Requisitions -->
+            <div class="dossier-section" style="margin-bottom: 16px;">
+              <div class="section-subhead">
+                <span>STATUTORY REQUISITIONS & DISPATCHES</span>
+              </div>
+              <div class="requisition-buttons-grid">
+                <button class="btn btn-gov-secondary btn-full" onclick="openNoticeModal('bank')">
+                  <span>🏦</span> Draft Sec 91 CrPC Bank Freeze Notice (mule44@ybl)
+                </button>
+                <button class="btn btn-gov-secondary btn-full" onclick="openNoticeModal('telecom')">
+                  <span>📡</span> Draft Sec 91 CrPC Telecom CDR Order (+91 98765-21440)
+                </button>
+                <button class="btn btn-gov-primary btn-full" onclick="openWhatsAppModal()">
+                  <span>📲</span> Copy WhatsApp Tactical Alert (PCR Team)
+                </button>
+                <button class="btn btn-gov-secondary btn-full" onclick="copyZimniSnippet()">
+                  <span>📝</span> Copy Munshi Case Diary (Zimni) Text
+                </button>
+              </div>
+            </div>
+
+            <!-- Payment Methods Radar -->
+            <div class="dossier-section">
+              <div class="section-subhead">
+                <span>PAYMENT METHODS OBSERVED IN CORPUS</span>
+              </div>
+              <div class="trend-bars-container">
+                <div class="trend-bar-row">
+                  <div class="trend-bar-meta">
+                    <span class="trend-name font-bold">UPI / Domestic Bank Accounts</span>
+                    <span class="trend-val mono">52% (972 mentions)</span>
+                  </div>
+                  <div class="bar-track"><div class="bar-fill bar-blue" style="width: 52%;"></div></div>
+                </div>
+                <div class="trend-bar-row">
+                  <div class="trend-bar-meta">
+                    <span class="trend-name font-bold">TRON USDT (TRC-20 Stablecoin)</span>
+                    <span class="trend-val mono text-blue">28% (523 mentions)</span>
+                  </div>
+                  <div class="bar-track"><div class="bar-fill bar-amber" style="width: 28%;"></div></div>
+                </div>
+                <div class="trend-bar-row">
+                  <div class="trend-bar-meta">
+                    <span class="trend-name font-bold">E-Commerce Gift Cards (Amazon/Flipkart)</span>
+                    <span class="trend-val mono">14% (261 mentions)</span>
+                  </div>
+                  <div class="bar-track"><div class="bar-fill bar-purple" style="width: 14%;"></div></div>
+                </div>
               </div>
             </div>
           </div>
 
         </div>
-
-      </section>
+      </div>
 
     </main>
 
-    <!-- ================================================================= -->
-    <!-- MODAL: GLOBAL PRECINCT INTEL SEARCH (Requirement #7) -->
-    <!-- ================================================================= -->
+    <!-- ===================================================================== -->
+    <!-- VIEW 4: CASE & APPLICATION TRACKING DASHBOARD -->
+    <!-- ===================================================================== -->
+    <section class="portal-section" id="section-tracking" style="display: none;">
+      <div class="section-top-bar flex-between">
+        <div>
+          <h2 class="portal-section-title">CASE & APPLICATION TRACKING DASHBOARD</h2>
+          <p class="portal-section-sub">Track real-time statutory lifecycle progress, pending forensic tasks, and court submission milestones.</p>
+        </div>
+        <button class="btn btn-gov-primary btn-sm" onclick="showSection('intake')">
+          <span>+</span> New Case Registration
+        </button>
+      </div>
+
+      <!-- Search & Filters -->
+      <div class="filter-bar-container">
+        <div class="search-input-wrapper" style="max-width: 380px;">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="track-search-input" placeholder="Search by FIR, Police Station, or IO..." oninput="filterTrackingCases()">
+        </div>
+        <div class="filter-chips-group">
+          <button class="filter-chip active" onclick="setTrackingFilter('ALL')">All Cases (3)</button>
+          <button class="filter-chip" onclick="setTrackingFilter('IN_TRIAGE')">In Triage (1)</button>
+          <button class="filter-chip" onclick="setTrackingFilter('UNDER_REVIEW')">Under Review (1)</button>
+          <button class="filter-chip" onclick="setTrackingFilter('CERTIFIED_ADMISSIBLE')">Admissible / Certified (1)</button>
+        </div>
+      </div>
+
+      <!-- Tracking Cases Cards Container -->
+      <div class="tracking-cards-grid" id="tracking-cases-container">
+        <!-- Rendered by JS -->
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- VIEW 5: STATUTORY COMPLIANCE CENTER -->
+    <!-- ===================================================================== -->
+    <section class="portal-section" id="section-compliance" style="display: none;">
+      <div class="section-top-bar flex-between">
+        <div>
+          <h2 class="portal-section-title">STATUTORY COMPLIANCE & LEGAL ADMISSIBILITY CENTER</h2>
+          <p class="portal-section-sub">Section 63 Bharatiya Sakshya Adhiniyam, 2023 compliance audit, chain of custody, and requisition readiness.</p>
+        </div>
+        <button class="btn btn-gov-primary btn-sm" onclick="openDossierModal()">
+          <span>⚖️</span> View Active Section 63 BSA Certificate
+        </button>
+      </div>
+
+      <!-- Compliance Score & Breakdown Header -->
+      <div class="compliance-overview-grid">
+        <div class="gov-card compliance-score-card">
+          <div class="score-circle-wrapper">
+            <div class="score-radial-progress" id="compliance-radial-meter">
+              <span class="score-percentage" id="compliance-score-val">94%</span>
+            </div>
+          </div>
+          <div class="score-details">
+            <h3 class="score-title text-green font-bold">STATUTORY GRADE: COURT ADMISSIBLE (A+)</h3>
+            <p class="text-sm text-secondary">
+              Digital evidence chain satisfies mandatory preconditions under <strong>Section 63(4) BSA 2023</strong> (replaces Section 65B Indian Evidence Act).
+            </p>
+            <div class="badge badge-sm badge-green" style="margin-top: 8px;">100% Cryptographic Verification Rate</div>
+          </div>
+        </div>
+
+        <div class="gov-card compliance-metrics-card">
+          <h4 class="compliance-metric-title">Compliance Factor Breakdown</h4>
+          <div class="compliance-meter-row">
+            <div class="flex-between text-xs">
+              <span>SHA-256 Pre-Ingestion Checksums</span>
+              <span class="mono font-bold text-green">100% (5/5 Files)</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill bar-green" style="width: 100%;"></div></div>
+          </div>
+          <div class="compliance-meter-row">
+            <div class="flex-between text-xs">
+              <span>Chain of Custody Malkhana Verification</span>
+              <span class="mono font-bold text-green">100% (Matched)</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill bar-green" style="width: 100%;"></div></div>
+          </div>
+          <div class="compliance-meter-row">
+            <div class="flex-between text-xs">
+              <span>SLM Determinism & Explainability (T=0.0)</span>
+              <span class="mono font-bold text-blue">96% (Audited)</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill bar-blue" style="width: 96%;"></div></div>
+          </div>
+          <div class="compliance-meter-row">
+            <div class="flex-between text-xs">
+              <span>Statutory Section 91 CrPC Orders Prepared</span>
+              <span class="mono font-bold text-amber">88% (Ready)</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill bar-amber" style="width: 88%;"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Statutory Checklist -->
+      <div class="gov-card" style="margin-top: 20px;">
+        <h3 class="panel-title" style="margin-bottom: 12px;">MANDATORY STATUTORY REQUISITIONS CHECKLIST</h3>
+        <table class="gov-table" style="font-size: 12px;">
+          <thead>
+            <tr>
+              <th>STATUTORY REQUIREMENT</th>
+              <th>LEGAL SECTION</th>
+              <th>VERIFICATION STATUS</th>
+              <th>OFFICER / SYSTEM EVIDENCE</th>
+              <th>ACTION</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Pre-Ingestion Cryptographic Integrity</strong></td>
+              <td class="mono">BSA 2023 Sec 63(2)(a)</td>
+              <td><span class="badge badge-sm badge-green">VERIFIED ✓</span></td>
+              <td class="text-xs">SHA-256 hashes generated prior to parsing; matches Malkhana MK-2026-89 barcode.</td>
+              <td><button class="btn btn-xs btn-gov-secondary" onclick="showSection('documents')">Inspect Hashes</button></td>
+            </tr>
+            <tr>
+              <td><strong>Computer System Regular Operation Certification</strong></td>
+              <td class="mono">BSA 2023 Sec 63(4)(c)</td>
+              <td><span class="badge badge-sm badge-green">CERTIFIED ✓</span></td>
+              <td class="text-xs">Debian 12 Hardened Kernel; offline air-gapped terminal integrity signed by Examiner.</td>
+              <td><button class="btn btn-xs btn-gov-secondary" onclick="openAuditModal()">View Audit Log</button></td>
+            </tr>
+            <tr>
+              <td><strong>Bank Account Immediate Debit Freezing Notice</strong></td>
+              <td class="mono">CrPC Sec 91 / BNS 94</td>
+              <td><span class="badge badge-sm badge-green">ATTACHED ✓</span></td>
+              <td class="text-xs">Statutory requisition notice prepared for SBI & Yes Bank regarding VPA mule44@ybl.</td>
+              <td><button class="btn btn-xs btn-gov-primary" onclick="openNoticeModal('bank')">Print Order</button></td>
+            </tr>
+            <tr>
+              <td><strong>Telecom Call Detail Record (CDR) Preservation</strong></td>
+              <td class="mono">CrPC Sec 91</td>
+              <td><span class="badge badge-sm badge-green">ATTACHED ✓</span></td>
+              <td class="text-xs">Requisition prepared for Bharti Airtel / Reliance Jio for target +91 98765-21440.</td>
+              <td><button class="btn btn-xs btn-gov-primary" onclick="openNoticeModal('telecom')">Print Order</button></td>
+            </tr>
+            <tr>
+              <td><strong>Investigating Officer Solemn Declaration</strong></td>
+              <td class="mono">BSA 2023 Sec 63(4)</td>
+              <td><span class="badge badge-sm badge-green" id="io-sig-badge">SIGNED ✓</span></td>
+              <td class="text-xs">Dual signed by Insp. Vikramjit Singh (IO) & SI Harpreet Kaur (Forensic Examiner).</td>
+              <td><button class="btn btn-xs btn-gov-secondary" onclick="openDossierModal()">Preview PDF</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- VIEW 6: DOCUMENT & EVIDENCE VAULT -->
+    <!-- ===================================================================== -->
+    <section class="portal-section" id="section-documents" style="display: none;">
+      <div class="section-top-bar flex-between">
+        <div>
+          <h2 class="portal-section-title">DOCUMENT & DIGITAL EVIDENCE VAULT</h2>
+          <p class="portal-section-sub">Immutable digital repository of seized electronic items, cryptographic certificates, and statutory manifests.</p>
+        </div>
+        <button class="btn btn-gov-secondary btn-sm" onclick="openLiveHashCheckerModal()">
+          <span>⚡</span> Live SHA-256 Hash Checker
+        </button>
+      </div>
+
+      <!-- Vault Overview Cards -->
+      <div class="portal-grid-3col">
+        <div class="metric-card">
+          <span class="metric-label">TOTAL SEIZED ITEMS</span>
+          <span class="metric-value text-blue">5 Evidence Files</span>
+          <span class="metric-foot">Malkhana Registered</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">INTEGRITY STATUS</span>
+          <span class="metric-value text-green">100% Uncompromised</span>
+          <span class="metric-foot">Zero Hash Mismatch</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">COURT ANNEXURES</span>
+          <span class="metric-value text-amber">Schedule A & B</span>
+          <span class="metric-foot">Ready for CJM Sessions</span>
+        </div>
+      </div>
+
+      <!-- Documents Table -->
+      <div class="gov-card" style="margin-top: 20px;">
+        <h3 class="panel-title" style="margin-bottom: 12px;">INGESTED EVIDENCE REGISTRY (SCHEDULE 'A')</h3>
+        <table class="gov-table" style="font-size: 12px;">
+          <thead>
+            <tr>
+              <th>ITEM #</th>
+              <th>EVIDENCE FILENAME</th>
+              <th>SEIZURE SOURCE & MALKHANA BARCODE</th>
+              <th>FORMAT PROFILE</th>
+              <th>IMMUTABLE SHA-256 CHECKSUM</th>
+              <th>STATUS</th>
+              <th>ACTIONS</th>
+            </tr>
+          </thead>
+          <tbody id="vault-evidence-tbody">
+            <!-- Populated by JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Live Hash Checker Card -->
+      <div class="gov-card" style="margin-top: 20px;">
+        <h3 class="panel-title">VERIFY EVIDENCE FILE HASH INTEGRITY</h3>
+        <p class="text-xs text-muted" style="margin-bottom: 10px;">
+          Enter raw forensic string or file snippet to test cryptographic hash recalculation against Section 63 BSA standards.
+        </p>
+        <div class="flex-gap">
+          <input type="text" id="hash-checker-input" class="gov-input mono" placeholder="Paste seized text or hash signature to verify..." style="flex: 1;">
+          <button class="btn btn-gov-primary btn-sm" onclick="calculateClientHash()">Compute SHA-256</button>
+        </div>
+        <div id="hash-checker-result" style="margin-top: 10px;"></div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- VIEW 7: GOVERNMENT SCHEMES & STATUTORY LAWS DIRECTORY -->
+    <!-- ===================================================================== -->
+    <section class="portal-section" id="section-schemes" style="display: none;">
+      <div class="section-top-bar flex-between">
+        <div>
+          <h2 class="portal-section-title">GOVERNMENT SCHEMES, STATUTORY LAWS & MHA GRANTS</h2>
+          <p class="portal-section-sub">Comprehensive reference library for cyber crime schemes, forensic assistance funds, and Indian legal frameworks.</p>
+        </div>
+        <button class="btn btn-gov-secondary btn-sm" onclick="openAssistantModal('Tell me about MHA I4C and Section 63 BSA.')">
+          <span>🤖</span> Ask Copilot
+        </button>
+      </div>
+
+      <!-- Search & Scheme Filter -->
+      <div class="filter-bar-container">
+        <div class="search-input-wrapper" style="max-width: 380px;">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="scheme-search-input" placeholder="Search schemes, acts, or funding directives..." oninput="filterSchemes()">
+        </div>
+        <div class="filter-chips-group">
+          <button class="filter-chip active" onclick="setSchemeFilter('ALL')">All Schemes (7)</button>
+          <button class="filter-chip" onclick="setSchemeFilter('MHA')">MHA / Central (3)</button>
+          <button class="filter-chip" onclick="setSchemeFilter('ACTS')">Statutory Acts (2)</button>
+          <button class="filter-chip" onclick="setSchemeFilter('FORENSICS')">Forensic Labs (2)</button>
+        </div>
+      </div>
+
+      <!-- Scheme Cards Grid -->
+      <div class="schemes-cards-grid" id="schemes-container">
+        <!-- Populated by JS -->
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL: SMART AI COPILOT ASSISTANT -->
+    <!-- ===================================================================== -->
+    <div class="modal-overlay" id="modal-assistant" style="display: none;">
+      <div class="modal-container modal-md">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <span class="modal-icon">🤖</span>
+            <div>
+              <h3 class="modal-title">STATUTORY & FORENSIC AI COPILOT</h3>
+              <span class="modal-subtitle">Air-Gapped Legal Advisory & Procedural Guidance (BSA 2023 & NDPS)</span>
+            </div>
+          </div>
+          <button class="modal-close-btn" onclick="closeAssistantModal()">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="assistant-chat-container" id="assistant-chat-container">
+            <div class="assistant-msg-bubble system-bubble">
+              <strong>Forensic Copilot Active:</strong> I can assist you with Section 63(4) BSA compliance, drafting Section 91 CrPC orders, identifying required digital evidence, or explaining regional evasion slang.
+            </div>
+          </div>
+
+          <!-- Quick Prompts Chips -->
+          <div class="quick-prompts-row" style="margin-top: 10px;">
+            <button class="prompt-chip" onclick="sendAssistantQuery('What are the mandatory requirements for Section 63 BSA court certificate?')">
+              BSA Sec 63 Requirements
+            </button>
+            <button class="prompt-chip" onclick="sendAssistantQuery('How to draft a Section 91 CrPC bank freeze notice for mule account?')">
+              Sec 91 CrPC Bank Freezing
+            </button>
+            <button class="prompt-chip" onclick="sendAssistantQuery('What digital evidence is required for darknet drug storefront cases?')">
+              Darknet Evidence Checklist
+            </button>
+            <button class="prompt-chip" onclick="sendAssistantQuery('What does surrogate slang White Shoes 5g mean?')">
+              Resolve Slang 'White Shoes'
+            </button>
+          </div>
+
+          <div class="chat-input-row" style="margin-top: 10px;">
+            <input type="text" id="assistant-query-input" class="gov-input" placeholder="Type statutory or investigative question..." onkeydown="if(event.key==='Enter') submitAssistantQuery()">
+            <button class="btn btn-gov-primary btn-sm" onclick="submitAssistantQuery()">Ask</button>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <span class="text-xs text-muted">Zero Cloud Leakage &bull; 100% Offline Rule Engine</span>
+          <button class="btn btn-gov-secondary btn-sm" onclick="closeAssistantModal()">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL: GLOBAL PRECINCT INTEL SEARCH -->
+    <!-- ===================================================================== -->
     <div class="modal-overlay" id="modal-global-search" style="display: none;">
       <div class="modal-container modal-md">
         <div class="modal-header">
@@ -694,9 +1282,9 @@
       </div>
     </div>
 
-    <!-- ================================================================= -->
-    <!-- MODAL: IMMUTABLE FORENSIC AUDIT TRAIL (Requirement #9) -->
-    <!-- ================================================================= -->
+    <!-- ===================================================================== -->
+    <!-- MODAL: IMMUTABLE FORENSIC AUDIT TRAIL -->
+    <!-- ===================================================================== -->
     <div class="modal-overlay" id="modal-audit" style="display: none;">
       <div class="modal-container modal-md">
         <div class="modal-header">
@@ -718,16 +1306,16 @@
 
         <div class="modal-footer">
           <button class="btn btn-gov-secondary btn-sm" onclick="closeAuditModal()">Close</button>
-          <button class="btn btn-gov-primary btn-sm" onclick="showToast('📜 Audit ledger exported with SHA-256 verification signature!', 'success')">
+          <button class="btn btn-gov-primary btn-sm" onclick="exportAuditLogCSV()">
             <span>📥</span> Export Audit Log (CSV)
           </button>
         </div>
       </div>
     </div>
 
-    <!-- ================================================================= -->
+    <!-- ===================================================================== -->
     <!-- MODAL: WHATSAPP FIELD DISPATCH MODAL -->
-    <!-- ================================================================= -->
+    <!-- ===================================================================== -->
     <div class="modal-overlay" id="modal-whatsapp" style="display: none;">
       <div class="modal-container modal-md">
         <div class="modal-header">
@@ -757,9 +1345,9 @@
       </div>
     </div>
 
-    <!-- ================================================================= -->
+    <!-- ===================================================================== -->
     <!-- MODAL: SECTION 63 BSA DIGITAL EVIDENCE CERTIFICATE -->
-    <!-- ================================================================= -->
+    <!-- ===================================================================== -->
     <div class="modal-overlay" id="modal-dossier" style="display: none;">
       <div class="modal-container modal-lg">
         <div class="modal-header">
@@ -868,9 +1456,9 @@
       </div>
     </div>
 
-    <!-- ================================================================= -->
+    <!-- ===================================================================== -->
     <!-- MODAL: SECTION 91 CRPC STATUTORY FIELD REQUISITION -->
-    <!-- ================================================================= -->
+    <!-- ===================================================================== -->
     <div class="modal-overlay" id="modal-notice" style="display: none;">
       <div class="modal-container modal-lg">
         <div class="modal-header">
