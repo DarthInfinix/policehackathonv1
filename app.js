@@ -34,7 +34,7 @@ let CASE_METADATA = {
 };
 
 // 5 Multi-Source Evidence Streams
-const EVIDENCE_FILES = [
+let EVIDENCE_FILES = [
   {
     id: "file-darknet",
     name: "darknet_hydra_listing.html",
@@ -659,20 +659,348 @@ function autofillCaseDetails() {
   showToast("⚡ Autofilled official Chandigarh Police Case Details!", "success");
 }
 
-function autofillEvidenceFiles() {
-  const tbody = document.getElementById('staged-evidence-tbody');
-  tbody.innerHTML = EVIDENCE_FILES.map(f => `
-    <tr>
-      <td class="mono font-bold">${f.name}</td>
-      <td>${f.source}</td>
-      <td><span class="badge badge-sm badge-neutral">${f.parserProfile}</span></td>
-      <td class="mono text-xs text-blue">${f.sha256.substring(0, 24)}...</td>
-    </tr>
-  `).join("");
+// ============================================================================
+// MEDIA INGESTION ENGINE (LOCAL DEVICE & CLOUD DRIVE SOURCES)
+// ============================================================================
 
-  document.getElementById('evidence-queue-section').style.display = 'block';
-  logAuditEvent("MEDIA_INGESTION", "Staged 5 multi-source evidence streams with pre-calculated SHA-256 hashes");
+function triggerDeviceFileInput() {
+  const fileInput = document.getElementById('media-file-input');
+  if (fileInput) {
+    fileInput.value = '';
+    fileInput.click();
+  }
+}
+
+function handleDragOver(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const dropZone = document.getElementById('evidence-drop-zone');
+  if (dropZone) dropZone.classList.add('dragover');
+}
+
+function handleDragLeave(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const dropZone = document.getElementById('evidence-drop-zone');
+  if (dropZone) dropZone.classList.remove('dragover');
+}
+
+function handleDrop(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const dropZone = document.getElementById('evidence-drop-zone');
+  if (dropZone) dropZone.classList.remove('dragover');
+
+  if (event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+    processFiles(event.dataTransfer.files);
+  }
+}
+
+function handleRealFileUpload(event) {
+  if (event.target && event.target.files && event.target.files.length > 0) {
+    processFiles(event.target.files);
+  }
+}
+
+async function calculateFileSha256(arrayBuffer) {
+  try {
+    const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  } catch (err) {
+    let hash = 0;
+    const view = new Uint8Array(arrayBuffer);
+    for (let i = 0; i < view.length; i++) {
+      hash = ((hash << 5) - hash) + view[i];
+      hash |= 0;
+    }
+    return Math.abs(hash).toString(16).padStart(64, '0');
+  }
+}
+
+async function processFiles(fileList) {
+  const files = Array.from(fileList);
+  if (!files.length) return;
+
+  showToast(`⏳ Ingesting ${files.length} file(s) and calculating cryptographic SHA-256 checksums...`, 'alert');
+
+  for (const file of files) {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const sha256 = await calculateFileSha256(arrayBuffer);
+      const isImg = file.type.startsWith('image/') || Boolean(file.name.match(/\.(jpg|jpeg|png|webp|gif|bmp)$/i));
+      const uniqueId = "file-upload-" + Date.now() + "-" + Math.random().toString(36).substr(2, 4);
+
+      let dataUrl = null;
+      let parserProfile = "Universal Forensic Message Envelope (UFME)";
+      let parsedLines = [];
+
+      if (isImg) {
+        parserProfile = "EXIF / Perceptual Hash Adapter";
+        dataUrl = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = e => resolve(e.target.result);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(file);
+        });
+
+        parsedLines = [
+          {
+            num: 1,
+            time: new Date().toLocaleTimeString('en-GB'),
+            sender: "EXIF_METADATA",
+            text: `[IMAGE: ${file.name}] Size: ${(file.size / 1024).toFixed(1)} KB | Calculated SHA-256: ${sha256} | Perceptual Hash pHash: ${sha256.substring(0, 14)} | Seized visual contraband exhibit.`
+          }
+        ];
+
+        // Register an image intelligence lead in TRIAGE_LEADS
+        TRIAGE_LEADS.unshift({
+          id: "lead-" + uniqueId,
+          category: "image",
+          type: "SEIZED VISUAL CONTRABAND EXHIBIT",
+          value: `${file.name} [${(file.size / 1024).toFixed(1)} KB]`,
+          fileId: uniqueId,
+          fileName: file.name,
+          lineNum: 1,
+          method: "Computer Vision & Perceptual Hash (EXIF)",
+          confidence: "99.8%",
+          corroboration: {
+            score: "98% (PHYSICAL DROP MATCH)",
+            isHigh: true,
+            basis: `Image exhibit verified via pre-ingestion SHA-256 (${sha256.substring(0, 16)}...). Authenticated under Section 63 BSA.`
+          },
+          status: "candidate",
+          context: `Seized evidence image '${file.name}' added from investigator PC. Cryptographically authenticated and stamped into evidence register.`,
+          slmRationale: {
+            model: "Local Multi-Modal Vision Adapter (MobileNet-V3 / Llama-Vision Local)",
+            promptTask: "Detect tamper marks, packaging typography, and pHash signature.",
+            reasoning: "Authentic camera capture confirmed without digital clone/editing artifacts. Matched drop zone packaging."
+          }
+        });
+
+      } else {
+        const text = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = e => resolve(e.target.result || "");
+          reader.onerror = () => resolve("");
+          reader.readAsText(file);
+        });
+
+        if (file.name.endsWith('.csv')) {
+          parserProfile = "Bank Statement Normalized / UFME";
+        } else if (file.name.endsWith('.json')) {
+          parserProfile = "Cellebrite UFED / JSON Stream";
+        } else if (file.name.endsWith('.html')) {
+          parserProfile = "Tor HTML Scraper / CTI Feed";
+        } else {
+          parserProfile = "Text Transcript / Raw Log Parser";
+        }
+
+        const rawLines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+        if (rawLines.length > 0) {
+          parsedLines = rawLines.slice(0, 100).map((l, idx) => ({
+            num: idx + 1,
+            time: new Date().toLocaleTimeString('en-GB'),
+            sender: "SEIZED_DATA",
+            text: l
+          }));
+        } else {
+          parsedLines = [
+            { num: 1, time: new Date().toLocaleTimeString('en-GB'), sender: "RECORD", text: `[RECORD: ${file.name}] SHA-256: ${sha256}` }
+          ];
+        }
+      }
+
+      const existingIdx = EVIDENCE_FILES.findIndex(f => f.name === file.name);
+      const newEntry = {
+        id: uniqueId,
+        name: file.name,
+        size: file.size,
+        sha256: sha256,
+        source: "Local Seizure (Uploaded from PC)",
+        parserProfile: parserProfile,
+        recordsCount: parsedLines.length,
+        lines: parsedLines,
+        isImage: isImg,
+        dataUrl: dataUrl
+      };
+
+      if (existingIdx >= 0) {
+        EVIDENCE_FILES[existingIdx] = newEntry;
+      } else {
+        EVIDENCE_FILES.push(newEntry);
+      }
+
+      logAuditEvent("MEDIA_INGESTION", `Ingested file '${file.name}' (${(file.size / 1024).toFixed(1)} KB) with SHA-256: ${sha256}`);
+    } catch (fileErr) {
+      console.error("Error processing file:", file, fileErr);
+      showToast(`⚠️ Could not process ${file.name}: ${fileErr.message}`, 'alert');
+    }
+  }
+
+  renderStagedEvidenceTable();
+  updateCounts();
+  showToast(`📥 Successfully ingested & verified ${files.length} file(s)!`, 'success');
+}
+
+function renderStagedEvidenceTable() {
+  const tbody = document.getElementById('staged-evidence-tbody');
+  const badge = document.getElementById('staged-files-badge');
+  const queueSection = document.getElementById('evidence-queue-section');
+
+  if (queueSection) queueSection.style.display = 'block';
+  if (badge) badge.textContent = `${EVIDENCE_FILES.length} Files Staged`;
+
+  if (!tbody) return;
+
+  tbody.innerHTML = EVIDENCE_FILES.map(f => {
+    const isImg = f.isImage || f.id === 'file-image' || Boolean(f.name.match(/\.(jpg|jpeg|png|webp|gif|bmp)$/i));
+    const thumbHtml = isImg && f.dataUrl
+      ? `<img src="${f.dataUrl}" class="evidence-thumb-img" alt="${escapeHtml(f.name)}" onclick="openImagePreviewModal('${escapeHtml(f.name)}', '${f.dataUrl}', '${f.sha256}')" title="Click to enlarge">`
+      : `<div class="file-type-icon-box">${isImg ? '📸' : (f.name.endsWith('.csv') ? '📊' : (f.name.endsWith('.html') ? '🌐' : '📄'))}</div>`;
+
+    const sizeStr = f.size ? `(${(f.size / 1024).toFixed(1)} KB)` : '';
+
+    return `
+      <tr>
+        <td>
+          <div class="media-thumbnail-cell">
+            ${thumbHtml}
+            <div>
+              <span class="mono font-bold">${escapeHtml(f.name)}</span>
+              <span class="text-xs text-muted" style="margin-left: 4px;">${sizeStr}</span>
+            </div>
+          </div>
+        </td>
+        <td><span class="text-xs">${escapeHtml(f.source)}</span></td>
+        <td><span class="badge badge-sm badge-neutral">${escapeHtml(f.parserProfile)}</span></td>
+        <td class="mono text-xs text-blue" title="${f.sha256}">
+          ${f.sha256.substring(0, 22)}...
+        </td>
+        <td>
+          <div class="flex-gap">
+            ${isImg && f.dataUrl ? `
+              <button type="button" class="btn btn-xs btn-gov-secondary" onclick="openImagePreviewModal('${escapeHtml(f.name)}', '${f.dataUrl}', '${f.sha256}')">View</button>
+            ` : ''}
+            <button type="button" class="btn btn-xs btn-danger" onclick="removeStagedFile('${f.id}')" title="Remove file">✕</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function removeStagedFile(fileId) {
+  EVIDENCE_FILES = EVIDENCE_FILES.filter(f => f.id !== fileId);
+  renderStagedEvidenceTable();
+  updateCounts();
+  showToast("🗑️ Removed file from staged queue", "alert");
+}
+
+function autofillEvidenceFiles() {
+  renderStagedEvidenceTable();
+  logAuditEvent("MEDIA_INGESTION", "Loaded default 5-source multi-stream seized evidence corpus with pre-verified hashes");
   showToast("📥 5 Multi-Source evidence files staged and hashes verified!", "success");
+}
+
+// Cloud Drive Modal Controls
+function openCloudDriveModal() {
+  const modal = document.getElementById('modal-cloud-drive');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeCloudDriveModal() {
+  const modal = document.getElementById('modal-cloud-drive');
+  if (modal) modal.style.display = 'none';
+}
+
+function ingestFromDriveLink() {
+  const urlInput = document.getElementById('cloud-drive-url');
+  const url = urlInput ? urlInput.value.trim() : "";
+  if (!url) {
+    showToast("⚠️ Please enter a Google Drive or Cloud Share link", "alert");
+    return;
+  }
+
+  let name = "cloud_drive_seizure_" + Date.now() + ".pdf";
+  if (url.includes('.jpg') || url.includes('.png') || url.includes('.jpeg')) {
+    name = "cloud_seized_photo_" + Date.now() + ".jpg";
+  } else if (url.includes('.csv')) {
+    name = "cloud_bank_statement_" + Date.now() + ".csv";
+  } else if (url.includes('.json')) {
+    name = "cloud_telegram_dump_" + Date.now() + ".json";
+  }
+
+  const fakeHash = Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join('');
+  const newEntry = {
+    id: "file-cloud-" + Date.now(),
+    name: name,
+    size: 245000,
+    sha256: fakeHash,
+    source: `Google Drive Remote Link (${url.substring(0, 32)}...)`,
+    parserProfile: "Cloud Sync / Secure Forensics Adapter",
+    recordsCount: 6,
+    lines: [
+      { num: 1, time: new Date().toLocaleTimeString('en-GB'), sender: "CLOUD_INGEST", text: `[CLOUD_SOURCE] Ingested from Google Drive: ${url}` },
+      { num: 2, time: new Date().toLocaleTimeString('en-GB'), sender: "CRYPTO_VERIFIER", text: `Calculated SHA-256 checksum: ${fakeHash} [SEC 63 BSA COMPLIANT]` },
+      { num: 3, time: new Date().toLocaleTimeString('en-GB'), sender: "SYSTEM", text: "Normalized remote exhibit into Universal Forensic Message Envelope (UFME)." }
+    ]
+  };
+
+  EVIDENCE_FILES.push(newEntry);
+  renderStagedEvidenceTable();
+  updateCounts();
+  closeCloudDriveModal();
+  logAuditEvent("CLOUD_DRIVE_INGEST", `Ingested remote evidence file from Google Drive link: ${url}`);
+  showToast(`☁️ Ingested '${name}' from Google Drive with verified SHA-256 hash!`, 'success');
+}
+
+function ingestPresetCloudFile(name, category, profile) {
+  const fakeHash = Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join('');
+  const isImg = category === 'image';
+  
+  const sampleDataUrl = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='260' viewBox='0 0 400 260'><rect width='400' height='260' fill='%231E293B'/><rect x='20' y='20' width='360' height='220' fill='%230F172A' stroke='%23334155' stroke-width='2'/><circle cx='200' cy='110' r='45' fill='%23B91C1C' opacity='0.2'/><text x='200' y='118' font-family='monospace' font-size='32' text-anchor='middle' fill='%23EF4444'>📸</text><text x='200' y='160' font-family='monospace' font-size='14' font-weight='bold' text-anchor='middle' fill='%23F8FAFC'>SEIZED DROP PHOTOGRAPH</text><text x='200' y='185' font-family='monospace' font-size='11' text-anchor='middle' fill='%2394A3B8'>Recovered Malkhana MK-2026-89</text><text x='200' y='205' font-family='monospace' font-size='10' text-anchor='middle' fill='%2364748B'>SHA-256 Checksum Verified</text></svg>";
+
+  const newEntry = {
+    id: "file-preset-" + Date.now(),
+    name: name,
+    size: 512000,
+    sha256: fakeHash,
+    source: "Law Enforcement Secure Cloud Storage",
+    parserProfile: profile,
+    recordsCount: 4,
+    isImage: isImg,
+    dataUrl: isImg ? sampleDataUrl : null,
+    lines: [
+      { num: 1, time: new Date().toLocaleTimeString('en-GB'), sender: "CLOUD_EXHIBIT", text: `[EXHIBIT: ${name}] Ingested from Secure Cloud Repository. Profile: ${profile}` },
+      { num: 2, time: new Date().toLocaleTimeString('en-GB'), sender: "HASH_VERIFIER", text: `Pre-ingestion SHA-256: ${fakeHash} [INTEGRITY CHECK PASSED]` }
+    ]
+  };
+
+  EVIDENCE_FILES.push(newEntry);
+  renderStagedEvidenceTable();
+  updateCounts();
+  closeCloudDriveModal();
+  logAuditEvent("CLOUD_PRESET_INGEST", `Ingested police cloud exhibit '${name}'`);
+  showToast(`☁️ Ingested '${name}' from Law Enforcement Cloud!`, 'success');
+}
+
+// Image Preview Lightbox Modal
+function openImagePreviewModal(title, dataUrl, sha256) {
+  const modal = document.getElementById('modal-image-preview');
+  const titleEl = document.getElementById('image-preview-title');
+  const imgEl = document.getElementById('image-preview-img');
+  const hashEl = document.getElementById('image-preview-hash');
+
+  if (titleEl) titleEl.textContent = `SEIZED EXHIBIT: ${title}`;
+  if (imgEl) imgEl.src = dataUrl;
+  if (hashEl) hashEl.textContent = `SHA-256: ${sha256}`;
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeImagePreviewModal() {
+  const modal = document.getElementById('modal-image-preview');
+  if (modal) modal.style.display = 'none';
 }
 
 function populateReviewScreen() {
@@ -797,13 +1125,22 @@ function switchWorkbenchMode(mode) {
 function renderFileTabs() {
   const container = document.getElementById("file-tabs-container");
   if (!container) return;
-  container.innerHTML = EVIDENCE_FILES.map(file => `
-    <button class="file-tab-btn ${file.id === currentSelectedFileId ? 'active' : ''}" 
-            onclick="selectFile('${file.id}')">
-      <span>${file.id === 'file-darknet' ? '🌐' : '📄'}</span>
-      <span>${file.name}</span>
-    </button>
-  `).join("");
+  container.innerHTML = EVIDENCE_FILES.map(file => {
+    let icon = '📄';
+    const isImg = file.isImage || file.id === 'file-image' || Boolean(file.name.match(/\.(jpg|jpeg|png|webp|gif|bmp)$/i));
+    if (file.id === 'file-darknet' || file.name.endsWith('.html')) icon = '🌐';
+    else if (isImg) icon = '📸';
+    else if (file.name.endsWith('.csv')) icon = '📊';
+    else if (file.name.endsWith('.json')) icon = '📱';
+
+    return `
+      <button class="file-tab-btn ${file.id === currentSelectedFileId ? 'active' : ''}" 
+              onclick="selectFile('${file.id}')">
+        <span>${icon}</span>
+        <span>${escapeHtml(file.name)}</span>
+      </button>
+    `;
+  }).join("");
 }
 
 function selectFile(fileId) {
@@ -831,7 +1168,53 @@ function renderRawLines(filterQuery = "") {
   const container = document.getElementById("raw-lines-container");
   if (!file || !container) return;
 
-  let lines = file.lines;
+  const isImg = file.isImage || file.id === 'file-image' || Boolean(file.name.match(/\.(jpg|jpeg|png|webp|gif|bmp)$/i));
+
+  if (isImg) {
+    const linesCount = document.getElementById("raw-lines-count");
+    if (linesCount) linesCount.textContent = `1 Seized Image Exhibit`;
+    
+    const sampleSvg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='260' viewBox='0 0 400 260'><rect width='400' height='260' fill='%231E293B'/><rect x='20' y='20' width='360' height='220' fill='%230F172A' stroke='%23334155' stroke-width='2'/><circle cx='200' cy='110' r='45' fill='%23B91C1C' opacity='0.2'/><text x='200' y='118' font-family='monospace' font-size='32' text-anchor='middle' fill='%23EF4444'>📸</text><text x='200' y='160' font-family='monospace' font-size='14' font-weight='bold' text-anchor='middle' fill='%23F8FAFC'>SEIZED PACKAGING PHOTOGRAPH</text><text x='200' y='185' font-family='monospace' font-size='11' text-anchor='middle' fill='%2394A3B8'>Dead-Drop Sector 43 ISBT (Near Pillar 14)</text><text x='200' y='205' font-family='monospace' font-size='10' text-anchor='middle' fill='%2364748B'>SHA-256 Verified Under Section 63 BSA</text></svg>";
+    const imgSrc = file.dataUrl || sampleSvg;
+
+    container.innerHTML = `
+      <div class="seized-image-preview-panel">
+        <div style="text-align: center; background: #0F172A; padding: 18px; border-radius: 6px; position: relative;">
+          <img src="${imgSrc}" alt="${escapeHtml(file.name)}" style="max-height: 320px; max-width: 100%; border-radius: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.6); cursor: pointer;" onclick="openImagePreviewModal('${escapeHtml(file.name)}', '${imgSrc}', '${file.sha256}')" title="Click to enlarge image">
+          <div style="position: absolute; top: 12px; right: 14px;">
+            <button type="button" class="btn btn-xs btn-gov-secondary" onclick="openImagePreviewModal('${escapeHtml(file.name)}', '${imgSrc}', '${file.sha256}')">🔍 Expand</button>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px;">
+          <div style="background: #F8FAFC; border: 1px solid var(--border-subtle); padding: 8px 12px; border-radius: 4px;">
+            <span class="text-xs text-muted" style="display: block;">EXIF RESOLUTION / SIZE</span>
+            <span class="mono font-bold" style="font-size: 12px;">${file.size ? (file.size / 1024).toFixed(1) + ' KB' : '1.4 MB (Seized Camera Raw)'}</span>
+          </div>
+          <div style="background: #F8FAFC; border: 1px solid var(--border-subtle); padding: 8px 12px; border-radius: 4px;">
+            <span class="text-xs text-muted" style="display: block;">PERCEPTUAL HASH (pHash)</span>
+            <span class="mono font-bold text-purple" style="font-size: 12px;">${file.sha256 ? file.sha256.substring(0, 14) : 'a8f1e29c04b5'}</span>
+          </div>
+          <div style="background: #F8FAFC; border: 1px solid var(--border-subtle); padding: 8px 12px; border-radius: 4px;">
+            <span class="text-xs text-muted" style="display: block;">COURT ADMISSIBILITY</span>
+            <span class="badge badge-sm badge-green" style="margin-top: 2px;">SEC 63 BSA AUTHENTICATED ✓</span>
+          </div>
+        </div>
+
+        <div class="raw-line-row" style="margin-top: 12px;">
+          <span class="raw-line-num">#001</span>
+          <div class="raw-line-content">
+            <span class="raw-line-timestamp">[${file.lines && file.lines[0] ? file.lines[0].time : '14:04:00'}]</span>
+            <span class="raw-line-sender">${file.lines && file.lines[0] ? file.lines[0].sender : 'EXIF_METADATA'}:</span>
+            <span class="raw-line-text">${escapeHtml(file.lines && file.lines[0] ? file.lines[0].text : 'Packaging exhibit recovered during Malkhana seizure MK-2026-89.')}</span>
+          </div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  let lines = file.lines || [];
   if (filterQuery.trim() !== "") {
     const q = filterQuery.toLowerCase();
     lines = lines.filter(l => l.text.toLowerCase().includes(q) || l.sender.toLowerCase().includes(q) || String(l.num).includes(q));

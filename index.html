@@ -43,9 +43,9 @@
         <button class="nav-item" id="nav-btn-tracking" onclick="showSection('tracking')">
           <span>📊</span> Track Cases
         </button>
-        <button class="nav-item" id="nav-btn-compliance" onclick="showSection('compliance')">
+        <!-- <button class="nav-item" id="nav-btn-compliance" onclick="showSection('compliance')">
           <span>⚖️</span> Compliance
-        </button>
+        </button> -->
         <button class="nav-item" id="nav-btn-documents" onclick="showSection('documents')">
           <span>📁</span> Document Vault
         </button>
@@ -57,9 +57,9 @@
       <!-- Right Utility Actions -->
       <div class="header-right">
         <!-- AI Copilot Assistant -->
-        <button class="btn btn-gov-secondary btn-sm" onclick="openAssistantModal()" title="AI Statutory & Forensic Copilot">
+        <!-- <button class="btn btn-gov-secondary btn-sm" onclick="openAssistantModal()" title="AI Statutory & Forensic Copilot">
           <span>🤖</span> Copilot
-        </button>
+        </button> -->
 
         <!-- Global Search -->
         <button class="btn btn-gov-secondary btn-sm" onclick="openGlobalSearchModal()" title="Cross-Case Global Intel Search">
@@ -386,27 +386,48 @@
           </div>
 
           <div class="form-body">
-            <div class="drop-zone-large" onclick="autofillEvidenceFiles()">
+            <!-- Hidden Native File Input -->
+            <input type="file" id="media-file-input" multiple accept="image/*,.txt,.json,.csv,.html,.pdf,.doc,.docx,.log" style="display: none;" onchange="handleRealFileUpload(event)">
+
+            <!-- Interactive Ingestion Drop Zone -->
+            <div class="drop-zone-large" id="evidence-drop-zone" 
+                 onclick="triggerDeviceFileInput()"
+                 ondragover="handleDragOver(event)" 
+                 ondragleave="handleDragLeave(event)" 
+                 ondrop="handleDrop(event)">
               <div class="drop-zone-icon">📥</div>
               <div class="drop-zone-title font-bold">Select or Drop Seized Evidence & Darknet Feeds</div>
-              <div class="drop-zone-desc text-muted">Supports Tor .onion HTML/JSON, Cellebrite UFED, WhatsApp exports, and Bank CSVs</div>
-              <button class="btn btn-gov-secondary btn-sm" style="margin-top: 10px;" onclick="event.stopPropagation(); autofillEvidenceFiles();">
-                <span>⚡</span> Load Multi-Source Case Files (5 Evidence Items inc. Tor Listing)
-              </button>
+              <div class="drop-zone-desc text-muted">Click to browse images (JPG, PNG, WEBP) and logs from your PC, or drag & drop files here</div>
+              
+              <div class="flex-gap" style="justify-content: center; margin-top: 14px; flex-wrap: wrap;">
+                <button type="button" class="btn btn-gov-primary btn-sm" onclick="event.stopPropagation(); triggerDeviceFileInput();">
+                  <span>📁</span> Upload Images / Files from PC
+                </button>
+                <button type="button" class="btn btn-gov-secondary btn-sm" onclick="event.stopPropagation(); openCloudDriveModal();">
+                  <span>☁️</span> Ingest from Google Drive / Cloud
+                </button>
+                <button type="button" class="btn btn-gov-secondary btn-sm" onclick="event.stopPropagation(); autofillEvidenceFiles();">
+                  <span>⚡</span> Load Sample Case Corpus (5 Items)
+                </button>
+              </div>
             </div>
 
             <div class="evidence-queue-section" id="evidence-queue-section" style="margin-top: 14px; display: none;">
               <div class="section-subhead flex-between">
                 <span>INGESTED EVIDENCE MANIFEST (CALCULATED SHA-256 HASHES)</span>
-                <span class="badge badge-sm badge-green" id="staged-files-badge">5 Files Staged</span>
+                <div class="flex-gap">
+                  <span class="badge badge-sm badge-green" id="staged-files-badge">5 Files Staged</span>
+                  <button type="button" class="btn btn-xs btn-gov-secondary" onclick="triggerDeviceFileInput()">+ Add More Files</button>
+                </div>
               </div>
               <table class="gov-table" style="font-size: 11.5px;">
                 <thead>
                   <tr>
-                    <th>FILENAME</th>
+                    <th>PREVIEW / FILENAME</th>
                     <th>SOURCE & IDENTIFIER</th>
                     <th>PARSER PROFILE</th>
                     <th>IMMUTABLE SHA-256 CHECKSUM</th>
+                    <th>ACTION</th>
                   </tr>
                 </thead>
                 <tbody id="staged-evidence-tbody">
@@ -1481,6 +1502,104 @@
           <button class="btn btn-gov-primary btn-sm" onclick="window.print()">
             <span>🖨️</span> Print Official Notice (PDF)
           </button>
+        </div>
+    <!-- ===================================================================== -->
+    <!-- MODAL: GOOGLE DRIVE & CLOUD EVIDENCE INGESTION -->
+    <!-- ===================================================================== -->
+    <div class="modal-overlay" id="modal-cloud-drive" style="display: none;">
+      <div class="modal-container modal-md">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <span class="modal-icon">☁️</span>
+            <div>
+              <h3 class="modal-title">INGEST EVIDENCE FROM GOOGLE DRIVE / CLOUD</h3>
+              <span class="modal-subtitle">Secure interdiction & remote evidence link gateway for law enforcement</span>
+            </div>
+          </div>
+          <button class="modal-close-btn" onclick="closeCloudDriveModal()">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label class="form-label" for="cloud-drive-url">Google Drive / Cloud Share Link or Direct URL *</label>
+            <div class="flex-gap">
+              <input type="text" id="cloud-drive-url" class="gov-input mono" placeholder="https://drive.google.com/file/d/1A2B3C4D... or https://onedrive.live.com/..." style="flex: 1;">
+              <button class="btn btn-gov-primary btn-sm" onclick="ingestFromDriveLink()">
+                <span>⚡</span> Fetch & Ingest
+              </button>
+            </div>
+            <span class="text-xs text-muted" style="margin-top: 4px; display: block;">
+              Supports Google Drive file/folder URLs, OneDrive shares, AWS S3 buckets, and direct media URLs.
+            </span>
+          </div>
+
+          <div style="margin-top: 14px; border-top: 1px solid var(--border-subtle); padding-top: 14px;">
+            <div class="section-subhead flex-between" style="margin-bottom: 8px;">
+              <span>OR CHOOSE PRE-CONFIGURED POLICE CLOUD EVIDENCE REPOSITORIES</span>
+              <span class="badge badge-sm badge-blue">Gov Cloud CTI</span>
+            </div>
+
+            <div class="cloud-repos-list" style="display: flex; flex-direction: column; gap: 8px;">
+              <div class="cloud-repo-item flex-between" style="background: #F8FAFC; border: 1px solid var(--border-subtle); border-radius: 6px; padding: 10px 12px;">
+                <div>
+                  <div class="font-bold text-blue" style="font-size: 12.5px;">📸 Malkhana Cloud Photo Vault (MK-2026-89)</div>
+                  <div class="text-xs text-muted">seized_dropzone_stamp_sec43.png &bull; Dead-drop packaging with Skull logo stamp</div>
+                </div>
+                <button class="btn btn-xs btn-gov-secondary" onclick="ingestPresetCloudFile('dropzone_stamp_sec43.png', 'image', 'EXIF / Perceptual Hash Adapter')">
+                  + Ingest Image
+                </button>
+              </div>
+
+              <div class="cloud-repo-item flex-between" style="background: #F8FAFC; border: 1px solid var(--border-subtle); border-radius: 6px; padding: 10px 12px;">
+                <div>
+                  <div class="font-bold text-blue" style="font-size: 12.5px;">🌐 I4C Darknet Crawler Storage (.onion Mirror)</div>
+                  <div class="text-xs text-muted">hydra_v3_storefront_capture.html &bull; Live DOM scrape snapshot with vendor contacts</div>
+                </div>
+                <button class="btn btn-xs btn-gov-secondary" onclick="ingestPresetCloudFile('hydra_v3_storefront_capture.html', 'darknet', 'Tor HTML Scraper / UFME')">
+                  + Ingest HTML
+                </button>
+              </div>
+
+              <div class="cloud-repo-item flex-between" style="background: #F8FAFC; border: 1px solid var(--border-subtle); border-radius: 6px; padding: 10px 12px;">
+                <div>
+                  <div class="font-bold text-blue" style="font-size: 12.5px;">🏦 Nodal Bank Cloud SFTP (1930 Cyber Cell)</div>
+                  <div class="text-xs text-muted">sbi_cyber_fraud_statement_aug.csv &bull; Normalized transaction ledger with UTR matching</div>
+                </div>
+                <button class="btn btn-xs btn-gov-secondary" onclick="ingestPresetCloudFile('sbi_cyber_fraud_statement_aug.csv', 'financial', 'Bank Statement Normalized / UFME')">
+                  + Ingest CSV
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-gov-secondary btn-sm" onclick="closeCloudDriveModal()">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL: IMAGE PREVIEW LIGHTBOX -->
+    <!-- ===================================================================== -->
+    <div class="modal-overlay" id="modal-image-preview" style="display: none;" onclick="closeImagePreviewModal()">
+      <div class="modal-container modal-md" onclick="event.stopPropagation();" style="max-width: 650px;">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <span class="modal-icon">🔍</span>
+            <div>
+              <h3 class="modal-title" id="image-preview-title">SEIZED IMAGE EXHIBIT</h3>
+              <span class="modal-subtitle" id="image-preview-sub">Cryptographic Section 63 BSA Hash Authenticated</span>
+            </div>
+          </div>
+          <button class="modal-close-btn" onclick="closeImagePreviewModal()">✕</button>
+        </div>
+        <div class="modal-body" style="text-align: center; background: #0F172A; padding: 20px;">
+          <img id="image-preview-img" src="" alt="Seized Evidence" style="max-height: 440px; max-width: 100%; border-radius: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.6);">
+        </div>
+        <div class="modal-footer flex-between">
+          <span class="mono text-xs text-muted" id="image-preview-hash">SHA-256: -</span>
+          <button class="btn btn-gov-secondary btn-sm" onclick="closeImagePreviewModal()">Close</button>
         </div>
       </div>
     </div>
