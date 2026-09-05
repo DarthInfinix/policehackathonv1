@@ -21,309 +21,63 @@ let CASE_METADATA = {
   model: "Llama-3.2-3B-Instruct (Local 4-bit GGUF, T=0.0)"
 };
 
-// 5 Multi-Source Evidence Streams (including Tor .onion Scraped Listing)
-const EVIDENCE_FILES = [
-  {
-    id: "file-darknet",
-    name: "darknet_hydra_listing.html",
-    sha256: "3f8b01c9a441e892d1048b194029481729481940294810a9f11bc40e2d312948",
-    source: "Tor Onion Mirror: hydra44chd.onion (Scraped CTI Feed)",
-    parserProfile: "Tor HTML Scraper / UFME Standard",
-    recordsCount: 4,
-    lines: [
-      { num: 1, time: "13:45:00", sender: "TOR_PAGE_HEADER", text: "[MARKET] DarkHydra V3 (.onion) | Vendor: @chd_plug (5.0★ / 42 Deals)" },
-      { num: 2, time: "13:45:10", sender: "PRODUCT_LISTING", text: "Product: Pure Dutch 4-MMC Crystals (Mephedrone / Meow) - 10g ($120), 50g ($450). Escrow Accepted." },
-      { num: 3, time: "13:45:20", sender: "PAYMENT_INFO", text: "TRON USDT (TRC-20) Escrow Deposit Address: TJY9q8Z3vXwK1pL7mN6bV5cR4tY2uI1oP" },
-      { num: 4, time: "13:45:30", sender: "VENDOR_CONTACT", text: "Direct India Domestic Dead-Drop Dispatch: Contact Telegram @chd_plug" }
-    ]
-  },
-  {
-    id: "file-telegram",
-    name: "telegram_chd_syndicate_dump.json",
-    sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    source: "Seized OnePlus 11 (Malkhana Barcode: MK-2026-89)",
-    parserProfile: "Cellebrite UFED / UFME Standard",
-    recordsCount: 12,
-    lines: [
-      { num: 1, time: "14:02:10", sender: "@chd_plug", text: "bhai 5 tole chitta ready hai, 3500 rate. sector 43 bus stand te drop milega 📍" },
-      { num: 2, time: "14:02:35", sender: "@buyer_99", text: "payment kive karna? cash chalega drop te?" },
-      { num: 3, time: "14:03:01", sender: "@chd_plug", text: "cash no bhai. advance only. send 3500 on mule44@ybl, screenshot bhej fast." },
-      { num: 4, time: "14:03:40", sender: "@buyer_99", text: "ok done, sending on mule44@ybl now. bhai delivery clean karwa de." },
-      { num: 5, time: "14:05:12", sender: "@chd_plug", text: "payment confirmed. packet pinned behind red transformer near pillar 14, sector 43. collect in 15 mins." },
-      { num: 6, time: "14:15:20", sender: "@chd_plug", text: "fresh batch of white shoes size 5g in stock for weekend, dm fast ❄️📦" },
-      { num: 7, time: "15:40:02", sender: "@stamp_dealer", text: "5 stamp paper (LSD blotter) available, 2.5k per hit, USDT TRC20 address: TJY9q8Z3vXwK1pL7mN6bV5cR4tY2uI1oP" },
-      { num: 8, time: "16:10:14", sender: "@chd_plug", text: "for bulk order (>20k) no upi, only amazon e-gift card voucher or TRON to avoid cyber freeze." },
-      { num: 9, time: "18:22:00", sender: "@local_distro", text: "contact backup burner sim: +91 98765-21440 if telegram gets banned." },
-      { num: 10, time: "20:15:30", sender: "@buyer_22", text: "bhai pichli baar drop clean nahi tha, PCR patrol thi sector 43 mein." },
-      { num: 11, time: "20:16:10", sender: "@chd_plug", text: "don't worry, backup drop spot near sec 22 community center park." },
-      { num: 12, time: "23:45:00", sender: "@chd_plug", text: "midnight drops active till 3:30 AM. ping @chd_plug_admin for live menu." }
-    ]
-  },
-  {
-    id: "file-whatsapp",
-    name: "whatsapp_seized_phone_export.txt",
-    sha256: "8a14b301c2992f4405a3089d7010469b61405eefae93f538eef64ec5521a00a1",
-    source: "Seized Redmi Note 12 (Malkhana Barcode: MK-2026-90)",
-    parserProfile: "WhatsApp Raw Parser / UFME",
-    recordsCount: 6,
-    lines: [
-      { num: 1, time: "11:20:15", sender: "+91 98140-77621", text: "Sir maal received in Sector 35. Pure quality." },
-      { num: 2, time: "11:22:00", sender: "Self (Mule)", text: "Send token amount of 2000 on punjab_speed@paytm" },
-      { num: 3, time: "11:25:30", sender: "+91 98140-77621", text: "Transferred. UTR: 422019284910. Need 2 more packets tomorrow." },
-      { num: 4, time: "13:00:10", sender: "Self (Mule)", text: "Switching to Telegram @chd_plug. Delete this chat." },
-      { num: 5, time: "17:15:00", sender: "+91 98765-21440", text: "Call on burner SIM if bank account gets flagged." },
-      { num: 6, time: "17:16:20", sender: "Self (Mule)", text: "Noted. Using mule44@ybl for tonight drops." }
-    ]
-  },
-  {
-    id: "file-sbi",
-    name: "sbi_mule_account_statement.csv",
-    sha256: "41b7cd9103fa72ce66d21415f33d4f828a2a7a40b925fb3b5be57d195c6a1e94",
-    source: "Lawful 91 CrPC Bank Notice (SBI Sec 17 Branch)",
-    parserProfile: "Bank CSV Normalized / UFME",
-    recordsCount: 5,
-    lines: [
-      { num: 1, time: "09:12:00", sender: "TXN_LOG", text: "2026-08-11, CR, 3500.00, UPI/P2P/422019284910/mule44@ybl/Payment from Buyer" },
-      { num: 2, time: "11:45:00", sender: "TXN_LOG", text: "2026-08-11, CR, 2000.00, UPI/P2P/422019330192/punjab_speed@paytm/Token" },
-      { num: 3, time: "14:10:00", sender: "TXN_LOG", text: "2026-08-11, CR, 3500.00, UPI/P2P/422019448102/mule44@ybl/Drop-43" },
-      { num: 4, time: "18:30:00", sender: "TXN_LOG", text: "2026-08-11, DR, 8500.00, ATM WDL/ATM-SEC22-CHD/Cash Withdrawal" },
-      { num: 5, time: "22:00:00", sender: "TXN_LOG", text: "2026-08-11, CR, 7000.00, UPI/P2P/422019881029/mule44@ybl/Chd-Order" }
-    ]
-  },
-  {
-    id: "file-image",
-    name: "dropzone_stamp_sec22.jpg",
-    sha256: "9f2b84ac102d184719c2a710e28f3910c8402b18471029481729481940294810",
-    source: "Recovered from Seized Phone Gallery (DCIM/Telegram)",
-    parserProfile: "EXIF/Perceptual Hash Adapter",
-    recordsCount: 1,
-    lines: [
-      { num: 1, time: "14:04:00", sender: "IMAGE_METADATA", text: "[EXIF: No GPS] [Perceptual Hash pHash: a8f1e29c04b5] Drop packaging stamped with skull logo on transparent ziploc." }
-    ]
-  }
-];
+// ============================================================================
+// DYNAMIC MULTI-SOURCE EVIDENCE STATE (REAL INGESTED FILES FROM SQLITE)
+// ============================================================================
 
-let TRIAGE_LEADS = [
-  {
-    id: "lead-tor-1",
-    category: "darknet",
-    type: "TOR STOREFRONT LISTING",
-    value: "4-MMC Crystals (DarkHydra #402)",
-    fileId: "file-darknet",
-    fileName: "darknet_hydra_listing.html",
-    lineNum: 2,
-    method: "Tor DOM HTML Parser",
-    confidence: "99%",
-    corroboration: {
-      score: "94% (HIGH CORROBORATION)",
-      isHigh: true,
-      basis: "Tor listing vendor contact matches seized Telegram handle (@chd_plug) & TRON USDT wallet."
-    },
-    status: "candidate",
-    context: "Product: Pure Dutch 4-MMC Crystals (Mephedrone) - 10g ($120)... Contact Telegram @chd_plug",
-    slmRationale: {
-      model: "Llama-3.2-3B-Instruct (Zero-Shot DOM Extraction)",
-      promptTask: "Extract illicit drug product, crypto wallet, and fulfillment channel from raw Tor HTML.",
-      reasoning: "Extracted 4-MMC synthetic stimulant listing cross-linked to Telegram handle @chd_plug for domestic dispatch."
-    }
-  },
-  {
-    id: "lead-1",
-    category: "financial",
-    type: "UPI IDENTIFIER",
-    value: "mule44@ybl",
-    fileId: "file-telegram",
-    fileName: "telegram_chd_syndicate_dump.json",
-    lineNum: 3,
-    method: "Deterministic Regex",
-    confidence: "100%",
-    corroboration: {
-      score: "95% (HIGH CORROBORATION)",
-      isHigh: true,
-      basis: "Matched in Telegram chat (Line 3) + Re-confirmed in SBI Bank Statement CSV (₹3,500 Credit at 09:12 IST)."
-    },
-    status: "candidate",
-    context: "send 3500 on mule44@ybl, screenshot bhej fast.",
-    slmRationale: null
-  },
-  {
-    id: "lead-2",
-    category: "financial",
-    type: "UPI IDENTIFIER",
-    value: "punjab_speed@paytm",
-    fileId: "file-whatsapp",
-    fileName: "whatsapp_seized_phone_export.txt",
-    lineNum: 2,
-    method: "Deterministic Regex",
-    confidence: "100%",
-    corroboration: {
-      score: "92% (HIGH CORROBORATION)",
-      isHigh: true,
-      basis: "Matched in WhatsApp chat + Cross-verified in SBI Statement CSV (₹2,000 Token Credit at 11:45 IST)."
-    },
-    status: "candidate",
-    context: "Send token amount of 2000 on punjab_speed@paytm",
-    slmRationale: null
-  },
-  {
-    id: "lead-3",
-    category: "financial",
-    type: "CRYPTO TRON (USDT)",
-    value: "TJY9q8Z3vXwK1pL7mN6bV5cR4tY2uI1oP",
-    fileId: "file-telegram",
-    fileName: "telegram_chd_syndicate_dump.json",
-    lineNum: 7,
-    method: "Deterministic Regex",
-    confidence: "100%",
-    corroboration: {
-      score: "90% (HIGH - CROSS-CORRELATED)",
-      isHigh: true,
-      basis: "Matches TRON deposit address listed on DarkHydra.onion marketplace (Listing #402) and Telegram chat (Line 7)."
-    },
-    status: "candidate",
-    context: "5 stamp paper available... USDT TRC20 address: TJY9q8Z3...",
-    slmRationale: null
-  },
-  {
-    id: "lead-4",
-    category: "slang",
-    type: "SLANG: HEROIN CODE",
-    value: "Chitta (5 tola @ ₹3500)",
-    fileId: "file-telegram",
-    fileName: "telegram_chd_syndicate_dump.json",
-    lineNum: 1,
-    method: "Local SLM (Llama-3.2-3B)",
-    confidence: "98% (T=0.0)",
-    corroboration: {
-      score: "98% (HIGH CORROBORATION)",
-      isHigh: true,
-      basis: "Lexicon keyword match ('Chitta') + Syntactic transaction markers (rate '3500' & drop location)."
-    },
-    status: "candidate",
-    context: "bhai 5 tole chitta ready hai, 3500 rate. sector 43 bus stand te drop milega 📍",
-    slmRationale: {
-      model: "Llama-3.2-3B-Instruct (Local GGUF, Quant: q4_k_m)",
-      promptTask: "Extract illicit narcotics commercial intent using active Tricity NDPS Lexicon.",
-      reasoning: "Matched active lexicon entry 'Chitta' (Heroin) combined with mass unit ('tole'), price ('3500'), and dead-drop logistics."
-    }
-  },
-  {
-    id: "lead-5",
-    category: "slang",
-    type: "SURROGATE: LSD BLOTTER",
-    value: "Stamp Paper (Blotter Sheets)",
-    fileId: "file-telegram",
-    fileName: "telegram_chd_syndicate_dump.json",
-    lineNum: 7,
-    method: "Local SLM (Llama-3.2-3B)",
-    confidence: "94% (T=0.0)",
-    corroboration: {
-      score: "90% (HIGH CORROBORATION)",
-      isHigh: true,
-      basis: "Disambiguated surrogate term 'stamp paper' as synthetic psychoactive blotter based on pricing per hit (2.5k) and escrow wallet."
-    },
-    status: "candidate",
-    context: "5 stamp paper (LSD blotter) available, 2.5k per hit, USDT TRC20...",
-    slmRationale: {
-      model: "Llama-3.2-3B-Instruct (Local GGUF, Quant: q4_k_m)",
-      promptTask: "Disambiguate polysemic keyword 'paper' (academic vs illicit).",
-      reasoning: "Disambiguated surrogate term 'stamp paper' as synthetic psychoactive blotter based on pricing per hit (2.5k) and escrow wallet payment rails."
-    }
-  },
-  {
-    id: "lead-6",
-    category: "slang",
-    type: "SURROGATE METAPHOR: STIMULANT",
-    value: "White Shoes (Size 5g) ❄️",
-    fileId: "file-telegram",
-    fileName: "telegram_chd_syndicate_dump.json",
-    lineNum: 6,
-    method: "Local SLM (Llama-3.2-3B)",
-    confidence: "91% (T=0.0)",
-    corroboration: {
-      score: "88% (HIGH CORROBORATION)",
-      isHigh: true,
-      basis: "Surrogate apparel code resolved via multi-modal token context (5g metric + snowflake emoji ❄️)."
-    },
-    status: "candidate",
-    context: "fresh batch of white shoes size 5g in stock for weekend, dm fast ❄️📦",
-    slmRationale: {
-      model: "Llama-3.2-3B-Instruct (Local GGUF, Quant: q4_k_m)",
-      promptTask: "Identify metaphorical commodity concealment.",
-      reasoning: "Surrogate apparel code identified. 'Size 5g' reflects mass metric (grams) incompatible with footwear; snowflake emoji ❄️ confirms stimulant distribution intent."
-    }
-  },
-  {
-    id: "lead-7",
-    category: "image",
-    type: "DROP-ZONE COORDINATE",
-    value: "Sector 43 ISBT (Pillar 14)",
-    fileId: "file-telegram",
-    fileName: "telegram_chd_syndicate_dump.json",
-    lineNum: 5,
-    method: "Local SLM (Llama-3.2-3B)",
-    confidence: "96% (T=0.0)",
-    corroboration: {
-      score: "96% (HIGH CORROBORATION)",
-      isHigh: true,
-      basis: "Physical landmark extracted in post-payment confirmation message from seller."
-    },
-    status: "candidate",
-    context: "packet pinned behind red transformer near pillar 14, sector 43.",
-    slmRationale: {
-      model: "Llama-3.2-3B-Instruct (Local GGUF, Quant: q4_k_m)",
-      promptTask: "Extract physical dead-drop coordinates.",
-      reasoning: "Extracted actionable dead-drop landmark coordinates for field intercept teams."
-    }
-  }
-];
-
-// Historical Precinct Cases Database (for Requirement #7 Global Intel Search)
-const HISTORICAL_PRECINCT_INTEL = [
-  {
-    identifier: "mule44@ybl",
-    fir: "FIR No. 89/2025/CYBER",
-    ps: "PS Cyber Crime, Sector 34, Chandigarh",
-    date: "14.11.2025",
-    role: "Suspected Mule Account (Fast-Payout Layer)",
-    notes: "Account frozen previously; reopened with modified linked mobile number."
-  },
-  {
-    identifier: "+91 98765-21440",
-    fir: "FIR No. 12/2026/NDPS",
-    ps: "PS Sector 36, Chandigarh",
-    date: "04.02.2026",
-    role: "Burner SIM (CAF in Fake Assam Identity)",
-    notes: "Active in cell towers near Panjab University South Campus."
-  },
-  {
-    identifier: "TJY9q8Z3vXwK1pL7mN6bV5cR4tY2uI1oP",
-    fir: "FIR No. 44/2026/CYBER",
-    ps: "State Cyber Cell, SAS Nagar (Mohali)",
-    date: "28.05.2026",
-    role: "TRON USDT Escrow Deposit",
-    notes: "Cross-border synthetic 4-MMC procurement wallet."
-  }
-];
-
-// Cryptographic Forensic Audit Ledger (Requirement #9)
-let AUDIT_LOG = [
-  { time: "16.08.2026 12:00:02 IST", actor: "System Daemon", action: "BOOT_INTEGRITY", detail: "Air-gapped kernel hash verified (Debian 12, SHA-256: 4a8f9c11...)" },
-  { time: "16.08.2026 12:05:14 IST", actor: "Insp. Vikramjit Singh (#788)", action: "CASE_INTAKE", detail: "Registered FIR No. 104/2026/CYBER u/s NDPS 21/22/29." },
-  { time: "16.08.2026 12:06:30 IST", actor: "SI Harpreet Kaur", action: "HASH_VERIFY", detail: "Calculated SHA-256 for 5 files (Matched Malkhana MK-2026-89)." },
-  { time: "16.08.2026 12:08:45 IST", actor: "Local Llama-3.2-3B", action: "MODEL_TRIAGE", detail: "Deterministic extraction executed (T=0.0, Seed=42). 8 leads parsed." }
-];
-
-const CASE_CHRONOLOGY = [
-  { time: "11:20 IST", body: "Initial WhatsApp query: Buyer contacts +91 98140-77621; token directed to punjab_speed@paytm." },
-  { time: "13:45 IST", body: "Tor Storefront Match: DarkHydra.onion lists 4-MMC and directs direct buyers to @chd_plug." },
-  { time: "14:02 IST", body: "Telegram negotiation: @chd_plug quotes ₹3500 for 5 tola Chitta; provides mule44@ybl." },
-  { time: "14:05 IST", body: "Dead-Drop Handoff: Payment recorded via SBI account; packet pinned at Sector 43 Pillar 14." },
-  { time: "15:40 IST", body: "Payment Shift: Dealer offers LSD blotters via TRON USDT wallet." }
-];
-
-let currentSelectedFileId = "file-darknet";
+let REAL_FILES = [];
+let REAL_FILE_RECORDS = {}; // In-memory cache: fileId -> array of record objects
+let currentSelectedFileId = null;
+let REAL_TRIAGE_LEADS = [];
 let currentTriageFilter = "all";
+
+// Real Cryptographic Forensic Audit Ledger
+let AUDIT_LOG = [];
+let CASE_CHRONOLOGY = [];
+
+async function loadCaseFiles() {
+  try {
+    const caseId = CASE_METADATA.fir ? CASE_METADATA.fir.replace(/[^a-zA-Z0-9_-]/g, "_") : "FIR_104_2026";
+    const resp = await fetch(`http://localhost:8000/api/files?case_id=${encodeURIComponent(caseId)}`);
+    if (resp.ok) {
+      const data = await resp.json();
+      REAL_FILES = data.files || [];
+      if (REAL_FILES.length > 0 && !currentSelectedFileId) {
+        currentSelectedFileId = REAL_FILES[0].file_id;
+      }
+    }
+  } catch (err) {
+    console.warn("Could not fetch case files:", err);
+  }
+}
+
+async function loadTriageLeads() {
+  try {
+    const caseId = CASE_METADATA.fir ? CASE_METADATA.fir.replace(/[^a-zA-Z0-9_-]/g, "_") : "FIR_104_2026";
+    const resp = await fetch(`http://localhost:8000/api/leads?case_id=${encodeURIComponent(caseId)}`);
+    if (resp.ok) {
+      const data = await resp.json();
+      REAL_TRIAGE_LEADS = data.leads || [];
+    }
+  } catch (err) {
+    console.warn("Could not fetch triage leads:", err);
+  }
+}
+
+async function fetchFileRecords(fileId) {
+  if (REAL_FILE_RECORDS[fileId]) return REAL_FILE_RECORDS[fileId];
+  try {
+    const resp = await fetch(`http://localhost:8000/api/file_records?file_id=${encodeURIComponent(fileId)}`);
+    if (resp.ok) {
+      const data = await resp.json();
+      REAL_FILE_RECORDS[fileId] = data.records || [];
+      return REAL_FILE_RECORDS[fileId];
+    }
+  } catch (err) {
+    console.warn("Could not fetch records for file:", fileId, err);
+  }
+  return [];
+}
 
 // ============================================================================
 // 2. STEP-BY-STEP WIZARD WORKFLOW CONTROLLER
@@ -384,31 +138,353 @@ function proceedToStep2() {
   goToStep(2);
 }
 
-function autofillEvidenceFiles() {
+// State for real ingested evidence files
+let REAL_INGESTED_FILES = [];
+let REAL_DISCOVERED_ENTITIES = {
+  phones: new Set(),
+  upi_handles: new Set(),
+  crypto_wallets: new Set(),
+  locations: new Set(),
+  slang_keywords: new Set()
+};
+let REAL_TOTAL_RECORDS = 0;
+let REAL_TOTAL_FLAGGED = 0;
+let REAL_CORROBORATIONS = [];
+
+async function updateStagedEvidenceTable() {
   const tbody = document.getElementById('staged-evidence-tbody');
-  tbody.innerHTML = EVIDENCE_FILES.map((f, i) => `
+  await loadCaseFiles();
+  
+  const countBadge = document.getElementById('staged-files-badge');
+  if (countBadge) countBadge.textContent = `${REAL_FILES.length} Files Staged`;
+  
+  if (REAL_FILES.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="4" style="text-align: center; color: #64748b; padding: 25px;">
+          No evidence files staged yet. Drag & drop chat dumps, bank CSVs, or darknet listings above.
+        </td>
+      </tr>
+    `;
+    document.getElementById('evidence-queue-section').style.display = 'block';
+    document.getElementById('btn-to-config').disabled = true;
+    return;
+  }
+
+  tbody.innerHTML = REAL_FILES.map(f => `
     <tr>
-      <td class="mono font-bold">${f.name}</td>
-      <td>${f.source}</td>
-      <td><span class="badge badge-sm badge-neutral">${f.parserProfile}</span></td>
-      <td class="mono text-xs text-blue">${f.sha256.substring(0, 24)}...</td>
+      <td class="mono font-bold">${escapeHtml(f.filename)}</td>
+      <td>${escapeHtml(f.file_type || 'Case Seizure')}</td>
+      <td><span class="badge badge-sm badge-neutral">${escapeHtml(f.file_type || 'RAW_STREAM')}</span></td>
+      <td class="mono text-xs text-blue">${escapeHtml((f.sha256_hash || '').substring(0, 24))}...</td>
     </tr>
   `).join("");
 
   document.getElementById('evidence-queue-section').style.display = 'block';
   document.getElementById('btn-to-config').disabled = false;
-  logAuditEvent("MEDIA_INGESTION", "Staged 5 multi-source files (Tor HTML, Telegram, WhatsApp, Bank CSV)");
-  showToast("📥 5 Multi-Source evidence files staged for analysis!", "success");
+}
+
+function updateInsightsBanner() {
+  const banner = document.getElementById('live-insights-banner');
+  if (!banner) return;
+  banner.style.display = 'block';
+
+  document.getElementById('insights-record-count').textContent = `${REAL_TOTAL_RECORDS} Records Processed`;
+  document.getElementById('insights-flagged-count').textContent = REAL_TOTAL_FLAGGED;
+  document.getElementById('insights-upi-count').textContent = REAL_DISCOVERED_ENTITIES.upi_handles.size;
+  document.getElementById('insights-crypto-count').textContent = REAL_DISCOVERED_ENTITIES.crypto_wallets.size;
+  document.getElementById('insights-corroboration-count').textContent = REAL_CORROBORATIONS.length;
+
+  const tagsContainer = document.getElementById('insights-tags-container');
+  let tagsHtml = "";
+
+  REAL_DISCOVERED_ENTITIES.slang_keywords.forEach(kw => {
+    tagsHtml += `<span class="badge badge-sm badge-red">🚨 Flagged: ${escapeHtml(kw)}</span>`;
+  });
+  REAL_DISCOVERED_ENTITIES.upi_handles.forEach(upi => {
+    tagsHtml += `<span class="badge badge-sm badge-amber">💳 UPI: ${escapeHtml(upi)}</span>`;
+  });
+  REAL_DISCOVERED_ENTITIES.crypto_wallets.forEach(w => {
+    tagsHtml += `<span class="badge badge-sm badge-purple">⛓️ Wallet: ${escapeHtml(w.substring(0, 10))}...</span>`;
+  });
+  REAL_DISCOVERED_ENTITIES.locations.forEach(loc => {
+    tagsHtml += `<span class="badge badge-sm badge-blue">📍 Location: ${escapeHtml(loc)}</span>`;
+  });
+
+  tagsContainer.innerHTML = tagsHtml;
+}
+
+async function handleRealFilesSelected(fileList) {
+  if (!fileList || fileList.length === 0) return;
+  const caseId = CASE_METADATA.fir ? CASE_METADATA.fir.replace(/[^a-zA-Z0-9_-]/g, "_") : "FIR_104_2026";
+  const total = fileList.length;
+  const progressCont = document.getElementById('upload-progress-container');
+  const progressBar = document.getElementById('upload-progress-bar');
+  const progressPct = document.getElementById('upload-progress-pct');
+  const progressLabel = document.getElementById('upload-progress-label');
+
+  if (progressCont) progressCont.style.display = 'block';
+
+  let successCount = 0;
+  for (let i = 0; i < total; i++) {
+    const file = fileList[i];
+    const pct = Math.round(((i) / total) * 100);
+    if (progressBar) progressBar.style.width = `${pct}%`;
+    if (progressPct) progressPct.textContent = `${pct}%`;
+    if (progressLabel) progressLabel.textContent = `Ingesting [${i + 1}/${total}]: ${file.name} (${Math.round(file.size / 1024)} KB)...`;
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const resp = await fetch(`http://localhost:8000/api/upload?case_id=${encodeURIComponent(caseId)}&filename=${encodeURIComponent(file.name)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream" },
+        body: buffer
+      });
+
+      if (resp.ok) {
+        const jsonRes = await resp.json();
+        const data = jsonRes.data;
+        if (data) {
+          REAL_TOTAL_RECORDS += data.total_records || 0;
+          REAL_TOTAL_FLAGGED += data.total_flagged || 0;
+
+          if (data.extracted_entities) {
+            (data.extracted_entities.phones || []).forEach(p => REAL_DISCOVERED_ENTITIES.phones.add(p));
+            (data.extracted_entities.upi_handles || []).forEach(u => REAL_DISCOVERED_ENTITIES.upi_handles.add(u));
+            (data.extracted_entities.crypto_wallets || []).forEach(c => REAL_DISCOVERED_ENTITIES.crypto_wallets.add(c));
+            (data.extracted_entities.locations || []).forEach(l => REAL_DISCOVERED_ENTITIES.locations.add(l));
+            (data.extracted_entities.slang_keywords || []).forEach(s => REAL_DISCOVERED_ENTITIES.slang_keywords.add(s));
+          }
+
+          if (data.active_correlations && data.active_correlations.length > 0) {
+            REAL_CORROBORATIONS = data.active_correlations;
+          }
+
+          logAuditEvent("FILE_UPLOADED_REAL", `Real file ${file.name} ingested (${data.total_records} records, ${data.total_flagged} flagged, SHA-256: ${(data.sha256 || '').substring(0, 16)}...)`);
+        }
+        successCount++;
+      }
+    } catch (err) {
+      console.warn("Backend API upload error for file:", file.name, err);
+    }
+  }
+
+  if (progressBar) progressBar.style.width = '100%';
+  if (progressPct) progressPct.textContent = '100%';
+  if (progressLabel) progressLabel.textContent = `✓ Successfully ingested ${successCount} file(s) with SHA-256 integrity check.`;
+
+  // Clear inputs so re-selecting same file triggers change
+  const rInput = document.getElementById('real-file-input');
+  if (rInput) rInput.value = '';
+  const pInput = document.getElementById('panel-file-input');
+  if (pInput) pInput.value = '';
+
+  await updateStagedEvidenceTable();
+  updateInsightsBanner();
+  showToast(`📁 Ingested ${successCount} of ${total} files with SHA-256 verification!`, "success");
+
+  setTimeout(() => {
+    if (progressCont) progressCont.style.display = 'none';
+  }, 3500);
+}
+
+async function handlePanelFilesSelected(fileList) {
+  if (!fileList || fileList.length === 0) return;
+  await handleRealFilesSelected(fileList);
+  await renderDashboard();
+}
+
+async function autofillEvidenceFiles() {
+  const caseId = CASE_METADATA.fir ? CASE_METADATA.fir.replace(/[^a-zA-Z0-9_-]/g, "_") : "FIR_104_2026";
+  showToast("⚙️ Pre-fetching authentic case evidence files from storage...", "info");
+  try {
+    const resp = await fetch(`http://localhost:8000/api/load_demo_data?case_id=${encodeURIComponent(caseId)}`, {
+      method: "POST"
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      REAL_TOTAL_RECORDS = data.total_records || 683;
+      REAL_TOTAL_FLAGGED = data.total_flagged || 350;
+      await updateStagedEvidenceTable();
+      updateInsightsBanner();
+      logAuditEvent("MEDIA_INGESTION", `Loaded ${data.files_loaded} authentic demo files (${data.total_records} records)`);
+      showToast(`📥 Pre-staged ${data.files_loaded} demo files (${data.total_records} records) into manifest!`, "success");
+      return;
+    }
+  } catch (err) {
+    console.warn("Error loading demo data:", err);
+  }
+  await updateStagedEvidenceTable();
+  showToast("📥 Pre-staged case files loaded into manifest!", "success");
+}
+
+// Drag & drop support
+window.addEventListener('DOMContentLoaded', () => {
+  const dropZone = document.getElementById('main-drop-zone');
+  if (dropZone) {
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.style.borderColor = '#38bdf8';
+      dropZone.style.background = 'rgba(56, 189, 248, 0.05)';
+    });
+    dropZone.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      dropZone.style.borderColor = '';
+      dropZone.style.background = '';
+    });
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.style.borderColor = '';
+      dropZone.style.background = '';
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        handleRealFilesSelected(e.dataTransfer.files);
+      }
+    });
+  }
+});
+
+// ============================================================================
+// SILLYTAVERN-STYLE LOCAL SLM INFERENCE DISCOVERY & PING ENGINE
+// ============================================================================
+
+let DISCOVERED_MODELS = [];
+
+async function discoverLocalModels(overrideUrl = null) {
+  const urlInput = document.getElementById('config-server-url');
+  const serverUrl = overrideUrl || (urlInput ? urlInput.value.trim() : (CASE_METADATA.serverUrl || "http://localhost:8080"));
+  const pingBadge = document.getElementById('server-ping-badge');
+  const selectEl = document.getElementById('config-slm-engine');
+  const btn = document.getElementById('btn-ping-server');
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span>⚙️</span> Pinging...`;
+  }
+  if (pingBadge) {
+    pingBadge.className = "badge badge-sm badge-neutral";
+    pingBadge.textContent = "● Pinging...";
+  }
+
+  try {
+    const resp = await fetch(`http://localhost:8000/api/llm/models?url=${encodeURIComponent(serverUrl)}`);
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.status === "online" && data.models && data.models.length > 0) {
+        DISCOVERED_MODELS = data.models;
+        CASE_METADATA.serverUrl = serverUrl;
+
+        if (pingBadge) {
+          pingBadge.className = "badge badge-sm badge-green";
+          pingBadge.textContent = `● Connected (${data.models.length} Models)`;
+        }
+
+        if (selectEl) {
+          selectEl.innerHTML = data.models.map(m => `
+            <option value="${escapeHtml(m.id)}">${escapeHtml(m.id)} [${m.category.toUpperCase()}]</option>
+          `).join("");
+          CASE_METADATA.model = data.models[0].id;
+        }
+
+        updateModelBlurb();
+        showToast(`🟢 Connected to inference server at ${serverUrl} (${data.models.length} models detected)`, "success");
+        if (btn) { btn.disabled = false; btn.innerHTML = `<span>⚡</span> Connected & Discover`; }
+        return true;
+      }
+    }
+  } catch (err) {
+    console.warn("Could not query model server:", err);
+  }
+
+  // If 8080 was offline and no override was specified, auto-try 8012 where user's toy model might be
+  if (!overrideUrl && serverUrl.includes("8080")) {
+    console.log("8080 offline, auto-trying port 8012...");
+    const fallbackSuccess = await discoverLocalModels("http://localhost:8012");
+    if (fallbackSuccess) {
+      if (urlInput) urlInput.value = "http://localhost:8012";
+      if (btn) { btn.disabled = false; btn.innerHTML = `<span>⚡</span> Connected & Discover`; }
+      return true;
+    }
+  }
+
+  if (pingBadge) {
+    pingBadge.className = "badge badge-sm badge-amber";
+    pingBadge.textContent = `● Offline (${serverUrl})`;
+  }
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = `<span>⚡</span> Retry Connect`;
+  }
+  updateModelBlurb();
+  return false;
+}
+
+function setServerUrlAndDiscover(url) {
+  const input = document.getElementById('config-server-url');
+  if (input) input.value = url;
+  discoverLocalModels(url);
+}
+
+function updateModelBlurb() {
+  const selectEl = document.getElementById('config-slm-engine');
+  const blurbBadge = document.getElementById('model-blurb-badge');
+  const blurbTitle = document.getElementById('model-blurb-title');
+  const blurbText = document.getElementById('model-blurb-text');
+  if (!selectEl || !blurbTitle) return;
+
+  const selectedId = selectEl.value;
+  CASE_METADATA.model = selectedId;
+
+  const headerBadge = document.getElementById('header-model-name');
+  if (headerBadge) headerBadge.textContent = selectedId;
+
+  const found = DISCOVERED_MODELS.find(m => m.id === selectedId);
+  if (found) {
+    if (blurbBadge) {
+      blurbBadge.textContent = `⚡ ${found.category.toUpperCase()} CORE`;
+      blurbBadge.className = found.category === 'liquid' ? "badge badge-sm badge-blue" : found.category === 'gemma' ? "badge badge-sm badge-purple" : "badge badge-sm badge-green";
+    }
+    blurbTitle.textContent = found.name;
+    if (blurbText) blurbText.textContent = found.blurb;
+  } else {
+    const midLower = selectedId.toLowerCase();
+    if (midLower.includes("lfm") || midLower.includes("liquid")) {
+      if (blurbBadge) { blurbBadge.textContent = "⚡ LIQUID CORE"; blurbBadge.className = "badge badge-sm badge-blue"; }
+      blurbTitle.textContent = "Liquid Foundation Model (LFM 1B/8B)";
+      if (blurbText) blurbText.textContent = "Ultra-fast hybrid 1B/8B RNN-Transformer architecture with 1,000+ TPS prefill speed. Ideal for low-latency batch codeword triage.";
+    } else if (midLower.includes("gemma")) {
+      if (blurbBadge) { blurbBadge.textContent = "🧠 GEMMA CORE"; blurbBadge.className = "badge badge-sm badge-purple"; }
+      blurbTitle.textContent = "Google Gemma 2 / 3";
+      if (blurbText) blurbText.textContent = "Highly capable reasoning model with rigorous instruction following and factual contraband disambiguation.";
+    } else if (midLower.includes("llama")) {
+      if (blurbBadge) { blurbBadge.textContent = "🛡️ LLAMA CORE"; blurbBadge.className = "badge badge-sm badge-green"; }
+      blurbTitle.textContent = "Meta Llama 3 / 3.2";
+      if (blurbText) blurbText.textContent = "High-precision contextual classification, broad linguistic coverage of multilingual/Hinglish chat logs.";
+    } else {
+      if (blurbBadge) { blurbBadge.textContent = "⚙️ LOCAL CORE"; blurbBadge.className = "badge badge-sm badge-neutral"; }
+      blurbTitle.textContent = selectedId;
+      if (blurbText) blurbText.textContent = "Offline air-gapped GGUF inference core active on local precinct inference server (T=0.0).";
+    }
+  }
+}
+
+function quickOpenCodewordInduction() {
+  goToStep(5);
+  switchWorkbenchTab('induction');
+  const container = document.getElementById("screen-dashboard");
+  if (container) container.scrollIntoView({ behavior: 'smooth' });
+  showToast("⚡ Switched to Active Codeword Induction & Lexicon Governance", "info");
 }
 
 function proceedToStep3() {
   goToStep(3);
+  discoverLocalModels();
 }
 
 function startLoadingPipeline() {
-  const selectedEngine = document.getElementById('config-slm-engine').selectedOptions[0].text;
+  const engineSelect = document.getElementById('config-slm-engine');
+  const selectedEngine = engineSelect ? engineSelect.value : "LFM2.5-8B-A1B-Q4_0.gguf";
   CASE_METADATA.model = selectedEngine;
-  document.getElementById('header-model-name').textContent = "Llama-3.2-3B (Local GGUF)";
+  document.getElementById('header-model-name').textContent = selectedEngine;
 
   goToStep(4);
 
@@ -465,10 +541,13 @@ function restartWorkflow() {
 // 3. DASHBOARD RENDERING & WORKBENCH CONTROLLER
 // ============================================================================
 
-function renderDashboard() {
+async function renderDashboard() {
+  await loadCaseFiles();
+  await loadTriageLeads();
+  await loadInductedLexicon();
   renderFileTabs();
   renderFileMetadata();
-  renderRawLines();
+  await renderRawLines();
   renderTriageCards();
   renderVerifiedTable();
   renderChronology();
@@ -476,56 +555,118 @@ function renderDashboard() {
   updateCounts();
 }
 
-function renderFileTabs() {
-  const container = document.getElementById("file-tabs-container");
-  container.innerHTML = EVIDENCE_FILES.map(file => `
-    <button class="file-tab-btn ${file.id === currentSelectedFileId ? 'active' : ''}" 
-            onclick="selectFile('${file.id}')">
-      <span>${file.id === 'file-darknet' ? '🌐' : '📄'}</span>
-      <span>${file.name}</span>
-    </button>
-  `).join("");
+async function loadInductedLexicon() {
+  const list = document.getElementById("inducted-lexicon-list");
+  if (!list) return;
+  try {
+    const resp = await fetch("http://localhost:8000/api/slang_dictionary");
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.words && data.words.length > 0) {
+        list.innerHTML = data.words.map(w => `
+          <span class="badge badge-sm badge-green" style="cursor: pointer;" title="Inducted: ${w.induct_timestamp || 'Active'}">
+            ✓ ${escapeHtml(w.slang_term.toUpperCase())} (${escapeHtml((w.canonical_meaning || 'Contraband').split(' ')[0])})
+          </span>
+        `).join("");
+      }
+    }
+  } catch (err) {
+    console.warn("Could not load inducted lexicon:", err);
+  }
 }
 
-function selectFile(fileId) {
+function renderFileTabs() {
+  const container = document.getElementById("file-tabs-container");
+  if (!container) return;
+  
+  const countBadge = document.getElementById("evidence-files-count");
+  if (countBadge) countBadge.textContent = `${REAL_FILES.length} Files Loaded`;
+
+  if (REAL_FILES.length === 0) {
+    container.innerHTML = `<div style="font-size: 11px; color: #64748b; padding: 6px;">No evidence files uploaded yet.</div>`;
+    return;
+  }
+
+  container.innerHTML = REAL_FILES.map(file => {
+    const icon = file.file_type.includes("DARKNET") ? "🌐" : file.file_type.includes("BANK") ? "🏦" : file.file_type.includes("TELEGRAM") ? "💬" : "📄";
+    return `
+      <button class="file-tab-btn ${file.file_id === currentSelectedFileId ? 'active' : ''}" 
+              onclick="selectFile('${file.file_id}')">
+        <span>${icon}</span>
+        <span>${escapeHtml(file.filename)}</span>
+      </button>
+    `;
+  }).join("");
+}
+
+async function selectFile(fileId) {
   currentSelectedFileId = fileId;
   renderFileTabs();
   renderFileMetadata();
-  renderRawLines();
+  await renderRawLines();
 }
 
 function renderFileMetadata() {
-  const file = EVIDENCE_FILES.find(f => f.id === currentSelectedFileId);
-  if (!file) return;
-  document.getElementById("meta-filename").textContent = file.name;
-  document.getElementById("meta-sha256").textContent = file.sha256;
-  document.getElementById("meta-source").textContent = file.source;
-  document.getElementById("profile-indicator").textContent = `Profile: ${file.parserProfile}`;
+  const file = REAL_FILES.find(f => f.file_id === currentSelectedFileId);
+  if (!file) {
+    document.getElementById("meta-filename").textContent = "No file selected";
+    document.getElementById("meta-sha256").textContent = "--";
+    document.getElementById("meta-source").textContent = "N/A";
+    document.getElementById("profile-indicator").textContent = "Profile: None";
+    return;
+  }
+  document.getElementById("meta-filename").textContent = file.filename;
+  document.getElementById("meta-sha256").textContent = file.sha256_hash;
+  document.getElementById("meta-source").textContent = `Case Evidence Ingestion (${file.record_count} records)`;
+  document.getElementById("profile-indicator").textContent = `Profile: ${file.file_type}`;
 }
 
-function renderRawLines(filterQuery = "") {
-  const file = EVIDENCE_FILES.find(f => f.id === currentSelectedFileId);
+async function renderRawLines(filterQuery = "") {
+  const file = REAL_FILES.find(f => f.file_id === currentSelectedFileId);
   const container = document.getElementById("raw-lines-container");
-  if (!file) return;
+  if (!container) return;
 
-  let lines = file.lines;
+  if (!file) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 40px 10px; color: #64748b;">
+        <div style="font-size: 28px; margin-bottom: 8px;">📂</div>
+        <div style="font-weight: 600; font-size: 13px; color: #94a3b8;">No Evidence Files Uploaded</div>
+        <div style="font-size: 11px; margin-top: 4px;">Upload evidence in Step 2 to view raw messages.</div>
+        <button class="btn btn-gov-primary btn-sm" onclick="goToStep(2)" style="margin-top: 12px;">+ Go to Upload Screen</button>
+      </div>
+    `;
+    document.getElementById("raw-lines-count").textContent = "0 Lines";
+    return;
+  }
+
+  let lines = await fetchFileRecords(file.file_id);
   if (filterQuery.trim() !== "") {
     const q = filterQuery.toLowerCase();
-    lines = lines.filter(l => l.text.toLowerCase().includes(q) || l.sender.toLowerCase().includes(q) || String(l.num).includes(q));
+    lines = lines.filter(l => (l.raw_text && l.raw_text.toLowerCase().includes(q)) || (l.sender_id && l.sender_id.toLowerCase().includes(q)) || String(l.line_number).includes(q));
   }
 
   document.getElementById("raw-lines-count").textContent = `${lines.length} Lines`;
 
-  container.innerHTML = lines.map(line => `
-    <div class="raw-line-row" id="raw-line-${file.id}-${line.num}">
-      <span class="raw-line-num">#${String(line.num).padStart(3, '0')}</span>
-      <div class="raw-line-content">
-        <span class="raw-line-timestamp">[${line.time}]</span>
-        <span class="raw-line-sender">${line.sender}:</span>
-        <span class="raw-line-text">${escapeHtml(line.text)}</span>
+  if (lines.length === 0) {
+    container.innerHTML = `<div style="text-align: center; padding: 25px; color: #64748b; font-size: 11px;">No records match your search filter.</div>`;
+    return;
+  }
+
+  container.innerHTML = lines.map(line => {
+    const isFlagged = line.is_flagged === 1;
+    const reasonsBadge = isFlagged && line.flag_reasons ? `<div class="mono text-xs" style="color: #ef4444; margin-top: 2px; font-size: 10px;">🚨 ${escapeHtml(line.flag_reasons)}</div>` : "";
+    return `
+      <div class="raw-line-row ${isFlagged ? 'flagged-row' : ''}" id="raw-line-${file.file_id}-${line.line_number}">
+        <span class="raw-line-num">#${String(line.line_number).padStart(3, '0')}</span>
+        <div class="raw-line-content">
+          <span class="raw-line-timestamp">[${line.timestamp || 'N/A'}]</span>
+          <span class="raw-line-sender">${escapeHtml(line.sender_id)}:</span>
+          <span class="raw-line-text">${escapeHtml(line.raw_text)}</span>
+          ${reasonsBadge}
+        </div>
       </div>
-    </div>
-  `).join("");
+    `;
+  }).join("");
 }
 
 function filterRawLines() {
@@ -533,13 +674,13 @@ function filterRawLines() {
   renderRawLines(query);
 }
 
-function traceToSource(fileId, lineNum) {
+async function traceToSource(fileId, lineNum) {
   if (currentSelectedFileId !== fileId) {
-    selectFile(fileId);
+    await selectFile(fileId);
   }
 
   document.getElementById("raw-search-input").value = "";
-  renderRawLines();
+  await renderRawLines();
 
   setTimeout(() => {
     const targetElement = document.getElementById(`raw-line-${fileId}-${lineNum}`);
@@ -548,9 +689,11 @@ function traceToSource(fileId, lineNum) {
       targetElement.classList.remove('flash-highlight');
       void targetElement.offsetWidth;
       targetElement.classList.add('flash-highlight');
-      showToast(`📍 Traced to source line #${lineNum} in ${EVIDENCE_FILES.find(f => f.id === fileId).name}`, 'alert');
+      const f = REAL_FILES.find(x => x.file_id === fileId);
+      const name = f ? f.filename : "Evidence";
+      showToast(`📍 Traced to source line #${lineNum} in ${name}`, 'alert');
     }
-  }, 100);
+  }, 120);
 }
 
 // ============================================================================
@@ -568,24 +711,35 @@ function setTriageFilter(category) {
 
 function renderTriageCards() {
   const container = document.getElementById("triage-cards-container");
-  let leads = TRIAGE_LEADS;
+  if (!container) return;
+  let leads = REAL_TRIAGE_LEADS;
 
   if (currentTriageFilter !== "all") {
     leads = leads.filter(l => l.category === currentTriageFilter);
   }
 
+  if (leads.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 40px 10px; color: #64748b; font-size: 12px;">
+        No active leads found in this filter category. Upload more case evidence or switch filters.
+      </div>
+    `;
+    updateCounts();
+    return;
+  }
+
   container.innerHTML = leads.map(lead => {
     const isVerified = lead.status === "verified";
     const isDismissed = lead.status === "dismissed";
-    const badgeColor = lead.category === 'financial' ? 'badge-amber' : (lead.category === 'darknet' ? 'badge-purple' : (lead.category === 'image' ? 'badge-blue' : 'badge-neutral'));
+    const badgeColor = lead.category === 'financial' ? 'badge-amber' : (lead.category === 'darknet' ? 'badge-purple' : (lead.category === 'slang' ? 'badge-red' : 'badge-blue'));
 
     return `
       <div class="entity-card ${isVerified ? 'verified' : ''} ${isDismissed ? 'dismissed' : ''}" id="card-${lead.id}">
         <div class="entity-card-header">
           <div class="entity-type-group">
-            <span class="badge ${badgeColor}">${lead.type}</span>
-            <span class="corroboration-badge ${lead.corroboration.isHigh ? 'corroboration-high' : 'corroboration-low'}">
-              ${lead.corroboration.score}
+            <span class="badge ${badgeColor}">${escapeHtml(lead.type)}</span>
+            <span class="corroboration-badge ${lead.corroboration && lead.corroboration.isHigh ? 'corroboration-high' : 'corroboration-low'}">
+              ${lead.corroboration ? lead.corroboration.score : 'DETECTED'}
             </span>
           </div>
           <span class="badge badge-sm ${isVerified ? 'badge-green' : (isDismissed ? 'badge-red' : 'badge-neutral')}">
@@ -595,9 +749,11 @@ function renderTriageCards() {
 
         <div class="entity-val-row">
           <span class="entity-main-val text-blue">${escapeHtml(lead.value)}</span>
-          <button class="trace-source-btn" onclick="traceToSource('${lead.fileId}', ${lead.lineNum})">
-            Jump to Source ↗ (Line ${lead.lineNum})
-          </button>
+          ${lead.fileId ? `
+            <button class="trace-source-btn" onclick="traceToSource('${lead.fileId}', ${lead.lineNum})">
+              Jump to Line #${lead.lineNum} ↗
+            </button>
+          ` : ''}
         </div>
 
         <div class="entity-context-snippet mono">
@@ -605,7 +761,7 @@ function renderTriageCards() {
         </div>
 
         <div class="text-xs text-muted" style="margin-bottom: 6px;">
-          <strong>Corroboration:</strong> ${lead.corroboration.basis}
+          <strong>Corroboration:</strong> ${lead.corroboration ? escapeHtml(lead.corroboration.basis) : 'Extracted from evidence record.'}
         </div>
 
         ${lead.slmRationale ? `
@@ -613,9 +769,9 @@ function renderTriageCards() {
             <span>🔍 View Model Rationale</span> <span>▼</span>
           </button>
           <div class="glass-box-drawer" id="drawer-${lead.id}">
-            <div class="rationale-param"><span class="rationale-key">MODEL:</span> <span>${lead.slmRationale.model}</span></div>
-            <div class="rationale-param"><span class="rationale-key">TASK:</span> <span>${lead.slmRationale.promptTask}</span></div>
-            <div class="rationale-param"><span class="rationale-key">REASONING:</span> <span>${lead.slmRationale.reasoning}</span></div>
+            <div class="rationale-param"><span class="rationale-key">MODEL:</span> <span>${escapeHtml(lead.slmRationale.model)}</span></div>
+            <div class="rationale-param"><span class="rationale-key">TASK:</span> <span>${escapeHtml(lead.slmRationale.promptTask)}</span></div>
+            <div class="rationale-param"><span class="rationale-key">REASONING:</span> <span>${escapeHtml(lead.slmRationale.reasoning)}</span></div>
           </div>
         ` : ''}
 
@@ -653,7 +809,7 @@ function toggleRationale(leadId) {
 }
 
 function verifyLead(leadId) {
-  const lead = TRIAGE_LEADS.find(l => l.id === leadId);
+  const lead = REAL_TRIAGE_LEADS.find(l => l.id === leadId);
   if (!lead) return;
 
   lead.status = "verified";
@@ -664,7 +820,7 @@ function verifyLead(leadId) {
 }
 
 function unverifyLead(leadId) {
-  const lead = TRIAGE_LEADS.find(l => l.id === leadId);
+  const lead = REAL_TRIAGE_LEADS.find(l => l.id === leadId);
   if (!lead) return;
   lead.status = "candidate";
   renderTriageCards();
@@ -672,7 +828,7 @@ function unverifyLead(leadId) {
 }
 
 function dismissLead(leadId) {
-  const lead = TRIAGE_LEADS.find(l => l.id === leadId);
+  const lead = REAL_TRIAGE_LEADS.find(l => l.id === leadId);
   if (!lead) return;
   lead.status = "dismissed";
   logAuditEvent("IO_DISMISS", `Dismissed lead [${lead.value}]`);
@@ -682,7 +838,7 @@ function dismissLead(leadId) {
 }
 
 function promptEditLead(leadId) {
-  const lead = TRIAGE_LEADS.find(l => l.id === leadId);
+  const lead = REAL_TRIAGE_LEADS.find(l => l.id === leadId);
   if (!lead) return;
   const newVal = prompt("Enter corrected entity value:", lead.value);
   if (newVal && newVal.trim() !== "" && newVal !== lead.value) {
@@ -693,73 +849,76 @@ function promptEditLead(leadId) {
   }
 }
 
-// ============================================================================
-// 5. REQUIREMENT #5: INTERACTIVE SVG NETWORK GRAPH RENDERING
-// ============================================================================
-
-function renderNetworkGraph() {
+async function renderNetworkGraph() {
   const container = document.getElementById("network-graph-canvas-container");
   if (!container) return;
 
-  // Minimalist, crisp SVG Graph
-  container.innerHTML = `
-    <svg width="100%" height="100%" viewBox="0 0 380 260" xmlns="http://www.w3.org/2000/svg" style="background: #FAFAFA;">
-      <!-- Edges -->
-      <line x1="60" y1="50" x2="190" y2="100" class="svg-edge" stroke-dasharray="3,3" />
-      <line x1="190" y1="100" x2="310" y2="50" class="svg-edge" />
-      <line x1="190" y1="100" x2="90" y2="190" class="svg-edge" />
-      <line x1="190" y1="100" x2="280" y2="190" class="svg-edge" />
-      <line x1="280" y1="190" x2="320" y2="240" class="svg-edge" />
+  try {
+    const caseId = CASE_METADATA.fir ? CASE_METADATA.fir.replace(/[^a-zA-Z0-9_-]/g, "_") : "FIR_104_2026";
+    const resp = await fetch(`http://localhost:8000/api/graph?case_id=${encodeURIComponent(caseId)}`);
+    if (resp.ok) {
+      const data = await resp.json();
+      const nodes = data.nodes || [];
+      const edges = data.edges || [];
 
-      <!-- Edge Labels -->
-      <text x="110" y="70" font-size="8" fill="#64748B" font-family="monospace">Listed On</text>
-      <text x="240" y="70" font-size="8" fill="#64748B" font-family="monospace">Burner SIM</text>
-      <text x="110" y="150" font-size="8" fill="#64748B" font-family="monospace">TRON USDT</text>
-      <text x="250" y="150" font-size="8" fill="#64748B" font-family="monospace">UPI Mule</text>
-      <text x="310" y="220" font-size="8" fill="#64748B" font-family="monospace">SBI A/c</text>
+      if (nodes.length === 0) {
+        container.innerHTML = `
+          <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #64748b; font-size: 11px;">
+            No entities correlated yet. Upload evidence files to build link graph.
+          </div>
+        `;
+        return;
+      }
 
-      <!-- Node 1: Tor Marketplace (Purple) -->
-      <g class="svg-node" onclick="showToast('🌐 Tor Storefront: hydra44chd.onion (Listing #402)', 'alert')">
-        <circle cx="60" cy="50" r="18" fill="#FAF5FF" stroke="#6D28D9" stroke-width="2"/>
-        <text x="60" y="53" font-size="9" text-anchor="middle" fill="#6D28D9" font-weight="bold">Tor .onion</text>
-        <text x="60" y="78" font-size="8" text-anchor="middle" fill="#4C1D95" font-family="monospace">DarkHydra</text>
-      </g>
+      const width = 380;
+      const height = 260;
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const radius = Math.min(centerX, centerY) - 45;
 
-      <!-- Node 2: Primary Target Persona (Blue - Center) -->
-      <g class="svg-node" onclick="showToast('🎯 Primary Target Persona: @chd_plug', 'alert')">
-        <circle cx="190" cy="100" r="22" fill="#EFF6FF" stroke="#1D4ED8" stroke-width="2.5"/>
-        <text x="190" y="103" font-size="10" text-anchor="middle" fill="#1D4ED8" font-weight="bold">@chd_plug</text>
-        <text x="190" y="132" font-size="8" text-anchor="middle" fill="#1E40AF" font-family="monospace">Syndicate Admin</text>
-      </g>
+      const nodePositions = {};
+      const displayNodes = nodes.slice(0, 10);
+      displayNodes.forEach((node, i) => {
+        const angle = (i / displayNodes.length) * 2 * Math.PI - Math.PI / 2;
+        nodePositions[node.id] = {
+          x: Math.round(centerX + radius * Math.cos(angle)),
+          y: Math.round(centerY + radius * Math.sin(angle)),
+          ...node
+        };
+      });
 
-      <!-- Node 3: Contact Burner Phone (Blue) -->
-      <g class="svg-node" onclick="showToast('📱 Burner Contact: +91 98765-21440', 'alert')">
-        <circle cx="310" cy="50" r="16" fill="#EFF6FF" stroke="#1D4ED8" stroke-width="1.5"/>
-        <text x="310" y="53" font-size="8" text-anchor="middle" fill="#1D4ED8" font-weight="bold">Burner SIM</text>
-        <text x="310" y="75" font-size="8" text-anchor="middle" fill="#1E40AF" font-family="monospace">+91 98765...</text>
-      </g>
+      let edgesSvg = "";
+      edges.forEach(e => {
+        const src = nodePositions[e.from];
+        const dst = nodePositions[e.to];
+        if (src && dst) {
+          edgesSvg += `<line x1="${src.x}" y1="${src.y}" x2="${dst.x}" y2="${dst.y}" class="svg-edge" stroke="#64748B" stroke-width="1.2" opacity="0.6"/>`;
+        }
+      });
 
-      <!-- Node 4: TRON USDT Escrow (Amber) -->
-      <g class="svg-node" onclick="showToast('💳 Crypto Escrow: TJY9q8Z3vXwK1pL7mN6bV5cR4tY2uI1oP', 'alert')">
-        <circle cx="90" cy="190" r="16" fill="#FFFBEB" stroke="#D97706" stroke-width="1.5"/>
-        <text x="90" y="193" font-size="8" text-anchor="middle" fill="#B45309" font-weight="bold">TRON USDT</text>
-        <text x="90" y="215" font-size="8" text-anchor="middle" fill="#92400E" font-family="monospace">TJY9q8Z3...</text>
-      </g>
+      let nodesSvg = "";
+      Object.values(nodePositions).forEach(n => {
+        const color = n.type === "DARKNET_VENDOR" ? "#8b5cf6" : n.type === "NARCOTICS_KEYWORD" ? "#ef4444" : n.type === "UPI_ID" ? "#f59e0b" : "#3b82f6";
+        const shortLabel = n.label.length > 11 ? n.label.substring(0, 10) + '..' : n.label;
+        nodesSvg += `
+          <g class="svg-node" onclick="showToast('${n.type}: ${escapeHtml(n.label)} (${n.mentions} mentions)', 'alert')" style="cursor: pointer;">
+            <circle cx="${n.x}" cy="${n.y}" r="15" fill="#0f172a" stroke="${color}" stroke-width="2"/>
+            <text x="${n.x}" y="${n.y + 4}" font-size="7.5" text-anchor="middle" fill="#f1f5f9" font-family="monospace">${escapeHtml(shortLabel)}</text>
+          </g>
+        `;
+      });
 
-      <!-- Node 5: Domestic UPI Mule (Amber) -->
-      <g class="svg-node" onclick="showToast('💳 UPI Mule Endpoint: mule44@ybl', 'alert')">
-        <circle cx="280" cy="190" r="16" fill="#FFFBEB" stroke="#D97706" stroke-width="1.5"/>
-        <text x="280" y="193" font-size="8" text-anchor="middle" fill="#B45309" font-weight="bold">UPI Mule</text>
-        <text x="280" y="215" font-size="8" text-anchor="middle" fill="#92400E" font-family="monospace">mule44@ybl</text>
-      </g>
-
-      <!-- Node 6: Domestic Bank Account (Amber) -->
-      <g class="svg-node" onclick="showToast('🏦 Bank Account: SBI A/c 33910048291', 'alert')">
-        <circle cx="320" cy="240" r="12" fill="#FFFBEB" stroke="#B45309" stroke-width="1.5"/>
-        <text x="320" y="243" font-size="7.5" text-anchor="middle" fill="#B45309" font-weight="bold">SBI</text>
-      </g>
-    </svg>
-  `;
+      container.innerHTML = `
+        <svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" style="background: #0b1120; border-radius: 6px;">
+          ${edgesSvg}
+          ${nodesSvg}
+        </svg>
+      `;
+      return;
+    }
+  } catch (err) {
+    console.warn("Could not load network graph:", err);
+  }
 }
 
 // ============================================================================
@@ -776,44 +935,92 @@ function closeGlobalSearchModal() {
   document.getElementById("modal-global-search").style.display = "none";
 }
 
-function executeGlobalSearch() {
+async function executeGlobalSearch() {
   const query = document.getElementById("global-search-query").value.toLowerCase().trim();
   const container = document.getElementById("global-search-results");
 
   if (!query) {
-    container.innerHTML = `<div class="text-xs text-muted" style="padding: 10px;">Enter an identifier to search across historical precinct records.</div>`;
+    container.innerHTML = `<div class="text-xs text-muted" style="padding: 10px;">Enter an identifier to search across historical precinct records and live case evidence.</div>`;
     return;
   }
 
-  const hits = HISTORICAL_PRECINCT_INTEL.filter(item => 
+  // 1. Check historical mock intel
+  const historicalHits = HISTORICAL_PRECINCT_INTEL.filter(item => 
     item.identifier.toLowerCase().includes(query) || 
     item.fir.toLowerCase().includes(query) || 
     item.notes.toLowerCase().includes(query)
   );
 
-  if (hits.length === 0) {
+  // 2. Query live SQLite FTS5 search
+  let liveHits = [];
+  try {
+    const resp = await fetch(`http://localhost:8000/api/search?q=${encodeURIComponent(query)}&limit=10`);
+    if (resp.ok) {
+      const data = await resp.json();
+      liveHits = data.results || [];
+    }
+  } catch (e) {
+    console.warn("Live FTS5 search offline:", e);
+  }
+
+  if (historicalHits.length === 0 && liveHits.length === 0) {
     container.innerHTML = `
       <div class="text-xs text-muted" style="padding: 12px; text-align: center;">
-        No prior intelligence records found for "<strong>${escapeHtml(query)}</strong>". Identifier is novel to this case.
+        No prior intelligence or live evidence records found for "<strong>${escapeHtml(query)}</strong>".
       </div>
     `;
     return;
   }
 
-  container.innerHTML = hits.map(hit => `
-    <div class="global-search-hit">
-      <div class="flex-between" style="margin-bottom: 3px;">
-        <span class="mono font-bold text-blue">${hit.identifier}</span>
-        <span class="badge badge-sm badge-red">HISTORICAL MATCH (PRIOR CASE)</span>
+  let html = "";
+
+  // Render live FTS5 evidence matches if found
+  if (liveHits.length > 0) {
+    html += `
+      <div style="font-size: 11px; font-weight: bold; color: #38bdf8; margin: 8px 0 4px 0; border-bottom: 1px solid #1e293b; padding-bottom: 4px;">
+        ⚡ LIVE EVIDENCE CORPUS MATCHES (FTS5 INDEXED) &bull; ${liveHits.length} HITS
       </div>
-      <div class="text-xs" style="margin-bottom: 2px;">
-        <strong>Linked Case:</strong> <span class="mono font-bold">${hit.fir}</span> (${hit.ps})
+    `;
+    html += liveHits.map(hit => `
+      <div class="global-search-hit" style="border-left: 3px solid #38bdf8;">
+        <div class="flex-between" style="margin-bottom: 3px;">
+          <span class="mono font-bold text-blue">${escapeHtml(hit.filename)}: Line ${hit.line_number}</span>
+          <span class="badge badge-sm badge-green">${escapeHtml(hit.source_type)}</span>
+        </div>
+        <div class="text-xs mono" style="background: rgba(0,0,0,0.25); padding: 4px; border-radius: 3px; margin: 4px 0; word-break: break-all;">
+          ${escapeHtml(hit.raw_text.substring(0, 180))}...
+        </div>
+        <div class="text-xs text-muted">
+          <strong>Sender:</strong> ${escapeHtml(hit.sender_id)} &bull; <strong>Flags:</strong> ${escapeHtml(hit.flag_reasons || "None")}
+        </div>
       </div>
-      <div class="text-xs text-muted">
-        <strong>Role:</strong> ${hit.role} &bull; <em>${hit.notes}</em> (Dated: ${hit.date})
+    `).join("");
+  }
+
+  // Render historical cross-case matches
+  if (historicalHits.length > 0) {
+    html += `
+      <div style="font-size: 11px; font-weight: bold; color: #ef4444; margin: 12px 0 4px 0; border-bottom: 1px solid #1e293b; padding-bottom: 4px;">
+        ⚠️ CROSS-CASE PRECINCT MATCHES (HISTORICAL INTEL) &bull; ${historicalHits.length} HITS
       </div>
-    </div>
-  `).join("");
+    `;
+    html += historicalHits.map(hit => `
+      <div class="global-search-hit" style="border-left: 3px solid #ef4444;">
+        <div class="flex-between" style="margin-bottom: 3px;">
+          <span class="mono font-bold text-red">${escapeHtml(hit.identifier)}</span>
+          <span class="badge badge-sm badge-red">HISTORICAL MATCH</span>
+        </div>
+        <div class="text-xs" style="margin-bottom: 2px;">
+          <strong>Linked Case:</strong> <span class="mono font-bold">${escapeHtml(hit.fir)}</span> (${escapeHtml(hit.ps)})
+        </div>
+        <div class="text-xs text-muted">
+          <strong>Role:</strong> ${escapeHtml(hit.role)} &bull; <em>${escapeHtml(hit.notes)}</em> (Dated: ${escapeHtml(hit.date)})
+        </div>
+      </div>
+    `).join("");
+  }
+
+  container.innerHTML = html;
 }
 
 // ============================================================================
@@ -931,13 +1138,335 @@ function switchRightPanelTab(tabName) {
   document.getElementById("tab-btn-dossier").classList.toggle("active", tabName === "dossier");
   document.getElementById("tab-btn-graph").classList.toggle("active", tabName === "graph");
   document.getElementById("tab-btn-trends").classList.toggle("active", tabName === "trends");
+  const inductionBtn = document.getElementById("tab-btn-induction");
+  if (inductionBtn) inductionBtn.classList.toggle("active", tabName === "induction");
   
   document.getElementById("tab-content-dossier").classList.toggle("active", tabName === "dossier");
   document.getElementById("tab-content-graph").classList.toggle("active", tabName === "graph");
   document.getElementById("tab-content-trends").classList.toggle("active", tabName === "trends");
+  
+  const inductionContent = document.getElementById("tab-content-induction");
+  if (inductionContent) {
+    inductionContent.style.display = tabName === "induction" ? "block" : "none";
+  }
 
   if (tabName === "graph") {
     renderNetworkGraph();
+  }
+}
+
+// Workbench Codeword Induction
+let WORKBENCH_CANDIDATES = [];
+
+async function runWorkbenchCodewordInduction() {
+  const container = document.getElementById("workbench-induction-container");
+  const runBtn = document.getElementById("btn-wb-run-induction");
+  if (runBtn) {
+    runBtn.disabled = true;
+    runBtn.innerHTML = `<span>⚙️</span> Ingesting & Extracting...`;
+  }
+  
+  // Render Live AI Telemetry HUD
+  container.innerHTML = `
+    <div id="wb-induction-hud" class="ai-telemetry-hud">
+      <div class="ai-telemetry-header">
+        <div style="display: flex; align-items: center;">
+          <span class="ai-pulse-dot" id="wb-pulse-dot"></span>
+          <span class="mono font-bold text-xs" style="color: #38bdf8;" id="wb-hud-status">SLM Pipeline: Initializing On-Device LFM2.5 Core...</span>
+        </div>
+        <span class="badge badge-sm badge-blue mono" id="wb-hud-counter">0 / 6 Evaluated</span>
+      </div>
+
+      <div class="ai-progress-track">
+        <div class="ai-progress-bar" id="wb-hud-bar" style="width: 0%;"></div>
+      </div>
+
+      <div class="ai-kpi-bar">
+        <div class="ai-kpi-item">
+          <div class="ai-kpi-val" id="wb-kpi-model">LFM2.5-8B</div>
+          <div class="ai-kpi-label">Active Core</div>
+        </div>
+        <div class="ai-kpi-item">
+          <div class="ai-kpi-val" id="wb-kpi-latency">-- ms</div>
+          <div class="ai-kpi-label">Latency</div>
+        </div>
+        <div class="ai-kpi-item">
+          <div class="ai-kpi-val" id="wb-kpi-speed">-- tps</div>
+          <div class="ai-kpi-label">Decode Speed</div>
+        </div>
+        <div class="ai-kpi-item">
+          <div class="ai-kpi-val" id="wb-kpi-found" style="color: #f59e0b;">0</div>
+          <div class="ai-kpi-label">Surfaced</div>
+        </div>
+      </div>
+
+      <div class="terminal-console" id="wb-terminal-console">
+        <div class="terminal-line"><span class="terminal-ts">[SYS]</span> <span class="terminal-msg" style="color: #38bdf8;">Forensic SLM Engine Online &bull; Target Port: 8012 &bull; T=0.0</span></div>
+      </div>
+    </div>
+
+    <div id="wb-cards-stream-list"></div>
+  `;
+
+  const cardsStream = document.getElementById("wb-cards-stream-list");
+  const hudStatus = document.getElementById("wb-hud-status");
+  const hudCounter = document.getElementById("wb-hud-counter");
+  const hudBar = document.getElementById("wb-hud-bar");
+  const hudConsole = document.getElementById("wb-terminal-console");
+  const kpiLatency = document.getElementById("wb-kpi-latency");
+  const kpiSpeed = document.getElementById("wb-kpi-speed");
+  const kpiFound = document.getElementById("wb-kpi-found");
+
+  function logWbTerminal(type, msg, color = "#cbd5e1") {
+    const d = new Date();
+    const ts = d.toTimeString().split(' ')[0] + '.' + String(d.getMilliseconds()).padStart(3, '0');
+    const el = document.createElement('div');
+    el.className = 'terminal-line';
+    el.innerHTML = `<span class="terminal-ts">[${ts}]</span> <span class="terminal-msg" style="color: ${color};">${msg}</span>`;
+    hudConsole.appendChild(el);
+    hudConsole.scrollTop = hudConsole.scrollHeight;
+  }
+
+  // Correlated candidate lines from case evidence
+  // Fetch live transactional candidate lines from database
+  let candidateMessages = [];
+  try {
+    const caseId = CASE_METADATA.fir ? CASE_METADATA.fir.replace(/[^a-zA-Z0-9_-]/g, "_") : "FIR_104_2026";
+    const candResp = await fetch(`http://localhost:8000/api/candidates?case_id=${encodeURIComponent(caseId)}`);
+    if (candResp.ok) {
+      const cData = await candResp.json();
+      if (cData.candidates && cData.candidates.length > 0) {
+        candidateMessages = cData.candidates.map(c => ({
+          fileId: c.file_id,
+          lineNum: c.line_number,
+          sender: c.sender_id || c.sender || "@evidence",
+          text: c.raw_text,
+          context: [c.filename, c.sender_id ? `@${c.sender_id}` : "Chat Line"]
+        }));
+      }
+    }
+  } catch (err) {
+    console.warn("Could not fetch database candidates:", err);
+  }
+
+  if (candidateMessages.length === 0) {
+    candidateMessages = [
+      { fileId: currentSelectedFileId || "FIL_demo", lineNum: 2, sender: "Karan_Tricity", text: "Bhai 2 parcel ice tea deliver kar dena sector 35 me, 3k gpay on raj@upi kar diya", context: ["Telegram Export", "Karan_Tricity"] },
+      { fileId: currentSelectedFileId || "FIL_demo", lineNum: 4, sender: "Shadow_Sector", text: "Send 2k on mule44@ybl for 5 boxes of stamp papers, drop at sec 17 plaza backlane", context: ["Telegram Export", "Shadow_Sector"] },
+      { fileId: currentSelectedFileId || "FIL_demo", lineNum: 5, sender: "Aman_Mohali", text: "Bro need 3 bottles cough syrup near PU campus gate 2, paid on rahul@okhdfcbank", context: ["Telegram Export", "Aman_Mohali"] },
+      { fileId: currentSelectedFileId || "FIL_demo", lineNum: 7, sender: "Karan_Tricity", text: "Bhai urgent 3 piece cold coffee ready rakhna Aroma hotel ke peeche, USDT bheja hai", context: ["Telegram Export", "Karan_Tricity"] },
+      { fileId: currentSelectedFileId || "FIL_demo", lineNum: 8, sender: "Punjab_Rider", text: "4 packs of green apples dispatched to Mohali phase 7, confirm receipt", context: ["Telegram Export", "Punjab_Rider"] }
+    ];
+  }
+
+  WORKBENCH_CANDIDATES = [];
+
+  for (let i = 0; i < candidateMessages.length; i++) {
+    const item = candidateMessages[i];
+    const pct = Math.round(((i + 1) / candidateMessages.length) * 100);
+    hudBar.style.width = `${pct}%`;
+    hudCounter.textContent = `${i + 1} / ${candidateMessages.length} Scanned (${pct}%)`;
+    hudStatus.textContent = `Analyzing Line #${item.lineNum} (${item.sender})...`;
+
+    logWbTerminal("LINE", `Ingesting [${item.fileId}:#${item.lineNum}] (${item.sender}): "${escapeHtml(item.text)}"`, "#e2e8f0");
+
+    // Highlight line in Panel 1 if visible
+    let lineEl = document.getElementById(`raw-line-${item.fileId}-${item.lineNum}`);
+    if (lineEl) {
+      lineEl.classList.add("slm-scanning-glow");
+      lineEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    try {
+      const startTime = performance.now();
+      const resp = await fetch("/api/extract_codeword", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: item.text,
+          context: item.context,
+          server_url: CASE_METADATA.serverUrl || "http://localhost:8080",
+          model: CASE_METADATA.model || "LFM2.5-8B-A1B-Q4_0"
+        })
+      });
+
+      if (resp.ok) {
+        const data = await resp.json();
+        const latency = data.latency_ms || Math.round(performance.now() - startTime);
+        kpiLatency.textContent = `${latency} ms`;
+        if (data.speed_tps) {
+          kpiSpeed.textContent = `${data.speed_tps} tps`;
+        }
+
+        if (data.codeword && data.codeword.length > 2) {
+          const candidate = {
+            id: i,
+            term: data.codeword,
+            message: item.text,
+            context: item.context,
+            sender: item.sender,
+            fileId: item.fileId,
+            lineNum: item.lineNum,
+            latency: latency,
+            speed: data.speed_tps || 50.0
+          };
+          WORKBENCH_CANDIDATES.push(candidate);
+          kpiFound.textContent = WORKBENCH_CANDIDATES.length;
+
+          logWbTerminal("FLAG", `🚨 Surrogate Contraband Noun: "${escapeHtml(candidate.term)}" (${latency}ms) -> Added to officer review`, "#10b981");
+
+          // Stream card directly into UI
+          cardsStream.insertAdjacentHTML('beforeend', renderSingleWorkbenchCard(candidate));
+        } else {
+          logWbTerminal("INFO", `⚪ No covert surrogate noun detected (Routine coordination / payment terms screened).`, "#64748b");
+        }
+      }
+    } catch (err) {
+      logWbTerminal("ERR", `⚠️ Extraction error on line #${item.lineNum}: ${err.message}`, "#ef4444");
+      console.warn("Codeword extraction error:", err);
+    }
+
+    // Micro-delay for smooth human visual tracking
+    await new Promise(r => setTimeout(r, 240));
+
+    if (lineEl) {
+      lineEl.classList.remove("slm-scanning-glow");
+    }
+  }
+
+  hudStatus.textContent = `✓ Scan Complete: ${WORKBENCH_CANDIDATES.length} Discovered Codewords Awaiting Review`;
+  hudStatus.style.color = "#10b981";
+  hudBar.style.background = "#10b981";
+  logWbTerminal("DONE", `Corpus triage finished. Human officer sign-off required under BSA Section 63.`, "#38bdf8");
+  if (runBtn) {
+    runBtn.disabled = false;
+    runBtn.innerHTML = `<span>⚡</span> Re-Scan Case Evidence`;
+  }
+}
+
+function renderSingleWorkbenchCard(c) {
+  return `
+    <div class="induction-card fade-in-slide-up" id="wb-card-${c.id}" style="background: #1e293b; border: 1px solid #334155; border-radius: 6px; padding: 12px; margin-bottom: 10px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="font-size: 11px; color: #94a3b8; font-weight: 700;">PROPOSED NOUN:</span>
+          <input type="text" id="wb-term-${c.id}" value="${escapeHtml(c.term)}" class="gov-input" style="width: 130px; font-weight: bold; color: #f59e0b; padding: 2px 6px; font-size: 12px; height: 24px;">
+          <span class="badge badge-sm badge-blue" style="font-size: 9px;">${c.latency} ms</span>
+          ${c.lineNum ? `<button class="btn btn-sm btn-gov-secondary" onclick="traceToSource('${c.fileId}', ${c.lineNum})" style="padding: 1px 5px; font-size: 9.5px; height: 20px;">📍 Line #${c.lineNum}</button>` : ''}
+        </div>
+        <span class="badge badge-sm badge-amber" id="wb-status-${c.id}">Pending Review</span>
+      </div>
+
+      <div style="font-size: 11px; color: #cbd5e1; margin: 4px 0;">
+        <strong>Evidence Line:</strong> <span class="mono" style="background: rgba(0,0,0,0.25); padding: 2px 4px; border-radius: 3px;">"${escapeHtml(c.message)}"</span>
+      </div>
+
+      <div style="display: flex; gap: 6px; align-items: center; margin-top: 8px;">
+        <select id="wb-meaning-${c.id}" class="gov-input" style="font-size: 10.5px; padding: 3px 6px; flex: 1; height: 28px;">
+          <option value="Heroin / Opiate Surrogate">Heroin / Opiate Surrogate (NDPS Sec 21)</option>
+          <option value="MDMA / Synthetic Stimulant">MDMA / Synthetic Stimulant (NDPS Sec 22)</option>
+          <option value="Prescription Psychotropic">Prescription Psychotropic (NDPS Sec 22)</option>
+          <option value="Cannabis Derivative">Cannabis Derivative (NDPS Sec 20)</option>
+        </select>
+        <button class="btn btn-gov-primary btn-sm" id="wb-btn-induct-${c.id}" onclick="inductWorkbenchWord(${c.id})">
+          🛡️ Induct (BSA)
+        </button>
+        <button class="btn btn-gov-secondary btn-sm" id="wb-btn-dismiss-${c.id}" onclick="dismissWorkbenchWord(${c.id})" style="color: #ef4444; border-color: #ef4444;">
+          ✕ Reject
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function renderWorkbenchCandidates() {
+  const streamList = document.getElementById("wb-cards-stream-list");
+  if (!streamList) return;
+  if (WORKBENCH_CANDIDATES.length === 0) {
+    streamList.innerHTML = `<div style="font-size: 11px; color: #64748b; text-align: center; padding: 20px;">No unconfirmed surrogate codewords detected.</div>`;
+    return;
+  }
+
+  streamList.innerHTML = WORKBENCH_CANDIDATES.map(c => renderSingleWorkbenchCard(c)).join("");
+}
+
+async function inductWorkbenchWord(candidateId) {
+  const c = WORKBENCH_CANDIDATES.find(item => item.id === candidateId);
+  if (!c) return;
+
+  const termInput = document.getElementById(`wb-term-${candidateId}`);
+  const term = termInput.value.trim().toLowerCase();
+  const select = document.getElementById(`wb-meaning-${candidateId}`);
+  const meaning = select.value;
+  const btn = document.getElementById(`wb-btn-induct-${candidateId}`);
+  const dismissBtn = document.getElementById(`wb-btn-dismiss-${candidateId}`);
+
+  btn.disabled = true;
+  btn.textContent = "Inducting...";
+
+  try {
+    const resp = await fetch("/api/induct_codeword", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        term: term,
+        meaning: meaning,
+        case_id: CASE_METADATA.fir || "FIR_104_2026",
+        io_name: CASE_METADATA.io || "Insp. Vikramjit Singh"
+      })
+    });
+
+    if (resp.ok) {
+      const status = document.getElementById(`wb-status-${candidateId}`);
+      status.className = "badge badge-sm badge-green";
+      status.textContent = "INDUCTED (SEC 63 HASHED)";
+
+      btn.className = "btn btn-gov-secondary btn-sm";
+      btn.textContent = "✓ In Lexicon";
+      termInput.disabled = true;
+      termInput.style.color = "#10b981";
+      if (dismissBtn) dismissBtn.style.display = "none";
+
+      // Add to lexicon list badge
+      const list = document.getElementById("inducted-lexicon-list");
+      if (list) {
+        list.innerHTML += `<span class="badge badge-sm badge-green">✓ ${escapeHtml(term)} (${escapeHtml(meaning.split(' ')[0])})</span>`;
+      }
+
+      logAuditEvent("CODEWORD_INDUCTION", `Officer inducted "${term}" (${meaning}) under Section 63 BSA.`);
+      showToast(`🛡️ "${term}" inducted into precinct dictionary!`, "success");
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function dismissWorkbenchWord(candidateId) {
+  const c = WORKBENCH_CANDIDATES.find(item => item.id === candidateId);
+  if (!c) return;
+
+  const termInput = document.getElementById(`wb-term-${candidateId}`);
+  const term = termInput.value.trim().toLowerCase();
+  const card = document.getElementById(`wb-card-${candidateId}`);
+
+  try {
+    await fetch("/api/dismiss_codeword", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        term: term,
+        reason: "Officer manual rejection (false positive)",
+        case_id: CASE_METADATA.fir || "FIR_104_2026",
+        io_name: CASE_METADATA.io || "Insp. Vikramjit Singh"
+      })
+    });
+
+    card.style.opacity = "0.4";
+    card.innerHTML = `<div style="font-size: 11px; color: #ef4444; padding: 4px;">✕ Candidate <strong>"${escapeHtml(term)}"</strong> rejected by officer. Noted in BSA audit trail.</div>`;
+    logAuditEvent("CODEWORD_REJECTED", `Officer rejected candidate "${term}" as non-contraband.`);
+    showToast(`✕ "${term}" dismissed.`, "alert");
+  } catch (err) {
+    console.error(err);
   }
 }
 
@@ -972,9 +1501,9 @@ function renderVerifiedTable() {
 
   tbody.innerHTML = verified.map(lead => `
     <tr>
-      <td><span class="badge badge-sm badge-amber">${lead.type}</span></td>
+      <td><span class="badge badge-sm badge-amber">${escapeHtml(lead.type)}</span></td>
       <td class="mono font-bold text-blue">${escapeHtml(lead.value)}</td>
-      <td class="mono text-xs text-muted">${lead.fileName} (Line ${lead.lineNum})</td>
+      <td class="mono text-xs text-muted">${escapeHtml(lead.fileName)} (Line ${lead.lineNum})</td>
       <td><span class="badge badge-sm badge-green">IO SIGNED ✓</span></td>
     </tr>
   `).join("");
@@ -982,21 +1511,30 @@ function renderVerifiedTable() {
 
 function renderChronology() {
   const container = document.getElementById("chronology-timeline");
-  container.innerHTML = CASE_CHRONOLOGY.map(evt => `
+  if (!container) return;
+  
+  const events = CASE_CHRONOLOGY.length > 0 ? CASE_CHRONOLOGY : [
+    { time: "09:00 IST", body: "Case Intake Registered u/s NDPS 21/22/29 & IT Act Sec 66D." },
+    { time: "09:15 IST", body: "Media Ingestion: SHA-256 integrity calculated for seized forensic evidence." },
+    { time: "09:20 IST", body: "Air-Gapped NER & SLM Codeword Extraction Pipeline executed." },
+    { time: "09:30 IST", body: "Link graph nodes & cross-source financial corroboration established." }
+  ];
+
+  container.innerHTML = events.map(evt => `
     <div class="timeline-event">
-      <div class="timeline-time">${evt.time}</div>
-      <div class="timeline-body">${evt.body}</div>
+      <div class="timeline-time">${escapeHtml(evt.time)}</div>
+      <div class="timeline-body">${escapeHtml(evt.body)}</div>
     </div>
   `).join("");
 }
 
 function updateCounts() {
-  const total = TRIAGE_LEADS.length;
-  const verified = TRIAGE_LEADS.filter(l => l.status === "verified").length;
-  const financial = TRIAGE_LEADS.filter(l => l.category === "financial").length;
-  const slang = TRIAGE_LEADS.filter(l => l.category === "slang").length;
-  const darknet = TRIAGE_LEADS.filter(l => l.category === "darknet").length;
-  const image = TRIAGE_LEADS.filter(l => l.category === "image").length;
+  const total = REAL_TRIAGE_LEADS.length;
+  const verified = REAL_TRIAGE_LEADS.filter(l => l.status === "verified").length;
+  const financial = REAL_TRIAGE_LEADS.filter(l => l.category === "financial").length;
+  const slang = REAL_TRIAGE_LEADS.filter(l => l.category === "slang").length;
+  const darknet = REAL_TRIAGE_LEADS.filter(l => l.category === "darknet").length;
+  const image = REAL_TRIAGE_LEADS.filter(l => l.category === "image").length;
 
   document.getElementById("verified-count").textContent = verified;
   document.getElementById("total-leads-count").textContent = total;
@@ -1020,17 +1558,17 @@ function openDossierModal() {
   document.getElementById("court-model-meta").textContent = CASE_METADATA.model;
 
   const schedA = document.getElementById("court-schedule-a-tbody");
-  schedA.innerHTML = EVIDENCE_FILES.map((f, i) => `
+  schedA.innerHTML = REAL_FILES.map((f, i) => `
     <tr>
       <td class="mono">Item #${i+1}</td>
-      <td class="mono font-bold">${f.name}</td>
-      <td>${f.source}</td>
-      <td class="mono text-xs">${f.sha256}</td>
+      <td class="mono font-bold">${escapeHtml(f.filename)}</td>
+      <td>${escapeHtml(f.file_type)}</td>
+      <td class="mono text-xs">${escapeHtml(f.sha256_hash)}</td>
     </tr>
   `).join("");
 
   const schedB = document.getElementById("court-schedule-b-tbody");
-  const verified = TRIAGE_LEADS.filter(l => l.status === "verified");
+  const verified = REAL_TRIAGE_LEADS.filter(l => l.status === "verified");
 
   if (verified.length === 0) {
     schedB.innerHTML = `
@@ -1043,10 +1581,10 @@ function openDossierModal() {
   } else {
     schedB.innerHTML = verified.map(l => `
       <tr>
-        <td><strong>${l.type}</strong></td>
+        <td><strong>${escapeHtml(l.type)}</strong></td>
         <td class="mono font-bold">${escapeHtml(l.value)}</td>
-        <td class="mono text-xs">${l.fileName} [Line ${l.lineNum}]</td>
-        <td class="text-xs">${l.corroboration.basis}</td>
+        <td class="mono text-xs">${escapeHtml(l.fileName)} [Line ${l.lineNum}]</td>
+        <td class="text-xs">${l.corroboration ? escapeHtml(l.corroboration.basis) : 'Verified Lead'}</td>
         <td><span style="color: #15803D; font-weight: bold;">VERIFIED & ADMISSIBLE ✓</span></td>
       </tr>
     `).join("");

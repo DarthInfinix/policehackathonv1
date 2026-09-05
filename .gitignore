@@ -1,0 +1,7 @@
+.DS_STORE
+.DS_Store
+__pycache__/
+*.pyc
+data/case_evidence.db
+data/raw/drug_listings.csv
+data/raw/drug_listings.tar.gz

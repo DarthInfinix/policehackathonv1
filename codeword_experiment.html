@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Codeword Induction Workbench | Chandigarh Police Cyber Forensics</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { background: #0b1120; color: #f1f5f9; font-family: 'Inter', sans-serif; margin: 0; padding: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .header-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 16px; margin-bottom: 24px; }
+    .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .card { background: #0f172a; border: 1px solid #1e293b; border-radius: 8px; padding: 20px; }
+    .card-title { font-size: 14px; font-weight: 700; color: #38bdf8; letter-spacing: 0.05em; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+    .msg-item { background: #1e293b; border-radius: 6px; padding: 12px; margin-bottom: 10px; font-size: 13px; border-left: 3px solid #64748b; transition: all 0.2s; }
+    .msg-item.flagged-tx { border-left-color: #f59e0b; background: rgba(245, 158, 11, 0.05); }
+    .msg-item.inducted { border-left-color: #ef4444; background: rgba(239, 68, 68, 0.08); }
+    .msg-header { display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8; margin-bottom: 6px; }
+    .induction-card { background: #1e293b; border: 1px solid #334155; border-radius: 6px; padding: 14px; margin-bottom: 12px; animation: fadeIn 0.3s; }
+    .induction-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .term-pill { background: #f59e0b; color: #000; font-weight: 700; padding: 2px 8px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+    .term-pill.inducted { background: #10b981; color: #fff; }
+    .latency-pill { background: #3b82f6; color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 3px; font-family: monospace; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header-bar">
+      <div>
+        <div style="font-size: 11px; color: #94a3b8; letter-spacing: 0.1em; font-weight: 700;">CHANDIGARH POLICE &bull; CYBER CRIME INVESTIGATION DIVISION</div>
+        <h1 style="font-size: 20px; margin: 4px 0 0 0;">Emerging Codeword & Slang Induction Workbench</h1>
+        <div style="font-size: 12px; color: #64748b; margin-top: 2px;">Section 63(4) Bharatiya Sakshya Adhiniyam (BSA) Active Learning Copilot</div>
+      </div>
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <span id="slm-indicator" class="badge badge-green" style="padding: 6px 12px; font-family: monospace;">● Local LFM2.5 Engine (Port 8012) Online</span>
+        <a href="/" class="btn btn-gov-secondary btn-sm" style="text-decoration: none;">← Return to Main Dashboard</a>
+      </div>
+    </div>
+
+    <!-- Controls Banner -->
+    <div class="card" style="margin-bottom: 20px; background: rgba(30, 41, 59, 0.4);">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <div style="font-weight: 700; font-size: 14px;">The "Evasion Gap" Problem:</div>
+          <div style="font-size: 12px; color: #94a3b8; max-width: 700px; margin-top: 4px;">
+            Dealers avoid known keywords (<em>Chitta, Heroin</em>) and invent novel surrogate nouns (<em>"Ice Tea", "Cold Coffee", "Stamp Papers"</em>). Traditional regex misses them. This engine spots transactional context and uses on-device SLM inference to propose new codewords for human officer induction.
+          </div>
+        </div>
+        <button id="btn-run-induction" class="btn btn-gov-primary" onclick="runCodewordInductionPipeline()" style="padding: 10px 20px; font-size: 13px;">
+          ⚡ Run On-Device Codeword Induction
+        </button>
+      </div>
+    </div>
+
+    <div class="grid-2col">
+      <!-- Left Column: Raw Seized Chat Feed -->
+      <div class="card">
+        <div class="card-title">
+          <span>SEIZED CHAT DUMP STREAM</span>
+          <span class="badge badge-sm badge-neutral" id="chat-count-badge">8 Messages</span>
+        </div>
+        <div id="chat-feed-container">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Right Column: Discovered Codewords & Induction Actions -->
+      <div class="card">
+        <div class="card-title">
+          <span>DISCOVERED CANDIDATE CODEWORDS (PENDING HUMAN INDUCTION)</span>
+          <span class="badge badge-sm badge-amber" id="candidate-count-badge">0 Candidates</span>
+        </div>
+        <div id="induction-results-container">
+          <div style="color: #64748b; font-size: 12px; text-align: center; padding: 40px 0;">
+            Click <strong>"Run On-Device Codeword Induction"</strong> above to extract evasive slang tokens with local LFM2.5 model.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SAMPLE_MESSAGES = [
+      { id: 1, sender: "Neon_Ghost", time: "18:14:02", text: "Admin active hai kya? Sector 22 side fast delivery chahiye.", tx: false },
+      { id: 2, sender: "Karan_Tricity", time: "18:19:30", text: "Bhai 2 parcel ice tea deliver kar dena sector 35 me, 3k gpay on raj@upi kar diya", tx: true },
+      { id: 3, sender: "Viper_09", time: "18:24:11", text: "Quality check kar ke bhejna last time drop late tha", tx: false },
+      { id: 4, sender: "Shadow_Sector", time: "18:31:05", text: "Send 2k on mule44@ybl for 5 boxes of stamp papers, drop at sec 17 plaza backlane", tx: true },
+      { id: 5, sender: "Aman_Mohali", time: "18:42:20", text: "Bro need 3 bottles cough syrup near PU campus gate 2, paid on rahul@okhdfcbank", tx: true },
+      { id: 6, sender: "Desi_Plug_99", time: "18:50:15", text: "Sab parcel out for dispatch, courier boys on the move", tx: false },
+      { id: 7, sender: "Karan_Tricity", time: "18:55:40", text: "Bhai urgent 3 piece cold coffee ready rakhna Aroma hotel ke peeche, USDT bheja hai", tx: true },
+      { id: 8, sender: "Punjab_Rider", time: "19:02:10", text: "4 packs of green apples dispatched to Mohali phase 7, confirm receipt", tx: true }
+    ];
+
+    const INDUCTED_WORDS = new Set();
+
+    function renderMessages() {
+      const container = document.getElementById("chat-feed-container");
+      container.innerHTML = SAMPLE_MESSAGES.map(m => {
+        let isInducted = false;
+        INDUCTED_WORDS.forEach(w => {
+          if (m.text.toLowerCase().includes(w.toLowerCase())) isInducted = true;
+        });
+
+        const cssClass = isInducted ? "msg-item inducted" : m.tx ? "msg-item flagged-tx" : "msg-item";
+        return `
+          <div class="${cssClass}" id="msg-${m.id}">
+            <div class="msg-header">
+              <span class="mono font-bold" style="color: #38bdf8;">${m.sender}</span>
+              <span>${m.time} &bull; ${m.tx ? '<span style="color: #f59e0b;">💳 Transactional Context</span>' : '<span style="color: #64748b;">Chatter</span>'}</span>
+            </div>
+            <div style="line-height: 1.4;">${highlightEntities(m.text)}</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function highlightEntities(text) {
+      let t = text;
+      INDUCTED_WORDS.forEach(w => {
+        const regex = new RegExp(`(${w})`, 'gi');
+        t = t.replace(regex, `<strong style="color: #ef4444; background: rgba(239, 68, 68, 0.2); padding: 1px 4px; border-radius: 3px;">🚨 $1 [CONFIRMED CODEWORD]</strong>`);
+      });
+      return t;
+    }
+
+    async function checkSlmStatus() {
+      try {
+        const resp = await fetch("/api/slm_status");
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.status === "online") {
+            document.getElementById("slm-indicator").textContent = `● ${data.model} (Port ${data.port}) Online`;
+            document.getElementById("slm-indicator").className = "badge badge-green";
+            return;
+          }
+        }
+      } catch (e) {}
+      document.getElementById("slm-indicator").textContent = "● Offline Fallback (Deterministic Mode)";
+      document.getElementById("slm-indicator").className = "badge badge-amber";
+    }
+
+    async function runCodewordInductionPipeline() {
+      const btn = document.getElementById("btn-run-induction");
+      btn.disabled = true;
+      btn.textContent = "⚙️ Processing Stream with Local LFM2.5...";
+
+      const resultsContainer = document.getElementById("induction-results-container");
+      resultsContainer.innerHTML = `
+        <div id="induction-hud" class="ai-telemetry-hud">
+          <div class="ai-telemetry-header">
+            <div style="display: flex; align-items: center;">
+              <span class="ai-pulse-dot" id="hud-pulse-dot"></span>
+              <span class="mono font-bold text-xs" style="color: #38bdf8;" id="hud-status-text">LFM2.5 Air-Gapped Inference Core: Initializing...</span>
+            </div>
+            <span class="badge badge-sm badge-blue mono" id="hud-progress-text">0 / 5 Evaluated</span>
+          </div>
+
+          <div class="ai-progress-track">
+            <div id="hud-progress-bar" class="ai-progress-bar"></div>
+          </div>
+
+          <div class="ai-kpi-bar">
+            <div class="ai-kpi-item">
+              <div class="ai-kpi-val" id="hud-kpi-model">LFM2.5-8B</div>
+              <div class="ai-kpi-label">Active Core</div>
+            </div>
+            <div class="ai-kpi-item">
+              <div class="ai-kpi-val" id="hud-kpi-latency">-- ms</div>
+              <div class="ai-kpi-label">Latency</div>
+            </div>
+            <div class="ai-kpi-item">
+              <div class="ai-kpi-val" id="hud-kpi-speed">-- tps</div>
+              <div class="ai-kpi-label">Decode Speed</div>
+            </div>
+            <div class="ai-kpi-item">
+              <div class="ai-kpi-val" id="hud-kpi-count" style="color: #f59e0b;">0</div>
+              <div class="ai-kpi-label">Surfaced</div>
+            </div>
+          </div>
+
+          <div class="terminal-console" id="hud-terminal-console">
+            <div class="terminal-line"><span class="terminal-ts">[SYS]</span> <span class="terminal-msg" style="color: #38bdf8;">Hardware: Apple Silicon On-Device Core | Port 8012</span></div>
+          </div>
+        </div>
+        <div id="cards-stream-list"></div>
+      `;
+
+      const cardsStream = document.getElementById("cards-stream-list");
+      const hudStatus = document.getElementById("hud-status-text");
+      const hudProgress = document.getElementById("hud-progress-text");
+      const hudBar = document.getElementById("hud-progress-bar");
+      const hudConsole = document.getElementById("hud-terminal-console");
+      const kpiLatency = document.getElementById("hud-kpi-latency");
+      const kpiSpeed = document.getElementById("hud-kpi-speed");
+      const kpiCount = document.getElementById("hud-kpi-count");
+
+      function addLog(type, msg, color = "#cbd5e1") {
+        const d = new Date();
+        const ts = d.toTimeString().split(' ')[0] + '.' + String(d.getMilliseconds()).padStart(3, '0');
+        const el = document.createElement('div');
+        el.className = 'terminal-line';
+        el.innerHTML = `<span class="terminal-ts">[${ts}]</span> <span class="terminal-msg" style="color: ${color};">${msg}</span>`;
+        hudConsole.appendChild(el);
+        hudConsole.scrollTop = hudConsole.scrollHeight;
+      }
+
+      const candidates = [];
+      const txMessages = SAMPLE_MESSAGES.filter(m => m.tx);
+
+      for (let idx = 0; idx < txMessages.length; idx++) {
+        const msg = txMessages[idx];
+        const pct = Math.round(((idx + 1) / txMessages.length) * 100);
+        hudBar.style.width = `${pct}%`;
+        hudProgress.textContent = `${idx + 1} / ${txMessages.length} Evaluated (${pct}%)`;
+        hudStatus.textContent = `Analyzing Msg #${msg.id} (@${msg.sender})...`;
+
+        addLog("SCAN", `Ingesting Msg #${msg.id} [@${msg.sender}]: "${escapeHtml(msg.text)}"`, "#e2e8f0");
+
+        // Highlight message in feed
+        const msgEl = document.getElementById(`msg-${msg.id}`);
+        if (msgEl) {
+          msgEl.style.outline = "2px solid #38bdf8";
+          msgEl.style.boxShadow = "0 0 14px rgba(56, 189, 248, 0.4)";
+          msgEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        const msgIndex = SAMPLE_MESSAGES.findIndex(m => m.id === msg.id);
+        const priorContext = [];
+        if (msgIndex > 0) {
+          for (let k = Math.max(0, msgIndex - 2); k < msgIndex; k++) {
+            priorContext.push(`${SAMPLE_MESSAGES[k].sender}: ${SAMPLE_MESSAGES[k].text}`);
+          }
+        }
+
+        addLog("CTX", `Prior turns: ${priorContext.length} loaded | Dispatching to local LFM2.5 core...`, "#94a3b8");
+
+        try {
+          const startTime = performance.now();
+          const resp = await fetch("/api/extract_codeword", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              message: msg.text,
+              context: priorContext
+            })
+          });
+
+          if (resp.ok) {
+            const data = await resp.json();
+            const latency = data.latency_ms || Math.round(performance.now() - startTime);
+            kpiLatency.textContent = `${latency} ms`;
+            if (data.speed_tps) {
+              kpiSpeed.textContent = `${data.speed_tps} tps`;
+            }
+
+            if (data.codeword && data.codeword.length > 2) {
+              const cardIdx = candidates.length;
+              const c = {
+                term: data.codeword,
+                sourceMessage: msg.text,
+                contextLines: priorContext,
+                sender: msg.sender,
+                msgId: msg.id,
+                latency: latency,
+                port: data.port || 8012
+              };
+              candidates.push(c);
+              kpiCount.textContent = candidates.length;
+
+              addLog("HIT", `🚨 Extracted candidate: "${escapeHtml(c.term)}" (${latency}ms) - Guardrails passed.`, "#10b981");
+
+              // Append card immediately
+              cardsStream.insertAdjacentHTML('beforeend', renderSingleCard(c, cardIdx));
+              document.getElementById("candidate-count-badge").textContent = `${candidates.length} Discovered`;
+            } else {
+              addLog("MISS", `⚪ No novel surrogate codenoun detected (Routine chatter / filtered rail).`, "#64748b");
+            }
+          }
+        } catch (err) {
+          addLog("ERR", `⚠️ Inference failure: ${err.message}`, "#ef4444");
+          console.error(err);
+        }
+
+        // Brief delay for human eye telemetry tracking
+        await new Promise(r => setTimeout(r, 260));
+
+        if (msgEl) {
+          msgEl.style.outline = "";
+          msgEl.style.boxShadow = "";
+        }
+      }
+
+      hudStatus.textContent = `✓ Scan Complete: ${candidates.length} Codewords Surfaced for Human Induction`;
+      hudStatus.style.color = "#10b981";
+      hudBar.style.background = "#10b981";
+      addLog("DONE", `Completed analysis of all ${txMessages.length} transactional messages. Standing by for officer triage.`, "#38bdf8");
+      btn.disabled = false;
+      btn.textContent = "⚡ Re-Run On-Device Codeword Induction";
+    }
+
+    function renderSingleCard(c, i) {
+      return `
+        <div class="induction-card" id="card-${i}">
+          <div class="induction-header">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 11px; color: #94a3b8; font-weight: 700;">PROPOSED CODENOUN:</span>
+              <input type="text" id="term-input-${i}" value="${escapeHtml(c.term)}" class="gov-input" style="width: 140px; font-weight: bold; color: #f59e0b; padding: 2px 6px; font-size: 12px; height: 26px;">
+              <span class="latency-pill">${c.latency} ms</span>
+            </div>
+            <span class="badge badge-sm badge-amber" id="status-${i}">Pending Officer Review</span>
+          </div>
+
+          ${c.contextLines.length > 0 ? `
+            <div style="font-size: 11px; color: #94a3b8; margin: 6px 0 4px 0;">
+              <strong>Prior Thread Context:</strong>
+              <div class="mono" style="background: rgba(0,0,0,0.25); padding: 4px 8px; border-radius: 4px; margin-top: 2px; line-height: 1.3;">
+                ${c.contextLines.map(l => escapeHtml(l)).join("<br>")}
+              </div>
+            </div>
+          ` : ''}
+
+          <div style="font-size: 12px; color: #cbd5e1; margin: 6px 0;">
+            <strong>Target Line:</strong> <span class="mono" style="background: rgba(0,0,0,0.3); padding: 2px 4px; border-radius: 3px;">"${escapeHtml(c.sourceMessage)}"</span>
+          </div>
+
+          <div style="display: flex; gap: 8px; align-items: center; margin-top: 10px;">
+            <select id="select-meaning-${i}" class="gov-input" style="font-size: 11px; padding: 4px 8px; flex: 1;">
+              <option value="Heroin / Opiate Surrogate">Heroin / Opiate Surrogate (NDPS Sec 21)</option>
+              <option value="MDMA / Synthetic Stimulant">MDMA / Synthetic Stimulant (NDPS Sec 22)</option>
+              <option value="Prescription Psychotropic">Prescription Psychotropic (NDPS Sec 22)</option>
+              <option value="Cannabis Derivative">Cannabis Derivative (NDPS Sec 20)</option>
+            </select>
+
+            <button class="btn btn-gov-primary btn-sm" id="btn-induct-${i}" onclick="inductWord(${i})">
+              🛡️ Induct (BSA)
+            </button>
+            <button class="btn btn-gov-secondary btn-sm" id="btn-dismiss-${i}" onclick="dismissWord(${i})" style="color: #ef4444; border-color: #ef4444;">
+              ✕ Reject
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+          ${c.contextLines.length > 0 ? `
+            <div style="font-size: 11px; color: #94a3b8; margin: 6px 0 4px 0;">
+              <strong>Prior Thread Context:</strong>
+              <div class="mono" style="background: rgba(0,0,0,0.25); padding: 4px 8px; border-radius: 4px; margin-top: 2px; line-height: 1.3;">
+                ${c.contextLines.map(l => escapeHtml(l)).join("<br>")}
+              </div>
+            </div>
+          ` : ''}
+
+          <div style="font-size: 12px; color: #cbd5e1; margin: 6px 0;">
+            <strong>Target Line:</strong> <span class="mono" style="background: rgba(0,0,0,0.3); padding: 2px 4px; border-radius: 3px;">"${escapeHtml(c.sourceMessage)}"</span>
+          </div>
+
+          <div style="display: flex; gap: 8px; align-items: center; margin-top: 10px;">
+            <select id="select-meaning-${i}" class="gov-input" style="font-size: 11px; padding: 4px 8px; flex: 1;">
+              <option value="Heroin / Opiate Surrogate">Heroin / Opiate Surrogate (NDPS Sec 21)</option>
+              <option value="MDMA / Synthetic Stimulant">MDMA / Synthetic Stimulant (NDPS Sec 22)</option>
+              <option value="Prescription Psychotropic">Prescription Psychotropic (NDPS Sec 22)</option>
+              <option value="Cannabis Derivative">Cannabis Derivative (NDPS Sec 20)</option>
+            </select>
+
+            <button class="btn btn-gov-primary btn-sm" id="btn-induct-${i}" onclick="inductWord(${i})">
+              🛡️ Induct (BSA)
+            </button>
+            <button class="btn btn-gov-secondary btn-sm" id="btn-dismiss-${i}" onclick="dismissWord(${i})" style="color: #ef4444; border-color: #ef4444;">
+              ✕ Reject
+            </button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    async function inductWord(cardIdx) {
+      const termInput = document.getElementById(`term-input-${cardIdx}`);
+      const term = termInput.value.trim().toLowerCase();
+      const select = document.getElementById(`select-meaning-${cardIdx}`);
+      const meaning = select.value;
+      const btn = document.getElementById(`btn-induct-${cardIdx}`);
+      const dismissBtn = document.getElementById(`btn-dismiss-${cardIdx}`);
+
+      btn.disabled = true;
+      btn.textContent = "Inducting...";
+
+      try {
+        const resp = await fetch("/api/induct_codeword", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            term: term,
+            meaning: meaning,
+            case_id: "FIR_104_2026",
+            io_name: "Insp. Vikramjit Singh"
+          })
+        });
+
+        if (resp.ok) {
+          INDUCTED_WORDS.add(term);
+          const status = document.getElementById(`status-${cardIdx}`);
+          status.className = "badge badge-sm badge-green";
+          status.textContent = "INDUCTED & SEC 63 HASHED";
+
+          btn.className = "btn btn-gov-secondary btn-sm";
+          btn.textContent = "✓ In Precinct Lexicon";
+          termInput.disabled = true;
+          termInput.style.color = "#10b981";
+          if (dismissBtn) dismissBtn.style.display = "none";
+
+          renderMessages();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function dismissWord(cardIdx) {
+      const termInput = document.getElementById(`term-input-${cardIdx}`);
+      const term = termInput.value.trim().toLowerCase();
+      const card = document.getElementById(`card-${cardIdx}`);
+
+      try {
+        await fetch("/api/dismiss_codeword", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            term: term,
+            reason: "Officer manual rejection (false positive)",
+            case_id: "FIR_104_2026",
+            io_name: "Insp. Vikramjit Singh"
+          })
+        });
+
+        card.style.opacity = "0.4";
+        card.innerHTML = `<div style="font-size: 11px; color: #ef4444; padding: 6px;">✕ Candidate <strong>"${escapeHtml(term)}"</strong> rejected by officer. Noted in BSA audit trail.</div>`;
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function jsonStringify(obj) {
+      return JSON.stringify(obj);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      renderMessages();
+      checkSlmStatus();
+    });
+  </script>
+</body>
+</html>
