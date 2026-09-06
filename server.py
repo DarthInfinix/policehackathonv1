@@ -12,6 +12,9 @@ import json
 import os
 import re
 import storage
+import legal_dossier
+from ocr_worker import process_evidence_image
+from cdr_analyser import parse_cdr_csv, fetch_dead_drop_events, find_colocation_matches
 
 PORT = 8000
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -193,6 +196,42 @@ class ForensicHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             self._set_json_headers(200)
             self.wfile.write(json.dumps({"status": "success", "count": len(words), "words": words}).encode('utf-8'))
             return
+            # API: Export Court-Admissible PDF Dossier (Fork D)
+        if path == '/api/export_dossier':
+            try:
+                case_id = params.get('case_id', ['FIR_104_2026'])[0]
+                fir_number = params.get('fir_number', [case_id])[0]
+                io_name = params.get('io_name', ['Insp. Vikramjit Singh'])[0]
+                police_station = params.get('police_station', ['Sector 17, Chandigarh'])[0]
+
+                evidence_files = legal_dossier.fetch_evidence_files_for_case(storage.DB_PATH, case_id)
+                out_path = f"/tmp/exhibit_a_{case_id}.pdf"
+                legal_dossier.build_evidence_certificate(
+                    out_path,
+                    case_id=case_id,
+                    fir_number=fir_number,
+                    io_name=io_name,
+                    police_station=police_station,
+                    evidence_files=evidence_files,
+                )
+
+                with open(out_path, "rb") as f:
+                    pdf_bytes = f.read()
+
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/pdf')
+                self.send_header('Content-Disposition', f'attachment; filename="exhibit_a_{case_id}.pdf"')
+                self.send_header('Content-Length', str(len(pdf_bytes)))
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(pdf_bytes)
+                return
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                self._set_json_headers(500)
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+                return
 
         # Fallback to standard static file serving (index.html, styles.css, app.js, data files)
         return super().do_GET()
@@ -507,6 +546,56 @@ Evasion Code Word:"""
                 self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
                 return
 
+       # API: OCR Seized Screenshot (Fork A)
+        if path == '/api/upload_screenshot':
+            try:
+                params = urllib.parse.parse_qs(parsed.query)
+                case_id = params.get('case_id', ['FIR_104_2026'])[0]
+                filename = params.get('filename', ['screenshot.png'])[0]
+
+                content_length = int(self.headers.get('Content-Length', 0))
+                image_bytes = self.rfile.read(content_length)
+
+                text_content = process_evidence_image(image_bytes, case_id, source_label=filename)
+                ocr_filename = filename.rsplit('.', 1)[0] + '_ocr.txt'
+                result = storage.parse_and_ingest_file(case_id, ocr_filename, text_content.encode('utf-8'))
+
+                self._set_json_headers(200)
+                self.wfile.write(json.dumps({"status": "success", "filename": ocr_filename, "data": result}).encode('utf-8'))
+                return
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                self._set_json_headers(500)
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+                return
+
+        # API: CDR / Tower Correlation Upload (Fork C)
+        if path == '/api/upload_cdr':
+            try:
+                params = urllib.parse.parse_qs(parsed.query)
+                case_id = params.get('case_id', ['FIR_104_2026'])[0]
+
+                content_length = int(self.headers.get('Content-Length', 0))
+                file_bytes = self.rfile.read(content_length)
+
+                records = parse_cdr_csv(file_bytes, case_id)
+                dead_drops = fetch_dead_drop_events(storage.DB_PATH, case_id)
+                alerts = find_colocation_matches(records, dead_drops)
+
+                self._set_json_headers(200)
+                self.wfile.write(json.dumps({
+                    "status": "success",
+                    "records_parsed": len(records),
+                    "colocation_alerts": alerts
+                }, default=str).encode('utf-8'))
+                return
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                self._set_json_headers(500)
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+                return         
         self._set_json_headers(404)
         self.wfile.write(b'{"status": "error", "message": "Endpoint not found"}')
 
