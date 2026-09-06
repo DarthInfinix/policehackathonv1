@@ -48,6 +48,9 @@
         </div>
 
         <!-- Integrated Codeword Induction View D Shortcut -->
+        <button class="btn btn-gov-secondary btn-sm" onclick="window.open('/api/export_dossier?case_id='+encodeURIComponent(window.currentCaseId||'FIR_104_2026'), '_blank')" title="Export Section 63 BSA Evidence Certificate">
+  <span>🖨️</span> Export Court PDF
+</button>
         <button class="btn btn-gov-primary btn-sm" onclick="quickOpenCodewordInduction()" title="Active Slang Induction Copilot">
           <span>⚡</span> Codeword Induction
         </button>
@@ -383,6 +386,10 @@
               <span>＋ Ingest File</span>
             </button>
             <input type="file" id="panel-file-input" multiple style="display: none;" onchange="handlePanelFilesSelected(this.files)">
+            <input type="file" id="screenshot-file-input" accept="image/*" style="display: none;" onchange="uploadScreenshotForOCR(this.files[0])">
+<button class="btn btn-sm btn-gov-secondary" onclick="document.getElementById('screenshot-file-input').click()" style="padding: 3px 8px; font-size: 11px;">
+  <span>🖼️ OCR Screenshot</span>
+</button>
             <span class="record-counter" id="evidence-files-count">0 Files Loaded</span>
           </div>
         </div>
