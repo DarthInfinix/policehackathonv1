@@ -16,6 +16,19 @@ import csv
 import io
 import sqlite3
 from datetime import datetime, timedelta
+def _try_parse_any_timestamp(raw):
+    """Best-effort parse of whatever timestamp format ended up in evidence_records."""
+    if not raw:
+        return None
+    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(str(raw)[:19], fmt)
+        except ValueError:
+            continue
+    try:
+        return datetime.fromisoformat(str(raw))
+    except (ValueError, TypeError):
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -170,26 +183,26 @@ def _parse_duration(raw):
 def fetch_dead_drop_events(db_path, case_id):
     """
     Pull candidate "dead-drop" timestamps + locations from existing chat
-    evidence in storage.py's schema. This assumes entity_mentions/entities
-    already captured location-tagged lines; adjust the query to match
-    your actual `entities` table's `entity_type` values (e.g. 'location').
+    evidence, matching the real storage.py schema: entity_mentions links
+    to evidence_records via record_id only (no file_id/line_number there).
     """
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     cur = conn.execute(
         """
-        SELECT em.line_number, er.timestamp AS raw_timestamp, er.raw_text,
-               e.value AS location_value
+        SELECT er.line_number, er.timestamp AS raw_timestamp, er.raw_text,
+               e.raw_value AS location_value
         FROM entity_mentions em
-        JOIN entities e ON e.id = em.entity_id
-        JOIN evidence_records er ON er.file_id = em.file_id AND er.line_number = em.line_number
-        WHERE e.entity_type = 'location' AND em.case_id = ?
+        JOIN entities e ON e.entity_id = em.entity_id
+        JOIN evidence_records er ON er.record_id = em.record_id
+        WHERE e.entity_type = 'LOCATION' AND er.case_id = ?
         """,
         (case_id,),
     )
     rows = [dict(r) for r in cur.fetchall()]
     conn.close()
     return rows
+    
 
 
 def find_colocation_matches(cdr_records, dead_drop_events, window_minutes=30):
@@ -211,9 +224,9 @@ def find_colocation_matches(cdr_records, dead_drop_events, window_minutes=30):
         event_ts_raw = event.get("raw_timestamp")
         if not event_location or not event_ts_raw:
             continue
-        try:
-            event_ts = datetime.fromisoformat(event_ts_raw)
-        except (ValueError, TypeError):
+            
+        event_ts = _try_parse_any_timestamp(event_ts_raw)
+        if event_ts is None:
             continue
 
         for cdr in cdr_records:
