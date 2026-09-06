@@ -13,6 +13,7 @@ import os
 import re
 import storage
 import legal_dossier
+import tempfile
 from ocr_worker import process_evidence_image
 from cdr_analyser import parse_cdr_csv, fetch_dead_drop_events, find_colocation_matches
 
@@ -204,8 +205,7 @@ class ForensicHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 io_name = params.get('io_name', ['Insp. Vikramjit Singh'])[0]
                 police_station = params.get('police_station', ['Sector 17, Chandigarh'])[0]
 
-                evidence_files = legal_dossier.fetch_evidence_files_for_case(storage.DB_PATH, case_id)
-                                import tempfile
+                evidence_files = legal_dossier.fetch_evidence_files_for_case(storage.DB_PATH, case_id)  
                 out_path = os.path.join(tempfile.gettempdir(), f"exhibit_a_{case_id}.pdf")
                 legal_dossier.build_evidence_certificate(
                     out_path,
