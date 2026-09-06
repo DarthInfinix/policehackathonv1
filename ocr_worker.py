@@ -33,7 +33,12 @@ try:
     OCR_AVAILABLE = True
 except ImportError:
     OCR_AVAILABLE = False
-
+import platform
+if OCR_AVAILABLE and platform.system() == "Windows":
+    import os as _os
+    _default_tesseract = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+    if _os.path.exists(_default_tesseract):
+        pytesseract.pytesseract.tesseract_cmd = _default_tesseract
 
 # ---------------------------------------------------------------------------
 # Regex patterns for common Indian payment-app receipt fields
