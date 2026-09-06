@@ -205,7 +205,8 @@ class ForensicHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 police_station = params.get('police_station', ['Sector 17, Chandigarh'])[0]
 
                 evidence_files = legal_dossier.fetch_evidence_files_for_case(storage.DB_PATH, case_id)
-                out_path = f"/tmp/exhibit_a_{case_id}.pdf"
+                                import tempfile
+                out_path = os.path.join(tempfile.gettempdir(), f"exhibit_a_{case_id}.pdf")
                 legal_dossier.build_evidence_certificate(
                     out_path,
                     case_id=case_id,
