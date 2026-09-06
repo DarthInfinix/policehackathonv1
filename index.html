@@ -390,6 +390,10 @@
 <button class="btn btn-sm btn-gov-secondary" onclick="document.getElementById('screenshot-file-input').click()" style="padding: 3px 8px; font-size: 11px;">
   <span>🖼️ OCR Screenshot</span>
 </button>
+            <input type="file" id="cdr-file-input" accept=".csv" style="display: none;" onchange="uploadCdrFile(this.files[0])">
+<button class="btn btn-sm btn-gov-secondary" onclick="document.getElementById('cdr-file-input').click()" style="padding: 3px 8px; font-size: 11px;">
+  <span>📡 Upload CDR</span>
+</button>
             <span class="record-counter" id="evidence-files-count">0 Files Loaded</span>
           </div>
         </div>
