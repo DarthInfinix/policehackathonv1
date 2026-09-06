@@ -1,0 +1,9 @@
+txn_id,timestamp,account_number,txn_type,amount,currency,counterparty_upi,counterparty_name,description_remarks,status
+TXN-90112,2026-09-04 11:25:10,092100293812,CREDIT,4500.00,INR,buyer_sec35@okaxis,Ankit Verma,Sneaker size 5 token payment,COMPLETED
+TXN-90113,2026-09-04 12:10:44,092100293812,CREDIT,4800.00,INR,rahul_chd@ybl,Rahul Sharma,Split bill coaching advance,COMPLETED
+TXN-90114,2026-09-04 14:22:10,092100293812,CREDIT,20000.00,INR,9814022341@paytm,Karan Deep Singh,College coaching fees advance,COMPLETED
+TXN-90115,2026-09-04 14:28:30,092100293812,CREDIT,17500.00,INR,chd_mule99@okaxis,Gurinder Gill,Exam registration part 2,COMPLETED
+TXN-90116,2026-09-04 15:45:00,092100293812,DEBIT,45000.00,INR,cash_atm_wdr,ATM Cash Withdrawal Sec 22 CHD,Cash withdrawal self,COMPLETED
+TXN-90117,2026-09-04 16:30:12,092100293812,CREDIT,7000.00,INR,deepak_tricity@paytm,Deepak Kumar,Sweet mithai box 2 qty,COMPLETED
+TXN-90118,2026-09-04 17:15:22,092100293812,CREDIT,12000.00,INR,mule44@ybl,Sukhwinder Singh,Research chemicals dispatch,COMPLETED
+TXN-90119,2026-09-04 18:05:00,092100293812,DEBIT,19000.00,INR,crypto_onramp@upi,CoinDCX Aggregator,USDT on-ramp wallet funding,COMPLETED

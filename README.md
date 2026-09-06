@@ -16,20 +16,31 @@ The entire platform runs without `npm`, Node dependencies, Docker, or external c
 - Local inference server (optional for full SLM induction): `llama-server` running on `localhost:8080` or `localhost:8012` with any GGUF (e.g. `LFM2.5-8B-A1B-Q4_0.gguf`, `llama-3.2-3b`, `gemma-2-2b`). If no local model is running, the platform operates seamlessly using heuristic semantic fallbacks.
 
 ### Launching the Platform
-Run the forensic server from the repository root:
+
+#### Option A: 1-Click Complete Startup Script (Recommended)
+Automatically checks and launches `llama-server` instances for LiquidAI (port 8012) and dots.ocr (port 8015), starts `server.py` on port 8000, and opens the browser:
+```bash
+./start.sh
+```
+
+#### Option B: Standalone Web Server
 ```bash
 python3 server.py
 ```
-Open your browser to:
-```
-http://localhost:8000/
-```
+Open your browser to: `http://localhost:8000/`
 
-### Instant Verification
-1. On Step 1, click **"Proceed to Evidence Media Intake ➔"**.
-2. On Step 2, click **"⚡ Load Pre-Staged Datasets"** (instantly ingests 683 real records across 3 multi-source forensic datasets into SQLite).
-3. On Step 3, the model discovery engine will automatically ping your local server, populate model slugs, and show capability blurbs. Click **"⚡ Start Forensic Pipeline & Triage ➔"**.
-4. The workbench will load with live dynamic tabs, streaming raw database records, 31+ real triage leads, dynamic network graph, and active codeword induction.
+### Instant 4-Step Verification
+1. **Step 1 (Case Intake)**: Review prefilled Chandigarh Police case details (FIR 104/2026/CYBER, Sec 21/22 NDPS & Sec 66D IT Act), click **"Proceed to Evidence Media Intake ➔"**.
+2. **Step 2 (Media Intake & Previews)**:
+   - Browse or drag & drop seized evidence (images, CSVs, JSON, text dumps) or click **"⚡ Load Pre-Staged Datasets & OCR"**.
+   - Review live staged cards: see image thumbnails with an explicit **`[✓] Run Neural OCR`** checkbox (allowing operator to run or skip OCR per image), and monospace preview boxes showing the first lines of CSV/text files.
+   - Click **"Proceed to Engine Configuration ➔"**.
+3. **Step 3 (Engine Presets)**:
+   - **⚡ Light Mode (Default)**: Pure deterministic regex & financial NER + fast Tesseract OCR (0 GPU overhead).
+   - **🧠 Accuracy Mode**: Deep contextual reasoning via LiquidAI (LFM2.5 on port 8012) + dots.ocr Neural ViT.
+   - Click **"⚡ Start Forensic Pipeline & Triage ➔"**.
+4. **Step 4 (Genuine Loading Screen)**:
+   - Watches authentic live execution across exhibits: hashes files with SHA-256, streams neural OCR status and elapsed time, runs financial NER, queries correlations, and seals forensic records under Section 63(4) BSA before loading the Workbench.
 
 ---
 
@@ -57,7 +68,19 @@ All hardcoded mock data, fake preview arrays, and simulated files have been **co
 ### B. Forensic Backend Server (`server.py`)
 - **Threaded Concurrency**: Built on `socketserver.ThreadingTCPServer` to handle simultaneous file uploads, streaming lines, and SLM queries.
 - **Binary Multi-File Ingestion (`POST /api/upload`)**: Safely ingests heterogeneous file streams via `arrayBuffer()`, preserving binary and multi-byte UTF-8 encodings (tested on 463 KB darknet CSV dumps).
-- **1-Click Demo Ingestion (`POST /api/load_demo_data`)**: Reads and parses `data/processed/darknet_listings_sample.csv` (600 lines), `data/raw/sample_telegram_export.json` (8 lines), and `data/processed/bank_statement_baseline.csv` (75 lines) into SQLite in < 500ms.
+- **1-Click Demo Ingestion (`POST /api/load_demo_data`)**: Reads and parses 5 multi-source evidence datasets into SQLite in < 500ms:
+  - `darknet_listings_sample.csv` (600 records)
+  - `sample_telegram_export.json` (8 records)
+  - `bank_statement_baseline.csv` (75 records)
+  - `seized_paytm_mule_receipt.png` (8 records via Air-Gapped OCR)
+  - `seized_telegram_chat_drop.png` (7 records via Air-Gapped OCR)
+- **Air-Gapped OCR Engine (`ocr_worker.py`)**:
+  - Direct integration with local system **Tesseract 5.5.2** (`/opt/homebrew/bin/tesseract`) with zero external cloud or Python image library dependencies.
+  - TSV/line-level parsing extracting per-line bounding boxes and forensic confidence ratings.
+  - Contextual classification recognizing `UPI_PAYMENT_RECEIPT` (Paytm, PhonePe, Google Pay) vs `ENCRYPTED_CHAT_SCREENSHOT` (Telegram, WhatsApp).
+  - Speaker attribution extracting conversational usernames (`Karan`, `Desi_Plug`) from screenshot chat bubbles into forensic `sender_id`.
+  - Serves original exhibits via `GET /api/evidence_image?file_id=...` with content-type preservation.
+  - Reports OCR capabilities via `GET /api/ocr_status`.
 - **SillyTavern-Style Model Discovery (`GET /api/llm/models?url=...`)**:
   - Pings `${serverUrl}/v1/models` (default `http://localhost:8080`, with presets for `8012` and `11434`).
   - Dynamically classifies detected model architectures (Liquid LFM, Google Gemma, Meta Llama, Alibaba Qwen, Microsoft Phi) and injects operational blurbs and throughput metrics.
@@ -72,17 +95,17 @@ All hardcoded mock data, fake preview arrays, and simulated files have been **co
 ### C. Frontend Forensic Workbench (`index.html`, `app.js`, `styles.css`)
 - **Step 1 (Case Intake)**: Real FIR and IO metadata capture with Belt and Police Station auto-formatting.
 - **Step 2 (Media Intake)**:
-  - Drag-and-drop file ingestion supporting multi-file selection.
+  - Drag-and-drop file ingestion supporting multi-file selection including images (`.png`, `.jpg`, `.jpeg`, `.webp`).
   - Visual upload progress bar (`#upload-progress-container`) tracking live ingestion percentages.
-  - Dynamic staged table (`#staged-evidence-tbody`) displaying authentic ingested files and SHA-256 hashes.
+  - Dynamic staged table (`#staged-evidence-tbody`) displaying authentic ingested files, `📸 AIR-GAPPED OCR` badges, and SHA-256 hashes.
   - Instant pre-staged dataset button (`autofillEvidenceFiles()`).
 - **Step 3 (Inference Engine Configuration)**:
   - SillyTavern-style server URL input, presets (`8080`, `8012`, `11434`), and connection status badge (`🟢 Connected` / `🔴 Offline`).
   - Dynamic model select dropdown populated from live server.
   - Dynamic model capability blurb card.
 - **Step 5 (Workbench Dashboard)**:
-  - **Panel 1 (Left - Evidence Explorer)**: Dynamic file tabs generated from database; real SHA-256 display; streaming raw record viewer with line numbers and flag tags; real-time line search filter; instant `[ ＋ Ingest File ]` button.
-  - **Panel 2 (Center - Triage Workbench)**: Dynamic cards for 31+ real entities; risk scores; clickable `traceToSource(fileId, lineNum)` button jumping and highlighting source lines in Panel 1.
+  - **Panel 1 (Left - Evidence Explorer)**: Dynamic file tabs with `📸` badges for screenshots; real SHA-256 display; dual view toggle (`[ 📄 OCR Stream ]` vs `[ 📸 Seized Screenshot Original ]`); image preview viewer with Section 63(4) cryptographic verification subtext; streaming raw record viewer with line numbers, OCR badges, and flag tags; real-time line search filter; instant `[ ＋ Ingest File ]` button.
+  - **Panel 2 (Center - Triage Workbench)**: Dynamic cards for 40+ real entities (including screenshot entities like UPI `mule44@ybl` and drug slang `white shoes`, `ice tea`); risk scores; clickable `traceToSource(fileId, lineNum)` button automatically toggling text mode, jumping to, and highlighting source lines in Panel 1.
   - **Panel 3 (Right - Intelligence & Governance)**:
     - **Tab A (Link Graph)**: Dynamic SVG network topology generated from real entities and mentions.
     - **Tab B (Section 63 BSA)**: Live digital evidence certificate with SHA-256 hash chains.
@@ -95,52 +118,49 @@ All hardcoded mock data, fake preview arrays, and simulated files have been **co
 
 | Endpoint | Method | Params / Body | Description |
 | :--- | :--- | :--- | :--- |
-| `/api/files` | `GET` | `case_id` | Returns list of all ingested evidence files with SHA-256 and record counts. |
+| `/api/cases` | `GET` | — | Returns list of all registered precinct cases with file and record totals. |
+| `/api/cases/create` | `POST` | `{ case_id, fir_number, police_station, io_name, io_belt, category }` | Registers a case in SQLite for Section 63 BSA legal chain of custody. |
+| `/api/cross_case_matches`| `GET` | `case_id` | Identifies matching targets (UPI, phones, wallets) across historical cases. |
+| `/api/files` | `GET` | `case_id` | Returns list of all ingested evidence files with SHA-256, OCR types, and record counts. |
 | `/api/file_records` | `GET` | `file_id`, `limit` | Streams actual records/lines for a file with forensic line numbers and tags. |
-| `/api/leads` | `GET` | `case_id` | Returns dynamic triage leads generated from real extracted entities. |
-| `/api/candidates` | `GET` | `case_id`, `limit` | Returns transactional evidence messages for codeword induction. |
+| `/api/evidence_image` | `GET` | `file_id` | Serves original seized evidence image exhibit for Section 63(4) BSA preview. |
+| `/api/ocr_status` | `GET` | — | Returns local air-gapped OCR engine status (dots.ocr / Tesseract 5.5.2). |
+| `/api/leads` | `GET` | `case_id` | Returns dynamic triage leads with `crossCaseHit` indicators and corroboration basis. |
+| `/api/candidates` | `GET` | `case_id`, `file_id`, `limit` | Returns transactional evidence messages for codeword induction. |
 | `/api/slang_dictionary` | `GET` | — | Returns confirmed inducted codewords from precinct database. |
 | `/api/graph` | `GET` | `case_id` | Returns nodes and links for the interactive entity relationship graph. |
 | `/api/search` | `GET` | `q`, `case_id`, `limit` | Runs SQLite FTS5 full-text search across all evidence records. |
 | `/api/llm/models` | `GET` | `url` | Pings local inference server for available model slugs with architecture blurbs. |
 | `/api/slm_status` | `GET` | — | Quick ping to check if local llama-server is online on default ports. |
-| `/api/upload` | `POST` | `case_id`, `filename` (query), binary body | Ingests and parses an evidence file into SQLite; extracts entities. |
-| `/api/load_demo_data` | `POST` | `case_id` | Ingests authentic Darknet, Telegram, and Bank statement samples from disk. |
+| `/api/upload` | `POST` | `case_id`, `filename` (query), binary body | Ingests and parses an evidence file (or runs OCR on images) into SQLite; extracts entities. |
+| `/api/load_demo_data` | `POST` | `case_id`, `type=default|adversarial` | Ingests pre-staged datasets or the adversarial stress corpus from disk. |
 | `/api/extract_codeword` | `POST` | `{ message, context, server_url, model }` | SLM few-shot completion isolating disguised contraband nouns. |
-| `/api/induct_codeword` | `POST` | `{ term, meaning, case_id, io_name }` | Commits an officer-verified codeword into `slang_dictionary` with BSA audit. |
-| `/api/dismiss_codeword` | `POST` | `{ term, reason, case_id, io_name }` | Logs candidate rejection in the Section 63 BSA audit log. |
+| `/api/induct_codeword` | `POST` | `{ term, meaning, case_id, io_name }` | Commits an officer-verified codeword into `slang_dictionary` with SHA-256 hash. |
+| `/api/dismiss_codeword` | `POST` | `{ term, reason, case_id, io_name }` | Dismisses a false positive candidate with BSA audit record. |
 
 ---
 
-## 4. Work Left to Implement: Next Modules for AI Agents & Forks
+## 4. Adversarial Stress Testing & Verification
 
-Other AI agents building in their own forks or feature branches should focus on the following concrete extensions. **The core architecture, database schema, and REST endpoints are already in place—build your modules to plug directly into this backbone:**
+The repository includes a comprehensive adversarial stress test corpus and automated test suites:
 
+### A. Adversarial Stress Corpus (`data/adversarial/`)
+- `adversarial_whatsapp_hinglish.txt`: Heavily obfuscated chat threads using Hinglish and Punjabi phonetic substitutions (*chitta, white sneakers, sweet mithai, tola, peti, parcel*), split payments, and drop point coordinates (Aroma Hotel Sector 22, ISBT 43).
+- `adversarial_darknet_listings.json`: PGP-signed synthetic Tor marketplace storefront listings for 4-MMC (mephedrone), LSD blotters, and pharma grade benzos with TRON USDT and Bitcoin escrow addresses.
+- `adversarial_bank_structuring.csv`: AML evasion micro-deposits structured below reporting thresholds matching chat amounts and mule accounts.
+- `adversarial_seized_chat_chit.png`: Dark-mode mobile chat screenshot with real timestamps and UPI handles for neural OCR stress testing.
+- `adversarial_handwritten_chit.jpeg`: Authentic seized handwritten Hindi/English ledger exhibit.
+
+### B. Running Automated Verification Suites
+```bash
+# 1. Run Adversarial Stress Test (Obfuscation recall & cross-case corroboration)
+python3 tests/stress_test_adversarial.py
+
+# 2. Run End-to-End Workbench API Integration Suite
+python3 tests/test_api_workflow.py
 ```
-                               ┌────────────────────────┐
-                               │     MAIN PIPELINE      │
-                               │ server.py + storage.py │
-                               └───────────┬────────────┘
-         ┌──────────────────┬──────────────┼──────────────┬──────────────────┐
-         ▼                  ▼              ▼              ▼                  ▼
-   [FORK A: OCR]      [FORK B: GRAPH] [FORK C: CDR] [FORK D: DOSSIER] [FORK E: SIDECAR]
-   Screenshot OCR     Force-Directed   Tower Azimuth  Court PDF & QR   Offline llama.cpp
-   Receipt Extractor  Timeline Physics Geo-Fencing    Sec 91 Notices   Launcher Script
-```
 
----
-
-### 🔹 FORK A: Offline OCR & Seized Screenshot Harvester
-* **Branch Name:** `feature/offline-ocr-worker`
-* **File to Create:** `ocr_worker.py`
-* **Objective:** Frontline police seize screenshots of WhatsApp chats, Telegram channels, and UPI payment receipts (Paytm/PhonePe/Google Pay).
-* **Scope & Requirements:**
-  1. Use standard library or local lightweight OCR (`pytesseract` or `easyocr` or `surya-ocr`).
-  2. Implement `process_evidence_image(image_path_or_bytes, case_id)`:
-     - Pre-processes image (greyscale, contrast thresholding).
-     - Extracts text lines with approximate bounding boxes.
-     - Parses detected UPI transaction IDs, transaction amounts (₹), timestamps, and mobile numbers.
-  3. Wire directly into `storage.parse_and_ingest_file(case_id, filename, text_content.encode())` so screenshots appear seamlessly in Panel 1 as an ingested evidence stream.
+The core architecture (SQLite, WAL mode, FTS5, OCR engine, SLM induction, dual-view exhibit UI) is **fully implemented and tested**. Agents working on new features should branch out from `main`:
 
 ---
 
@@ -210,21 +230,23 @@ Other AI agents building in their own forks or feature branches should focus on 
 ## 5. Repository File Tree
 
 ```
-├── index.html                  # Main forensic dashboard UI (Steps 1-5, Panel 1-3)
-├── styles.css                  # High-density dark-mode forensic styling
-├── app.js                      # Core frontend controller, WebSocket/REST API client, state
-├── server.py                   # Threaded Python HTTP forensic server (zero dependencies)
+├── index.html                  # Main forensic dashboard UI (Steps 1-5, Panel 1-3, Dual Exhibit Viewer)
+├── styles.css                  # High-density dark-mode forensic styling & exhibit image styles
+├── app.js                      # Core frontend controller, WebSocket/REST API client, OCR mode toggle
+├── server.py                   # Threaded Python HTTP forensic server (OCR & image endpoints)
 ├── storage.py                  # SQLite WAL database engine, FTS5 search, entity extractor
-├── codeword_experiment.html    # (Reference only - features merged into View D)
+├── ocr_worker.py               # Air-gapped Tesseract 5.5.2 OCR engine & screenshot classifier
 ├── data/
 │   ├── case_evidence.db        # Active SQLite database in WAL mode
+│   ├── evidence_images/        # Seized evidence image store (Section 63(4) BSA exhibits)
 │   ├── processed/
 │   │   ├── darknet_listings_sample.csv  # 600 authentic darknet illicit marketplace listings
 │   │   └── bank_statement_baseline.csv  # 75 authentic banking & UPI transaction records
 │   └── raw/
 │       ├── sample_telegram_export.json  # Multi-party encrypted chat negotiation dump
-│       └── drug_listings.csv            # Reference raw listings corpus
-├── README.md                   # This master documentation and AI agent briefing
+│       ├── seized_paytm_mule_receipt.png # Seized Paytm payment receipt exhibit
+│       └── seized_telegram_chat_drop.png # Seized Telegram chat drop exhibit
+├── README.md                   # Master documentation and AI agent briefing
 └── .gitignore                  # Git hygiene rules
 ```
 

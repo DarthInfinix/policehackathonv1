@@ -1777,3 +1777,70 @@ body {
     transform: translateY(0);
   }
 }
+
+/* Evidence Image Viewer & OCR Display */
+.evidence-view-toggle {
+  background: #0f172a;
+  border-bottom: 1px solid var(--border-color);
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.evidence-image-viewer {
+  background: #090d16;
+  border-radius: 4px;
+  padding: 12px;
+  text-align: center;
+}
+
+.evidence-img-wrapper {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  background: #020617;
+}
+
+.evidence-img-wrapper img {
+  display: block;
+  max-width: 100%;
+  max-height: 480px;
+  object-fit: contain;
+  transition: transform 0.2s ease;
+}
+
+/* Pipeline Preset Cards */
+.preset-mode-card {
+  position: relative;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+.preset-mode-card:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+.preset-mode-card.active {
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.25);
+}
+
+/* Staged File Preview Cards */
+.staged-file-card {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.2s ease;
+}
+.staged-file-card:hover {
+  border-color: #475569;
+}
+
+

@@ -27,7 +27,7 @@ REGEX_PATTERNS = {
 
 # Suspicious Slang & Narcotics Keywords
 SUSPICIOUS_KEYWORDS = {
-    "narcotics": ["chitta", "white shoes", "4-mmc", "mephedrone", "ice tea", "mdma", "cocaine", "heroin", "charas", "hash", "pudiya", "tola", "malana", "weed", "greens", "shrooms", "acid", "lsd", "alprazolam", "tramadol", "diazepam"],
+    "narcotics": ["chitta", "white shoes", "white sneakers", "sneakers", "sweet mithai", "mithai", "stamp paper", "stamp papers", "4-mmc", "mephedrone", "ice tea", "mdma", "cocaine", "heroin", "charas", "hash", "pudiya", "tola", "malana", "weed", "greens", "shrooms", "acid", "lsd", "alprazolam", "tramadol", "diazepam"],
     "action": ["dead drop", "drop point", "deaddrop", "parcel", "delivery", "cash", "usdt", "transfer", "stash", "plug", "escrow", "vendor", "pgp"],
     "locations": ["sector 17", "sector 22", "sector 26", "sector 35", "sector 43", "aroma", "sukhna", "panjab university", "pu campus", "mohali", "phase 7", "phase 3b2", "panchkula", "zirakpur", "elante"]
 }
@@ -201,7 +201,7 @@ def extract_entities_from_text(text: str) -> Dict[str, List[str]]:
 
     return results
 
-def parse_and_ingest_file(case_id: str, filename: str, content_bytes: bytes, db_path: str = DB_PATH) -> Dict[str, Any]:
+def parse_and_ingest_file(case_id: str, filename: str, content_bytes: bytes, db_path: str = DB_PATH, skip_ocr: bool = False, engine_preference: str = "auto") -> Dict[str, Any]:
     """Ingests a file, auto-detects format, extracts entities, and populates SQLite."""
     file_sha256 = hashlib.sha256(content_bytes).hexdigest()
     file_id = f"FIL_{file_sha256[:12]}"
@@ -213,12 +213,47 @@ def parse_and_ingest_file(case_id: str, filename: str, content_bytes: bytes, db_
     records_to_insert = []
     file_type = "UNKNOWN"
 
-    # 1. Telegram JSON Detect
-    if filename.endswith(".json") or '"messages"' in text_content[:500]:
+    # 0. Seized Mobile Screenshot / Receipt Image Detection (OCR)
+    import ocr_worker
+    if ocr_worker.is_image_data(filename, content_bytes[:32]):
+        images_dir = os.path.join(os.path.dirname(db_path), "evidence_images")
+        os.makedirs(images_dir, exist_ok=True)
+        img_save_path = os.path.join(images_dir, f"{file_id}_{os.path.basename(filename)}")
+        with open(img_save_path, "wb") as f_img:
+            f_img.write(content_bytes)
+
+        if skip_ocr:
+            file_type = "IMAGE_EXHIBIT_RAW"
+            records_to_insert.append({
+                "source_type": "SEIZED_IMAGE_NO_OCR",
+                "sender_id": "SEIZED_EXHIBIT",
+                "timestamp": now_str,
+                "raw_text": f"[IMAGE EXHIBIT ARCHIVED - OCR SKIPPED BY OPERATOR: {os.path.basename(filename)}]",
+                "line_number": 1
+            })
+        else:
+            try:
+                ocr_res = ocr_worker.process_image_bytes(content_bytes, filename, case_id, engine_preference=engine_preference)
+                file_type = f"IMAGE_OCR_{ocr_res.get('detected_category', 'SEIZURE')}"
+                for r in ocr_res.get("records", []):
+                    records_to_insert.append({
+                        "source_type": "SEIZED_SCREENSHOT_OCR",
+                        "sender_id": r.get("sender_id", "SEIZED_SCREENSHOT"),
+                        "timestamp": r.get("timestamp", now_str),
+                        "raw_text": r.get("raw_text", ""),
+                        "line_number": r.get("line_number", 1)
+                    })
+            except Exception as ocr_err:
+                print(f"[OCR ERROR] {ocr_err}")
+
+    # 1. Telegram & Darknet JSON Detect
+    if not records_to_insert and (filename.endswith(".json") or '"messages"' in text_content[:500]):
         try:
             tg_data = json.loads(text_content)
             if isinstance(tg_data, dict) and "messages" in tg_data:
-                file_type = "TELEGRAM_EXPORT"
+                is_darknet = "marketplace" in tg_data or "onion" in text_content[:1000].lower()
+                file_type = "DARKNET_MARKET_EXPORT" if is_darknet else "TELEGRAM_EXPORT"
+                source_label = "DARKNET_LISTING" if is_darknet else "TELEGRAM"
                 for idx, msg in enumerate(tg_data.get("messages", [])):
                     if msg.get("type") != "message":
                         continue
@@ -237,7 +272,7 @@ def parse_and_ingest_file(case_id: str, filename: str, content_bytes: bytes, db_
                     
                     sender = msg.get("from") or msg.get("actor") or f"user_{msg.get('from_id', 'unknown')}"
                     records_to_insert.append({
-                        "source_type": "TELEGRAM",
+                        "source_type": source_label,
                         "sender_id": str(sender),
                         "timestamp": msg.get("date", now_str),
                         "raw_text": raw_msg_text.strip(),
@@ -450,95 +485,247 @@ def search_records_fts(query: str, case_id: Optional[str] = None, limit: int = 5
     con = get_db(db_path)
     cur = con.cursor()
 
-    safe_query = re.sub(r'[^a-zA-Z0-9_\-\s]', '', query).strip()
-    if not safe_query:
-        return []
+    tokens = re.findall(r'[a-zA-Z0-9_\-]+', query)
+    safe_query = " ".join(tokens).strip()
 
-    sql = """
-    SELECT er.record_id, er.file_id, er.source_type, er.sender_id, er.timestamp, er.raw_text, er.line_number, er.is_flagged, er.flag_reasons, ef.filename
-    FROM records_fts fts
-    JOIN evidence_records er ON fts.rowid = er.rowid
-    JOIN evidence_files ef ON er.file_id = ef.file_id
-    WHERE records_fts MATCH ?
-    """
-    params = [safe_query]
-    if case_id:
-        sql += " AND er.case_id = ?"
-        params.append(case_id)
-    sql += " LIMIT ?"
-    params.append(limit)
+    results = []
+    if safe_query:
+        sql = """
+        SELECT er.record_id, er.file_id, er.source_type, er.sender_id, er.timestamp, er.raw_text, er.line_number, er.is_flagged, er.flag_reasons, ef.filename
+        FROM records_fts fts
+        JOIN evidence_records er ON fts.rowid = er.rowid
+        JOIN evidence_files ef ON er.file_id = ef.file_id
+        WHERE records_fts MATCH ?
+        """
+        params = [safe_query]
+        if case_id:
+            sql += " AND er.case_id = ?"
+            params.append(case_id)
+        sql += " LIMIT ?"
+        params.append(limit)
 
-    cur.execute(sql, params)
-    results = [dict(row) for row in cur.fetchall()]
+        try:
+            cur.execute(sql, params)
+            results = [dict(row) for row in cur.fetchall()]
+        except Exception:
+            results = []
+
+    # Fallback to direct substring search if FTS yielded 0 results
+    if not results and len(query.strip()) >= 3:
+        sql_fallback = """
+        SELECT er.record_id, er.file_id, er.source_type, er.sender_id, er.timestamp, er.raw_text, er.line_number, er.is_flagged, er.flag_reasons, ef.filename
+        FROM evidence_records er
+        JOIN evidence_files ef ON er.file_id = ef.file_id
+        WHERE er.raw_text LIKE ?
+        """
+        params_fb = [f"%{query.strip()}%"]
+        if case_id:
+            sql_fallback += " AND er.case_id = ?"
+            params_fb.append(case_id)
+        sql_fallback += " LIMIT ?"
+        params_fb.append(limit)
+        cur.execute(sql_fallback, params_fb)
+        results = [dict(row) for row in cur.fetchall()]
+
     con.close()
     return results
 
 def get_case_graph_data(case_id: str, db_path: str = DB_PATH) -> Dict[str, Any]:
-    """Generates clean graph nodes and edges for Vis.js / Cytoscape."""
+    """Generates clean graph nodes and edges for network visualization, excluding drug keywords."""
     con = get_db(db_path)
     cur = con.cursor()
 
-    # Get entities
+    # 1. Get non-narcotics entities (Actors, Financial Rails, Wallets, Locations)
     cur.execute("""
     SELECT DISTINCT e.entity_id, e.entity_type, e.raw_value, e.risk_score, COUNT(em.record_id) as mentions
     FROM entities e
     JOIN entity_mentions em ON e.entity_id = em.entity_id
     JOIN evidence_records er ON em.record_id = er.record_id
-    WHERE er.case_id = ?
+    WHERE er.case_id = ? AND e.entity_type NOT IN ('NARCOTICS_KEYWORD', 'SLANG')
     GROUP BY e.entity_id
     ORDER BY mentions DESC
-    LIMIT 40
+    LIMIT 50
     """, (case_id,))
     
-    nodes = []
-    node_ids = set()
+    nodes_map = {}
     for row in cur.fetchall():
-        node_id = row["entity_id"]
-        node_ids.add(node_id)
         ent_type = row["entity_type"]
-        color = "#ef4444" if ent_type == "ALIAS" else "#f59e0b" if ent_type == "UPI_ID" else "#8b5cf6" if ent_type == "CRYPTO_WALLET" else "#3b82f6"
-        nodes.append({
-            "id": node_id,
+        color = "#8b5cf6" if ent_type == "DARKNET_VENDOR" else "#f59e0b" if ent_type in ["UPI_ID", "CRYPTO_WALLET"] else "#10b981" if ent_type == "LOCATION" else "#3b82f6"
+        nodes_map[row["entity_id"]] = {
+            "id": row["entity_id"],
             "label": row["raw_value"],
             "type": ent_type,
             "risk": row["risk_score"],
             "mentions": row["mentions"],
             "color": color
-        })
+        }
 
-    # Get edges (co-occurrence in same record)
+    # 2. Get edges (co-occurrence in same record between non-narcotics entities)
     cur.execute("""
     SELECT em1.entity_id as src, em2.entity_id as dst, COUNT(*) as weight
     FROM entity_mentions em1
     JOIN entity_mentions em2 ON em1.record_id = em2.record_id AND em1.entity_id < em2.entity_id
     JOIN evidence_records er ON em1.record_id = er.record_id
-    WHERE er.case_id = ?
+    JOIN entities e1 ON em1.entity_id = e1.entity_id
+    JOIN entities e2 ON em2.entity_id = e2.entity_id
+    WHERE er.case_id = ? 
+      AND e1.entity_type NOT IN ('NARCOTICS_KEYWORD', 'SLANG') 
+      AND e2.entity_type NOT IN ('NARCOTICS_KEYWORD', 'SLANG')
     GROUP BY em1.entity_id, em2.entity_id
     LIMIT 60
     """, (case_id,))
 
     edges = []
+    connected_node_ids = set()
     for row in cur.fetchall():
-        if row["src"] in node_ids and row["dst"] in node_ids:
+        if row["src"] in nodes_map and row["dst"] in nodes_map:
             edges.append({
                 "from": row["src"],
                 "to": row["dst"],
                 "label": f"{row['weight']} mentions",
+                "weight": row["weight"],
                 "arrows": "to"
             })
+            connected_node_ids.add(row["src"])
+            connected_node_ids.add(row["dst"])
 
     con.close()
-    return {"nodes": nodes, "edges": edges}
+
+    # Filter to only nodes that are connected in the network
+    connected_nodes = [nodes_map[nid] for nid in connected_node_ids if nid in nodes_map]
+
+    # Sufficient data & linkage threshold:
+    # Requires at least 3 connected nodes and at least 2 edges
+    if len(connected_nodes) < 3 or len(edges) < 2:
+        return {
+            "status": "insufficient_linkage",
+            "reason": "Insufficient cross-source corroborated linkages between targets, financial rails, and locations.",
+            "connected_node_count": len(connected_nodes),
+            "edge_count": len(edges),
+            "nodes": [],
+            "edges": []
+        }
+
+    return {
+        "status": "sufficient_linkage",
+        "nodes": connected_nodes,
+        "edges": edges,
+        "connected_node_count": len(connected_nodes),
+        "edge_count": len(edges)
+    }
+
+def create_or_update_case(case_id: str, fir_number: str, police_station: str = "PS Cyber Crime, Sector 17, Chandigarh", io_name: str = "Insp. Vikramjit Singh", io_belt: str = "Belt #788-UT", category: str = "NDPS_CYBER", db_path: str = DB_PATH) -> Dict[str, Any]:
+    """Registers or updates a case entry in SQLite."""
+    con = get_db(db_path)
+    cur = con.cursor()
+    now_str = datetime.utcnow().isoformat() + "Z"
+    cur.execute("""
+    INSERT INTO cases (case_id, fir_number, police_station, io_name, io_belt, category, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(case_id) DO UPDATE SET
+        fir_number = excluded.fir_number,
+        police_station = excluded.police_station,
+        io_name = excluded.io_name,
+        io_belt = excluded.io_belt,
+        category = excluded.category
+    """, (case_id, fir_number, police_station, io_name, io_belt, category, now_str))
+    con.commit()
+    con.close()
+    log_audit(case_id, "CASE_REGISTERED", f"Case {case_id} ({fir_number}) registered under IO {io_name}.", performed_by=io_name, db_path=db_path)
+    return {
+        "case_id": case_id,
+        "fir_number": fir_number,
+        "police_station": police_station,
+        "io_name": io_name,
+        "io_belt": io_belt,
+        "category": category,
+        "created_at": now_str
+    }
+
+def get_all_cases(db_path: str = DB_PATH) -> List[Dict[str, Any]]:
+    """Returns all registered forensic cases with file and record aggregates."""
+    con = get_db(db_path)
+    cur = con.cursor()
+    cur.execute("""
+    SELECT 
+        c.case_id, 
+        c.fir_number, 
+        c.police_station, 
+        c.io_name, 
+        c.io_belt, 
+        c.category, 
+        c.created_at,
+        COUNT(DISTINCT ef.file_id) as total_files,
+        COUNT(DISTINCT er.record_id) as total_records
+    FROM cases c
+    LEFT JOIN evidence_files ef ON c.case_id = ef.case_id
+    LEFT JOIN evidence_records er ON c.case_id = er.case_id
+    GROUP BY c.case_id
+    ORDER BY c.created_at DESC
+    """)
+    cases = [dict(row) for row in cur.fetchall()]
+    con.close()
+    return cases
+
+def get_case_details(case_id: str, db_path: str = DB_PATH) -> Optional[Dict[str, Any]]:
+    """Returns full metadata for a specific case."""
+    con = get_db(db_path)
+    cur = con.cursor()
+    cur.execute("SELECT * FROM cases WHERE case_id = ?", (case_id,))
+    row = cur.fetchone()
+    con.close()
+    return dict(row) if row else None
+
+def get_cross_case_matches(case_id: str, db_path: str = DB_PATH) -> List[Dict[str, Any]]:
+    """Identifies entities in the current case that match historical cases stored on device."""
+    con = get_db(db_path)
+    cur = con.cursor()
+    cur.execute("""
+    SELECT DISTINCT
+        e.entity_type,
+        e.raw_value,
+        e.raw_value AS entity_value,
+        e.risk_score,
+        r_other.case_id AS matched_case_id,
+        COALESCE(c_other.fir_number, r_other.case_id) AS matched_fir,
+        COALESCE(c_other.police_station, 'Precinct Station') AS matched_ps,
+        COALESCE(c_other.io_name, 'Investigating Officer') AS matched_io,
+        COALESCE(f_other.filename, 'Archived Seizure') AS matched_filename,
+        r_other.line_number AS matched_line,
+        r_other.raw_text AS matched_context,
+        r_other.timestamp AS matched_timestamp
+    FROM entity_mentions em_curr
+    JOIN evidence_records r_curr ON em_curr.record_id = r_curr.record_id
+    JOIN entities e ON em_curr.entity_id = e.entity_id
+    JOIN entity_mentions em_other ON e.entity_id = em_other.entity_id
+    JOIN evidence_records r_other ON em_other.record_id = r_other.record_id
+    LEFT JOIN cases c_other ON r_other.case_id = c_other.case_id
+    LEFT JOIN evidence_files f_other ON r_other.file_id = f_other.file_id
+    WHERE r_curr.case_id = ? AND r_other.case_id != ?
+    ORDER BY e.risk_score DESC, r_other.timestamp DESC
+    LIMIT 50
+    """, (case_id, case_id))
+    matches = [dict(row) for row in cur.fetchall()]
+    con.close()
+    return matches
 
 def get_case_files(case_id: Optional[str] = None, db_path: str = DB_PATH) -> List[Dict[str, Any]]:
     """Returns list of real evidence files uploaded for a case."""
     con = get_db(db_path)
     cur = con.cursor()
-    cur.execute("""
-    SELECT file_id, case_id, filename, file_type, sha256_hash, record_count, uploaded_at
-    FROM evidence_files
-    ORDER BY uploaded_at ASC
-    """)
+    if case_id:
+        cur.execute("""
+        SELECT file_id, case_id, filename, file_type, sha256_hash, record_count, uploaded_at
+        FROM evidence_files
+        WHERE case_id = ?
+        ORDER BY uploaded_at ASC
+        """, (case_id,))
+    else:
+        cur.execute("""
+        SELECT file_id, case_id, filename, file_type, sha256_hash, record_count, uploaded_at
+        FROM evidence_files
+        ORDER BY uploaded_at ASC
+        """)
     files = [dict(row) for row in cur.fetchall()]
     con.close()
     return files
@@ -558,23 +745,49 @@ def get_file_records(file_id: str, limit: int = 1000, db_path: str = DB_PATH) ->
     con.close()
     return records
 
+def get_evidence_image_path(file_id: str, db_path: str = DB_PATH) -> Optional[str]:
+    """Finds the local file path for an ingested seized evidence image."""
+    images_dir = os.path.join(os.path.dirname(db_path), "evidence_images")
+    if not os.path.isdir(images_dir):
+        return None
+    for fname in os.listdir(images_dir):
+        if fname.startswith(f"{file_id}_") or fname.startswith(file_id):
+            full_p = os.path.join(images_dir, fname)
+            if os.path.isfile(full_p):
+                return full_p
+    return None
+
 def get_dynamic_triage_leads(case_id: Optional[str] = None, db_path: str = DB_PATH) -> List[Dict[str, Any]]:
-    """Dynamically generates triage leads from extracted entities and flagged records."""
+    """Dynamically generates triage leads from extracted entities and flagged records with cross-case matching."""
     con = get_db(db_path)
     cur = con.cursor()
     
     # 1. High-value entities (UPI, Phone, Crypto, Narcotics, Darknet Vendor, Location)
-    cur.execute("""
-    SELECT e.entity_id, e.entity_type, e.raw_value, e.risk_score, e.mention_count,
-           er.record_id, er.file_id, er.line_number, er.raw_text, ef.filename
-    FROM entities e
-    JOIN entity_mentions em ON e.entity_id = em.entity_id
-    JOIN evidence_records er ON em.record_id = er.record_id
-    JOIN evidence_files ef ON er.file_id = ef.file_id
-    GROUP BY e.entity_id
-    ORDER BY e.risk_score DESC, e.mention_count DESC
-    LIMIT 40
-    """)
+    if case_id:
+        cur.execute("""
+        SELECT e.entity_id, e.entity_type, e.raw_value, e.risk_score, e.mention_count,
+               er.record_id, er.file_id, er.line_number, er.raw_text, ef.filename, er.case_id
+        FROM entities e
+        JOIN entity_mentions em ON e.entity_id = em.entity_id
+        JOIN evidence_records er ON em.record_id = er.record_id
+        JOIN evidence_files ef ON er.file_id = ef.file_id
+        WHERE er.case_id = ?
+        GROUP BY e.entity_id
+        ORDER BY e.risk_score DESC, e.mention_count DESC
+        LIMIT 40
+        """, (case_id,))
+    else:
+        cur.execute("""
+        SELECT e.entity_id, e.entity_type, e.raw_value, e.risk_score, e.mention_count,
+               er.record_id, er.file_id, er.line_number, er.raw_text, ef.filename, er.case_id
+        FROM entities e
+        JOIN entity_mentions em ON e.entity_id = em.entity_id
+        JOIN evidence_records er ON em.record_id = er.record_id
+        JOIN evidence_files ef ON er.file_id = ef.file_id
+        GROUP BY e.entity_id
+        ORDER BY e.risk_score DESC, e.mention_count DESC
+        LIMIT 40
+        """)
     
     leads = []
     seen_values = set()
@@ -588,6 +801,34 @@ def get_dynamic_triage_leads(case_id: Optional[str] = None, db_path: str = DB_PA
         cat = "financial" if ent_type in ["UPI_ID", "CRYPTO_WALLET"] else "darknet" if ent_type == "DARKNET" else "slang" if ent_type == "SLANG" else "financial"
         type_label = "UPI IDENTIFIER" if ent_type == "UPI_ID" else "CRYPTO WALLET" if ent_type == "CRYPTO_WALLET" else "PHONE IDENTIFIER" if ent_type == "PHONE" else "GEOGRAPHIC LANDMARK" if ent_type == "LOCATION" else "NARCOTICS CODEWORD"
         
+        # Check cross-case link in SQLite
+        cross_case_hit = None
+        if case_id:
+            cur_cross = con.cursor()
+            cur_cross.execute("""
+            SELECT r2.case_id, COALESCE(c.fir_number, r2.case_id) as fir, COALESCE(c.io_name, 'IO') as io, f.filename, r2.raw_text
+            FROM entity_mentions em2
+            JOIN evidence_records r2 ON em2.record_id = r2.record_id
+            LEFT JOIN cases c ON r2.case_id = c.case_id
+            LEFT JOIN evidence_files f ON r2.file_id = f.file_id
+            WHERE em2.entity_id = ? AND r2.case_id != ?
+            LIMIT 1
+            """, (row["entity_id"], case_id))
+            cross_row = cur_cross.fetchone()
+            if cross_row:
+                cross_case_hit = {
+                    "matchedCaseId": cross_row["case_id"],
+                    "matchedFir": cross_row["fir"],
+                    "matchedIo": cross_row["io"],
+                    "matchedFile": cross_row["filename"],
+                    "snippet": cross_row["raw_text"][:140]
+                }
+
+        confidence_val = "99%" if cross_case_hit else f"{min(99, row['risk_score'] + 15)}%"
+        corrob_basis = f"Detected in {row['filename']} (Line #{row['line_number']})"
+        if cross_case_hit:
+            corrob_basis += f" &bull; ⚠️ Linked to past case {cross_case_hit['matchedFir']} ({cross_case_hit['matchedIo']})"
+
         leads.append({
             "id": f"lead-{row['entity_id']}",
             "category": cat,
@@ -596,12 +837,14 @@ def get_dynamic_triage_leads(case_id: Optional[str] = None, db_path: str = DB_PA
             "fileId": row["file_id"],
             "fileName": row["filename"],
             "lineNum": row["line_number"],
-            "method": "Deterministic NER + FTS",
-            "confidence": f"{min(99, row['risk_score'] + 15)}%",
+            "method": "Deterministic NER + FTS" if not cross_case_hit else "Cross-Case Intelligence + NER",
+            "confidence": confidence_val,
+            "crossCaseHit": cross_case_hit,
+            "isCrossCase": cross_case_hit is not None,
             "corroboration": {
-                "score": f"{min(98, 70 + row['mention_count'] * 8)}% (CORROBORATED)",
-                "isHigh": row["mention_count"] > 1,
-                "basis": f"Detected in {row['filename']} (Line #{row['line_number']}) with {row['mention_count']} cross-mentions."
+                "score": "99% (CRITICAL MATCH)" if cross_case_hit else f"{min(98, 70 + row['mention_count'] * 8)}% (CORROBORATED)",
+                "isHigh": (row["mention_count"] > 1) or (cross_case_hit is not None),
+                "basis": corrob_basis
             },
             "status": "candidate",
             "context": row["raw_text"][:160],
@@ -613,9 +856,9 @@ def get_dynamic_triage_leads(case_id: Optional[str] = None, db_path: str = DB_PA
     SELECT er.record_id, er.file_id, er.line_number, er.raw_text, er.flag_reasons, ef.filename
     FROM evidence_records er
     JOIN evidence_files ef ON er.file_id = ef.file_id
-    WHERE er.case_id = ? AND er.flag_reasons LIKE '%Slang:%'
+    WHERE (? IS NULL OR er.case_id = ?) AND er.flag_reasons LIKE '%Slang:%'
     LIMIT 20
-    """, (case_id,))
+    """, (case_id, case_id))
     
     for row in cur.fetchall():
         reasons = row["flag_reasons"]
@@ -635,6 +878,8 @@ def get_dynamic_triage_leads(case_id: Optional[str] = None, db_path: str = DB_PA
             "lineNum": row["line_number"],
             "method": "Precinct Lexicon + SLM Filter",
             "confidence": "94%",
+            "crossCaseHit": None,
+            "isCrossCase": False,
             "corroboration": {
                 "score": "91% (HIGH CORROBORATION)",
                 "isHigh": True,
@@ -670,38 +915,58 @@ def get_slang_dictionary(db_path: str = DB_PATH) -> List[Dict[str, Any]]:
     con.close()
     return rows
 
-def get_transactional_candidates(case_id: Optional[str] = None, limit: int = 15, db_path: str = DB_PATH) -> List[Dict[str, Any]]:
+def get_transactional_candidates(case_id: Optional[str] = None, file_id: Optional[str] = None, limit: int = 25, db_path: str = DB_PATH) -> List[Dict[str, Any]]:
     """Returns candidate transactional messages from ingested evidence for SLM induction."""
     con = get_db(db_path)
     cur = con.cursor()
     
-    # Check if case has records
-    where_clause = ""
+    where_clauses = []
     params: List[Any] = []
     if case_id:
-        where_clause = "WHERE (er.case_id = ? OR er.case_id LIKE 'FIR%')"
+        where_clauses.append("(er.case_id = ? OR er.case_id LIKE 'FIR%')")
         params.append(case_id)
-    else:
-        where_clause = "WHERE 1=1"
+    if file_id and file_id != "all":
+        where_clauses.append("er.file_id = ?")
+        params.append(file_id)
+
+    where_str = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else "WHERE 1=1"
 
     cur.execute(f"""
     SELECT er.record_id, er.file_id, er.case_id, er.source_type, er.sender_id, er.timestamp, er.raw_text, er.line_number, er.is_flagged, er.flag_reasons, ef.filename
     FROM evidence_records er
     JOIN evidence_files ef ON er.file_id = ef.file_id
-    {where_clause}
+    {where_str}
       AND (er.raw_text LIKE '%deliver%' OR er.raw_text LIKE '%parcel%' OR er.raw_text LIKE '%drop%' 
            OR er.raw_text LIKE '%packet%' OR er.raw_text LIKE '%rate%' OR er.raw_text LIKE '%stock%' 
            OR er.raw_text LIKE '%box%' OR er.raw_text LIKE '%piece%' OR er.raw_text LIKE '%gpay%' 
            OR er.raw_text LIKE '%usdt%' OR er.raw_text LIKE '%tea%' OR er.raw_text LIKE '%coffee%' 
-           OR er.raw_text LIKE '%shoes%' OR er.raw_text LIKE '%stamp%' OR er.raw_text LIKE '%apple%')
+           OR er.raw_text LIKE '%shoes%' OR er.raw_text LIKE '%stamp%' OR er.raw_text LIKE '%apple%'
+           OR er.raw_text LIKE '%advance%' OR er.raw_text LIKE '%paid%' OR er.raw_text LIKE '%payment%'
+           OR er.raw_text LIKE '%chitta%' OR er.raw_text LIKE '%syrup%' OR er.raw_text LIKE '%mule%')
     ORDER BY er.is_flagged DESC, er.line_number ASC
     LIMIT ?
     """, params + [limit])
     rows = [dict(r) for r in cur.fetchall()]
+
+    # If a specific file is targeted and has no keyword matches, let's pull non-blank lines from that file
+    # so the operator can still run induction on novel or unflagged text from that seized exhibit
+    if not rows and file_id and file_id != "all":
+        cur.execute("""
+        SELECT er.record_id, er.file_id, er.case_id, er.source_type, er.sender_id, er.timestamp, er.raw_text, er.line_number, er.is_flagged, er.flag_reasons, ef.filename
+        FROM evidence_records er
+        JOIN evidence_files ef ON er.file_id = ef.file_id
+        WHERE er.file_id = ? AND LENGTH(TRIM(er.raw_text)) > 4
+        ORDER BY er.line_number ASC
+        LIMIT ?
+        """, (file_id, limit))
+        rows = [dict(r) for r in cur.fetchall()]
+        con.close()
+        return rows
+
     con.close()
 
-    # Fallback to realistic seeds if database has no transaction messages yet
-    if not rows:
+    # Fallback to realistic seeds ONLY if database as a whole has no transaction messages yet and scope is global
+    if not rows and (not file_id or file_id == "all"):
         return [
             {"record_id": "CAND_1", "file_id": "seed-1", "line_number": 2, "sender": "Karan_Tricity", "filename": "sample_telegram_export.json", "raw_text": "Bhai 2 parcel ice tea deliver kar dena sector 35 me, 3k gpay on raj@upi kar diya", "is_flagged": 1},
             {"record_id": "CAND_2", "file_id": "seed-1", "line_number": 4, "sender": "Shadow_Sector", "filename": "sample_telegram_export.json", "raw_text": "Send 2k on mule44@ybl for 5 boxes of stamp papers, drop at sec 17 plaza backlane", "is_flagged": 1},
@@ -711,16 +976,28 @@ def get_transactional_candidates(case_id: Optional[str] = None, limit: int = 15,
         ]
     return rows
 
-def load_default_demo_datasets(case_id: str = "FIR_104_2026", base_dir: Optional[str] = None) -> Dict[str, Any]:
-    """Ingests authentic demo evidence files from the data directory into SQLite."""
+def load_default_demo_datasets(case_id: str = "FIR_104_2026", base_dir: Optional[str] = None, dataset_type: str = "default") -> Dict[str, Any]:
+    """Ingests authentic demo or adversarial evidence files from the data directory into SQLite."""
     if base_dir is None:
         base_dir = os.path.dirname(os.path.abspath(__file__))
 
-    candidate_paths = [
-        os.path.join(base_dir, "data", "processed", "darknet_listings_sample.csv"),
-        os.path.join(base_dir, "data", "raw", "sample_telegram_export.json"),
-        os.path.join(base_dir, "data", "processed", "bank_statement_baseline.csv")
-    ]
+    if dataset_type == "adversarial":
+        adv_dir = os.path.join(base_dir, "data", "adversarial")
+        candidate_paths = [
+            os.path.join(adv_dir, "adversarial_whatsapp_hinglish.txt"),
+            os.path.join(adv_dir, "adversarial_darknet_listings.json"),
+            os.path.join(adv_dir, "adversarial_bank_structuring.csv"),
+            os.path.join(adv_dir, "adversarial_seized_chat_chit.png"),
+            os.path.join(adv_dir, "adversarial_handwritten_chit.jpeg")
+        ]
+    else:
+        candidate_paths = [
+            os.path.join(base_dir, "data", "processed", "darknet_listings_sample.csv"),
+            os.path.join(base_dir, "data", "raw", "sample_telegram_export.json"),
+            os.path.join(base_dir, "data", "processed", "bank_statement_baseline.csv"),
+            os.path.join(base_dir, "data", "raw", "seized_paytm_mule_receipt.png"),
+            os.path.join(base_dir, "data", "raw", "seized_telegram_chat_drop.png")
+        ]
 
     ingested = []
     total_records = 0

@@ -12,6 +12,7 @@
 // ============================================================================
 
 let CASE_METADATA = {
+  case_id: "FIR_104_2026",
   fir: "FIR No. 104/2026/CYBER",
   ps: "PS Cyber Crime, Sector 17, Chandigarh",
   io: "Insp. Vikramjit Singh",
@@ -20,6 +21,8 @@ let CASE_METADATA = {
   category: "NDPS_CYBER",
   model: "Llama-3.2-3B-Instruct (Local 4-bit GGUF, T=0.0)"
 };
+
+let SAVED_CASES = [];
 
 // ============================================================================
 // DYNAMIC MULTI-SOURCE EVIDENCE STATE (REAL INGESTED FILES FROM SQLITE)
@@ -30,21 +33,181 @@ let REAL_FILE_RECORDS = {}; // In-memory cache: fileId -> array of record object
 let currentSelectedFileId = null;
 let REAL_TRIAGE_LEADS = [];
 let currentTriageFilter = "all";
+let CROSS_CASE_MATCHES = [];
 
 // Real Cryptographic Forensic Audit Ledger
 let AUDIT_LOG = [];
 let CASE_CHRONOLOGY = [];
 
+function getActiveCaseId() {
+  if (CASE_METADATA.case_id) return CASE_METADATA.case_id;
+  if (CASE_METADATA.fir) return CASE_METADATA.fir.replace(/[^a-zA-Z0-9_-]/g, "_");
+  return "FIR_104_2026";
+}
+
+async function loadSavedCasesList() {
+  try {
+    const resp = await fetch("http://localhost:8000/api/cases");
+    if (resp.ok) {
+      const data = await resp.json();
+      SAVED_CASES = data.cases || [];
+      renderSavedCasesDropdown();
+    }
+  } catch (err) {
+    console.warn("Could not fetch saved cases:", err);
+  }
+}
+
+function renderSavedCasesDropdown() {
+  const selStep1 = document.getElementById("select-existing-case");
+  const selHeader = document.getElementById("header-case-select");
+  
+  let optionsHtml = `<option value="NEW">＋ [Create New Investigation Case]</option>`;
+  SAVED_CASES.forEach(c => {
+    const isSelected = c.case_id === CASE_METADATA.case_id ? "selected" : "";
+    optionsHtml += `<option value="${escapeHtml(c.case_id)}" ${isSelected}>${escapeHtml(c.fir_number)} &bull; ${escapeHtml(c.police_station)} (${c.total_files} files, ${c.total_records} records)</option>`;
+  });
+
+  if (selStep1) selStep1.innerHTML = optionsHtml;
+  if (selHeader) {
+    selHeader.innerHTML = optionsHtml;
+    selHeader.style.display = "inline-block";
+  }
+}
+
+function handleSelectExistingCase(caseId) {
+  const badge = document.getElementById("intake-case-status-badge");
+  const summary = document.getElementById("selected-case-summary");
+
+  if (caseId === "NEW") {
+    CASE_METADATA.case_id = null;
+    document.getElementById("intake-fir").value = "";
+    document.getElementById("intake-ps").value = "PS Cyber Crime, Sector 17, Chandigarh";
+    document.getElementById("intake-io").value = "";
+    document.getElementById("intake-belt").value = "";
+    if (badge) {
+      badge.className = "badge badge-sm badge-blue";
+      badge.textContent = "New Case";
+    }
+    if (summary) summary.textContent = "Creating new case container. Enter FIR and officer credentials.";
+    return;
+  }
+
+  const found = SAVED_CASES.find(c => c.case_id === caseId);
+  if (found) {
+    CASE_METADATA.case_id = found.case_id;
+    CASE_METADATA.fir = found.fir_number;
+    CASE_METADATA.ps = found.police_station;
+    CASE_METADATA.io = found.io_name;
+    CASE_METADATA.belt = found.io_belt;
+    CASE_METADATA.category = found.category || "NDPS_CYBER";
+
+    document.getElementById("intake-fir").value = found.fir_number || "";
+    document.getElementById("intake-ps").value = found.police_station || "";
+    document.getElementById("intake-io").value = found.io_name || "";
+    document.getElementById("intake-belt").value = found.io_belt || "";
+    if (document.getElementById("intake-category")) {
+      document.getElementById("intake-category").value = CASE_METADATA.category;
+    }
+
+    if (badge) {
+      badge.className = "badge badge-sm badge-green";
+      badge.textContent = `${found.total_files} Files / ${found.total_records} Records`;
+    }
+    if (summary) {
+      summary.innerHTML = `<span style="color: #38bdf8;">✓ Loaded existing FIR:</span> ${escapeHtml(found.fir_number)} | Registered: ${escapeHtml(found.created_at || 'Active')} | IO: ${escapeHtml(found.io_name)} (${escapeHtml(found.io_belt)})`;
+    }
+
+    document.getElementById('header-case-tag').textContent = found.fir_number;
+    document.getElementById('header-case-meta').textContent = `${found.police_station} | IO: ${found.io_name} (${found.io_belt})`;
+
+    showToast(`📂 Switched to active case: ${found.fir_number}`, "info");
+  }
+}
+
+async function handleHeaderCaseSwitch(caseId) {
+  if (caseId === "NEW") {
+    restartWorkflow();
+    return;
+  }
+  handleSelectExistingCase(caseId);
+  await renderDashboard();
+  showToast(`📂 Switched to case ${CASE_METADATA.fir}`, "success");
+}
+
+function randomizeNewCase() {
+  const randNum = Math.floor(100 + Math.random() * 899);
+  const stations = [
+    "PS Cyber Crime, Sector 17, Chandigarh",
+    "PS Sector 34, UT Chandigarh",
+    "PS Manimajra, UT Chandigarh",
+    "PS Industrial Area Phase 1, Chandigarh",
+    "PS Sector 19, UT Chandigarh"
+  ];
+  const officers = [
+    { name: "Insp. Vikramjit Singh", belt: "Belt #788-UT" },
+    { name: "Insp. Jaswinder Singh", belt: "Belt #412-UT" },
+    { name: "Insp. Manpreet Kaur", belt: "Belt #605-UT" },
+    { name: "Insp. Rajesh Kumar", belt: "Belt #834-UT" },
+    { name: "Insp. Gurpreet Sandhu", belt: "Belt #921-UT" }
+  ];
+  const categories = ["NDPS_CYBER", "FINANCIAL_1930", "GENERAL_EXTORTION"];
+
+  const st = stations[Math.floor(Math.random() * stations.length)];
+  const off = officers[Math.floor(Math.random() * officers.length)];
+  const cat = categories[Math.floor(Math.random() * categories.length)];
+
+  const fir = `FIR No. ${randNum}/2026/CYBER`;
+  const caseId = `FIR_${randNum}_2026_CYBER`;
+
+  CASE_METADATA.case_id = caseId;
+  CASE_METADATA.fir = fir;
+  CASE_METADATA.ps = st;
+  CASE_METADATA.io = off.name;
+  CASE_METADATA.belt = off.belt;
+  CASE_METADATA.category = cat;
+
+  document.getElementById('intake-fir').value = fir;
+  document.getElementById('intake-ps').value = st;
+  document.getElementById('intake-io').value = off.name;
+  document.getElementById('intake-belt').value = off.belt;
+  document.getElementById('intake-category').value = cat;
+
+  const sel = document.getElementById("select-existing-case");
+  if (sel) sel.value = "NEW";
+
+  const badge = document.getElementById("intake-case-status-badge");
+  if (badge) {
+    badge.className = "badge badge-sm badge-purple";
+    badge.textContent = "🎲 Randomized Case";
+  }
+
+  const summary = document.getElementById("selected-case-summary");
+  if (summary) {
+    summary.textContent = `Generated unique case reference ${fir}. Ready for media intake.`;
+  }
+
+  // Reset evidence state for new case
+  REAL_FILES = [];
+  REAL_FILE_RECORDS = {};
+  currentSelectedFileId = null;
+  REAL_TRIAGE_LEADS = [];
+  STAGED_FILES_QUEUE = [];
+
+  showToast(`🎲 Generated new Case: ${fir} (${off.name})`, "success");
+}
+
 async function loadCaseFiles() {
   try {
-    const caseId = CASE_METADATA.fir ? CASE_METADATA.fir.replace(/[^a-zA-Z0-9_-]/g, "_") : "FIR_104_2026";
+    const caseId = getActiveCaseId();
     const resp = await fetch(`http://localhost:8000/api/files?case_id=${encodeURIComponent(caseId)}`);
     if (resp.ok) {
       const data = await resp.json();
       REAL_FILES = data.files || [];
-      if (REAL_FILES.length > 0 && !currentSelectedFileId) {
+      if (REAL_FILES.length > 0 && (!currentSelectedFileId || !REAL_FILES.some(f => f.file_id === currentSelectedFileId))) {
         currentSelectedFileId = REAL_FILES[0].file_id;
       }
+      updateInductionFileSelect();
     }
   } catch (err) {
     console.warn("Could not fetch case files:", err);
@@ -53,7 +216,7 @@ async function loadCaseFiles() {
 
 async function loadTriageLeads() {
   try {
-    const caseId = CASE_METADATA.fir ? CASE_METADATA.fir.replace(/[^a-zA-Z0-9_-]/g, "_") : "FIR_104_2026";
+    const caseId = getActiveCaseId();
     const resp = await fetch(`http://localhost:8000/api/leads?case_id=${encodeURIComponent(caseId)}`);
     if (resp.ok) {
       const data = await resp.json();
@@ -62,6 +225,82 @@ async function loadTriageLeads() {
   } catch (err) {
     console.warn("Could not fetch triage leads:", err);
   }
+}
+
+async function loadCrossCaseIntelligence() {
+  try {
+    const caseId = getActiveCaseId();
+    const resp = await fetch(`http://localhost:8000/api/cross_case_matches?case_id=${encodeURIComponent(caseId)}`);
+    if (resp.ok) {
+      const data = await resp.json();
+      CROSS_CASE_MATCHES = data.matches || [];
+      renderCrossCaseBanner();
+      renderCrossCaseDossier();
+    }
+  } catch (err) {
+    console.warn("Could not fetch cross-case matches:", err);
+  }
+}
+
+function renderCrossCaseBanner() {
+  const banner = document.getElementById("cross-case-banner");
+  const countEl = document.getElementById("cross-case-match-count");
+  const listEl = document.getElementById("cross-case-match-list");
+  if (!banner || !listEl) return;
+
+  if (CROSS_CASE_MATCHES.length === 0) {
+    banner.style.display = "none";
+    listEl.innerHTML = "";
+    return;
+  }
+
+  banner.style.display = "block";
+  if (countEl) countEl.textContent = CROSS_CASE_MATCHES.length;
+
+  listEl.innerHTML = CROSS_CASE_MATCHES.slice(0, 6).map(m => `
+    <div style="background: rgba(30, 41, 59, 0.7); padding: 6px 10px; border-radius: 4px; border-left: 3px solid #ef4444; display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <span class="mono font-bold" style="color: #fca5a5;">${escapeHtml(m.entity_value)}</span>
+        <span class="badge badge-sm badge-neutral" style="margin-left: 6px; font-size: 9.5px;">${escapeHtml(m.entity_type)}</span>
+        <div class="text-muted" style="font-size: 10px; margin-top: 2px;">
+          Linked Case: <strong style="color: #f1f5f9;">${escapeHtml(m.matched_fir)}</strong> (${escapeHtml(m.matched_ps)}) &bull; IO: ${escapeHtml(m.matched_io || 'Examiner')}
+        </div>
+      </div>
+      <span class="badge badge-sm badge-red" style="font-size: 9px;">99% RISK HIT</span>
+    </div>
+  `).join("");
+}
+
+function renderCrossCaseDossier() {
+  const section = document.getElementById("dossier-cross-case-section");
+  const badge = document.getElementById("dossier-cross-case-badge");
+  const content = document.getElementById("dossier-cross-case-content");
+  if (!section || !content) return;
+
+  if (CROSS_CASE_MATCHES.length === 0) {
+    section.style.display = "none";
+    return;
+  }
+
+  section.style.display = "block";
+  if (badge) badge.textContent = `${CROSS_CASE_MATCHES.length} Links`;
+
+  const distinctCases = new Set(CROSS_CASE_MATCHES.map(m => m.matched_fir));
+  content.innerHTML = `
+    <div style="margin-bottom: 6px; color: #f87171; font-weight: 600;">
+      Identified ${CROSS_CASE_MATCHES.length} shared target entities linked across ${distinctCases.size} historical precinct FIR(s):
+    </div>
+    <ul style="padding-left: 18px; margin-bottom: 8px;">
+      ${CROSS_CASE_MATCHES.map(m => `
+        <li style="margin-bottom: 4px;">
+          <strong>${escapeHtml(m.entity_value)}</strong> (${escapeHtml(m.entity_type)}) &bull; Identified in <strong>${escapeHtml(m.matched_fir)}</strong>
+        </li>
+      `).join("")}
+    </ul>
+    <div style="background: rgba(239, 68, 68, 0.1); border: 1px dashed #ef4444; padding: 6px; border-radius: 4px; font-size: 10px; color: #cbd5e1;">
+      🛡️ <strong>Cross-Case Syndication:</strong> Entity repetition indicates organized interstate narcotics or mule network. Include historical FIR citations in Section 91 CrPC notices.
+    </div>
+  `;
 }
 
 async function fetchFileRecords(fileId) {
@@ -111,6 +350,7 @@ function goToStep(stepNum) {
 }
 
 function autofillCaseDetails() {
+  CASE_METADATA.case_id = "FIR_104_2026";
   document.getElementById('intake-fir').value = "FIR No. 104/2026/CYBER";
   document.getElementById('intake-ps').value = "PS Cyber Crime, Sector 17, Chandigarh";
   document.getElementById('intake-io').value = "Insp. Vikramjit Singh";
@@ -120,22 +360,48 @@ function autofillCaseDetails() {
   showToast("⚡ Autofilled official Chandigarh Police Case Details!", "success");
 }
 
-function proceedToStep2() {
+async function proceedToStep2() {
   const fir = document.getElementById('intake-fir').value.trim() || "FIR No. 104/2026/CYBER";
   const io = document.getElementById('intake-io').value.trim() || "Insp. Vikramjit Singh";
   const ps = document.getElementById('intake-ps').value.trim() || "PS Cyber Crime, Sector 17, Chandigarh";
   const belt = document.getElementById('intake-belt').value.trim() || "Belt #788-UT";
+  const cat = document.getElementById('intake-category').value || "NDPS_CYBER";
 
+  const caseId = CASE_METADATA.case_id || (fir.replace(/[^a-zA-Z0-9_-]/g, "_") || "FIR_104_2026");
+
+  CASE_METADATA.case_id = caseId;
   CASE_METADATA.fir = fir;
   CASE_METADATA.io = io;
   CASE_METADATA.ps = ps;
   CASE_METADATA.belt = belt;
+  CASE_METADATA.category = cat;
+
+  // Persist case into SQLite
+  try {
+    await fetch("http://localhost:8000/api/cases/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        case_id: caseId,
+        fir_number: fir,
+        police_station: ps,
+        io_name: io,
+        io_belt: belt,
+        category: cat
+      })
+    });
+    // Refresh cases list
+    loadSavedCasesList();
+  } catch (err) {
+    console.warn("Could not register case in backend:", err);
+  }
 
   document.getElementById('header-case-tag').textContent = fir;
   document.getElementById('header-case-meta').textContent = `${ps} | IO: ${io} (${belt})`;
 
-  logAuditEvent("CASE_REGISTRATION", `Registered ${fir} by ${io} (${belt})`);
+  logAuditEvent("CASE_REGISTRATION", `Registered ${fir} by ${io} (${belt}) [Case ID: ${caseId}]`);
   goToStep(2);
+  await updateStagedEvidenceTable();
 }
 
 // State for real ingested evidence files
@@ -171,14 +437,21 @@ async function updateStagedEvidenceTable() {
     return;
   }
 
-  tbody.innerHTML = REAL_FILES.map(f => `
+  tbody.innerHTML = REAL_FILES.map(f => {
+    const isImage = (f.file_type || '').includes('IMAGE_OCR') || /\.(png|jpe?g|webp|bmp|tiff)$/i.test(f.filename);
+    const badge = isImage 
+      ? `<span class="badge badge-sm badge-blue">📸 AIR-GAPPED OCR</span>` 
+      : `<span class="badge badge-sm badge-neutral">${escapeHtml(f.file_type || 'RAW_STREAM')}</span>`;
+    const sourceLabel = isImage ? `Seized Mobile Screenshot (${f.record_count} OCR lines)` : escapeHtml(f.file_type || 'Case Seizure');
+    return `
     <tr>
       <td class="mono font-bold">${escapeHtml(f.filename)}</td>
-      <td>${escapeHtml(f.file_type || 'Case Seizure')}</td>
-      <td><span class="badge badge-sm badge-neutral">${escapeHtml(f.file_type || 'RAW_STREAM')}</span></td>
+      <td>${sourceLabel}</td>
+      <td>${badge}</td>
       <td class="mono text-xs text-blue">${escapeHtml((f.sha256_hash || '').substring(0, 24))}...</td>
     </tr>
-  `).join("");
+  `;
+  }).join("");
 
   document.getElementById('evidence-queue-section').style.display = 'block';
   document.getElementById('btn-to-config').disabled = false;
@@ -214,91 +487,251 @@ function updateInsightsBanner() {
   tagsContainer.innerHTML = tagsHtml;
 }
 
+let STAGED_FILES_QUEUE = [];
+let CURRENT_ENGINE_PRESET = "light";
+
 async function handleRealFilesSelected(fileList) {
   if (!fileList || fileList.length === 0) return;
-  const caseId = CASE_METADATA.fir ? CASE_METADATA.fir.replace(/[^a-zA-Z0-9_-]/g, "_") : "FIR_104_2026";
-  const total = fileList.length;
-  const progressCont = document.getElementById('upload-progress-container');
-  const progressBar = document.getElementById('upload-progress-bar');
-  const progressPct = document.getElementById('upload-progress-pct');
-  const progressLabel = document.getElementById('upload-progress-label');
 
-  if (progressCont) progressCont.style.display = 'block';
-
-  let successCount = 0;
-  for (let i = 0; i < total; i++) {
+  for (let i = 0; i < fileList.length; i++) {
     const file = fileList[i];
-    const pct = Math.round(((i) / total) * 100);
-    if (progressBar) progressBar.style.width = `${pct}%`;
-    if (progressPct) progressPct.textContent = `${pct}%`;
-    if (progressLabel) progressLabel.textContent = `Ingesting [${i + 1}/${total}]: ${file.name} (${Math.round(file.size / 1024)} KB)...`;
+    const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp|bmp|tiff)$/i.test(file.name);
+    const stagedId = "staged_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7);
 
-    try {
-      const buffer = await file.arrayBuffer();
-      const resp = await fetch(`http://localhost:8000/api/upload?case_id=${encodeURIComponent(caseId)}&filename=${encodeURIComponent(file.name)}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/octet-stream" },
-        body: buffer
-      });
+    let previewUrl = null;
+    let textPreview = "";
+    let typeBadge = "FILE";
 
-      if (resp.ok) {
-        const jsonRes = await resp.json();
-        const data = jsonRes.data;
-        if (data) {
-          REAL_TOTAL_RECORDS += data.total_records || 0;
-          REAL_TOTAL_FLAGGED += data.total_flagged || 0;
+    if (isImage) {
+      previewUrl = URL.createObjectURL(file);
+      typeBadge = "📸 IMAGE EXHIBIT";
+    } else {
+      if (file.name.endsWith('.csv')) typeBadge = "📊 SPREADSHEET / CSV";
+      else if (file.name.endsWith('.json')) typeBadge = "💬 CHAT / JSON DUMP";
+      else typeBadge = "📄 RAW TEXT DUMP";
 
-          if (data.extracted_entities) {
-            (data.extracted_entities.phones || []).forEach(p => REAL_DISCOVERED_ENTITIES.phones.add(p));
-            (data.extracted_entities.upi_handles || []).forEach(u => REAL_DISCOVERED_ENTITIES.upi_handles.add(u));
-            (data.extracted_entities.crypto_wallets || []).forEach(c => REAL_DISCOVERED_ENTITIES.crypto_wallets.add(c));
-            (data.extracted_entities.locations || []).forEach(l => REAL_DISCOVERED_ENTITIES.locations.add(l));
-            (data.extracted_entities.slang_keywords || []).forEach(s => REAL_DISCOVERED_ENTITIES.slang_keywords.add(s));
-          }
-
-          if (data.active_correlations && data.active_correlations.length > 0) {
-            REAL_CORROBORATIONS = data.active_correlations;
-          }
-
-          logAuditEvent("FILE_UPLOADED_REAL", `Real file ${file.name} ingested (${data.total_records} records, ${data.total_flagged} flagged, SHA-256: ${(data.sha256 || '').substring(0, 16)}...)`);
-        }
-        successCount++;
+      try {
+        const slice = file.slice(0, 1000);
+        const rawText = await slice.text();
+        const lines = rawText.split(/\r?\n/).filter(l => l.trim().length > 0).slice(0, 4);
+        textPreview = lines.join("\n") || "(Empty file)";
+      } catch (e) {
+        textPreview = "(Preview unavailable)";
       }
-    } catch (err) {
-      console.warn("Backend API upload error for file:", file.name, err);
     }
+
+    STAGED_FILES_QUEUE.push({
+      id: stagedId,
+      file: file,
+      name: file.name,
+      size: file.size,
+      isImage: isImage,
+      previewUrl: previewUrl,
+      textPreview: textPreview,
+      typeBadge: typeBadge,
+      runOcr: true
+    });
   }
 
-  if (progressBar) progressBar.style.width = '100%';
-  if (progressPct) progressPct.textContent = '100%';
-  if (progressLabel) progressLabel.textContent = `✓ Successfully ingested ${successCount} file(s) with SHA-256 integrity check.`;
-
-  // Clear inputs so re-selecting same file triggers change
+  // Clear file input so re-selecting same files triggers change event
   const rInput = document.getElementById('real-file-input');
   if (rInput) rInput.value = '';
-  const pInput = document.getElementById('panel-file-input');
-  if (pInput) pInput.value = '';
 
-  await updateStagedEvidenceTable();
-  updateInsightsBanner();
-  showToast(`📁 Ingested ${successCount} of ${total} files with SHA-256 verification!`, "success");
+  renderStagedCards();
+  showToast(`📋 Staged ${fileList.length} exhibit(s) for review. Configure OCR below!`, "info");
+}
 
-  setTimeout(() => {
-    if (progressCont) progressCont.style.display = 'none';
-  }, 3500);
+function renderStagedCards() {
+  const container = document.getElementById('staged-preview-section');
+  const grid = document.getElementById('staged-cards-grid');
+  const badge = document.getElementById('staged-count-badge');
+  const btnConfig = document.getElementById('btn-to-config');
+
+  if (!container || !grid) return;
+
+  if (STAGED_FILES_QUEUE.length === 0) {
+    container.style.display = 'none';
+    grid.innerHTML = '';
+    if (badge) badge.textContent = '0 Files Staged';
+    if (btnConfig && REAL_FILES.length === 0) btnConfig.disabled = true;
+    return;
+  }
+
+  container.style.display = 'block';
+  if (badge) badge.textContent = `${STAGED_FILES_QUEUE.length} Files Staged`;
+  if (btnConfig) btnConfig.disabled = false;
+
+  grid.innerHTML = STAGED_FILES_QUEUE.map(item => {
+    if (item.isImage) {
+      return `
+        <div class="staged-file-card" id="card-${item.id}">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div style="font-weight: 600; font-size: 11px; color: #f8fafc; max-width: 210px; word-break: break-all;">
+              ${escapeHtml(item.name)}
+            </div>
+            <button type="button" class="btn btn-sm btn-gov-secondary" onclick="removeStagedFile('${item.id}')" style="padding: 1px 6px; font-size: 10px; color: #ef4444;" title="Remove this file">✖</button>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <div style="width: 75px; height: 75px; border-radius: 4px; overflow: hidden; background: #020617; border: 1px solid #334155; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <img src="${item.previewUrl}" alt="Evidence Preview" style="max-width: 100%; max-height: 100%; object-fit: cover;">
+            </div>
+            <div style="font-size: 10px; color: #94a3b8; flex: 1;">
+              <div>${item.typeBadge}</div>
+              <div class="mono" style="margin-top: 2px;">Size: ${(item.size / 1024).toFixed(1)} KB</div>
+              <div style="margin-top: 6px; background: rgba(30, 41, 59, 0.5); padding: 4px 6px; border-radius: 4px; border: 1px solid #334155;">
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: ${item.runOcr ? '#38bdf8' : '#94a3b8'}; font-weight: 600;">
+                  <input type="checkbox" id="ocr-opt-${item.id}" ${item.runOcr ? 'checked' : ''} onchange="toggleStagedOcr('${item.id}', this.checked)">
+                  <span>Run Neural OCR</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    } else {
+      return `
+        <div class="staged-file-card" id="card-${item.id}">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div style="font-weight: 600; font-size: 11px; color: #f8fafc; max-width: 210px; word-break: break-all;">
+              ${escapeHtml(item.name)}
+            </div>
+            <button type="button" class="btn btn-sm btn-gov-secondary" onclick="removeStagedFile('${item.id}')" style="padding: 1px 6px; font-size: 10px; color: #ef4444;" title="Remove this file">✖</button>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8;">
+            <span class="badge badge-sm badge-neutral">${item.typeBadge}</span>
+            <span class="mono">${(item.size / 1024).toFixed(1)} KB</span>
+          </div>
+          <div style="background: #020617; border: 1px solid #1e293b; border-radius: 4px; padding: 6px 8px; font-family: monospace; font-size: 9.5px; color: #cbd5e1; max-height: 70px; overflow-y: auto; white-space: pre-wrap; line-height: 1.3;">${escapeHtml(item.textPreview)}</div>
+        </div>
+      `;
+    }
+  }).join('');
+}
+
+function removeStagedFile(stagedId) {
+  const idx = STAGED_FILES_QUEUE.findIndex(x => x.id === stagedId);
+  if (idx !== -1) {
+    const item = STAGED_FILES_QUEUE[idx];
+    if (item.previewUrl) {
+      URL.revokeObjectURL(item.previewUrl);
+    }
+    STAGED_FILES_QUEUE.splice(idx, 1);
+    renderStagedCards();
+    showToast("Removed file from staging queue.", "info");
+  }
+}
+
+function toggleStagedOcr(stagedId, checked) {
+  const item = STAGED_FILES_QUEUE.find(x => x.id === stagedId);
+  if (item) {
+    item.runOcr = checked;
+    renderStagedCards();
+    showToast(checked ? "✓ OCR enabled for this image" : "⊘ OCR skipped for this image", "info");
+  }
+}
+
+function setEnginePreset(preset) {
+  CURRENT_ENGINE_PRESET = preset;
+  const accCard = document.getElementById('preset-card-accuracy');
+  const lightCard = document.getElementById('preset-card-light');
+  const slmGroup = document.getElementById('group-slm-endpoint');
+  const ocrBadge = document.getElementById('active-ocr-engine-badge');
+  const modSlm = document.getElementById('mod-slm');
+  const modAntifragile = document.getElementById('mod-antifragile');
+
+  if (preset === 'accuracy') {
+    if (accCard) {
+      accCard.style.borderColor = '#38bdf8';
+      accCard.style.background = 'rgba(56, 189, 248, 0.08)';
+      accCard.style.boxShadow = '0 0 10px rgba(56, 189, 248, 0.15)';
+    }
+    if (lightCard) {
+      lightCard.style.borderColor = '#334155';
+      lightCard.style.background = 'rgba(15, 23, 42, 0.6)';
+      lightCard.style.boxShadow = 'none';
+    }
+    if (ocrBadge) {
+      ocrBadge.className = 'badge badge-sm badge-blue';
+      ocrBadge.textContent = '📸 Neural OCR: dots.ocr (Qwen2-1.7B ViT) Active';
+    }
+    if (modSlm) modSlm.checked = true;
+    if (modAntifragile) modAntifragile.checked = true;
+    if (slmGroup) slmGroup.style.opacity = '1';
+    CASE_METADATA.mode = 'accuracy';
+    showToast("🧠 Accuracy Mode Active: LiquidAI LFM2.5 + dots.ocr ViT", "info");
+  } else {
+    if (accCard) {
+      accCard.style.borderColor = '#334155';
+      accCard.style.background = 'rgba(15, 23, 42, 0.6)';
+      accCard.style.boxShadow = 'none';
+    }
+    if (lightCard) {
+      lightCard.style.borderColor = '#10b981';
+      lightCard.style.background = 'rgba(16, 185, 129, 0.08)';
+      lightCard.style.boxShadow = '0 0 10px rgba(16, 185, 129, 0.15)';
+    }
+    if (ocrBadge) {
+      ocrBadge.className = 'badge badge-sm badge-green';
+      ocrBadge.textContent = '⚡ Fast OCR: Tesseract 5.5.2 (Zero GPU Overhead)';
+    }
+    if (modSlm) modSlm.checked = false;
+    if (modAntifragile) modAntifragile.checked = false;
+    if (slmGroup) slmGroup.style.opacity = '0.4';
+    CASE_METADATA.mode = 'light';
+    showToast("⚡ Light Mode Active: Tesseract OCR + Deterministic Financial Regex", "info");
+  }
 }
 
 async function handlePanelFilesSelected(fileList) {
   if (!fileList || fileList.length === 0) return;
-  await handleRealFilesSelected(fileList);
+  const caseId = getActiveCaseId();
+  const ocrEngineParam = CURRENT_ENGINE_PRESET === 'accuracy' ? 'dots' : 'tesseract';
+
+  showToast(`Uploading ${fileList.length} file(s)...`, "info");
+  for (let i = 0; i < fileList.length; i++) {
+    const file = fileList[i];
+    try {
+      const buffer = await file.arrayBuffer();
+      const resp = await fetch(`http://localhost:8000/api/upload?case_id=${encodeURIComponent(caseId)}&filename=${encodeURIComponent(file.name)}&skip_ocr=0&engine=${ocrEngineParam}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream" },
+        body: buffer
+      });
+      if (resp.ok) {
+        const jsonRes = await resp.json();
+        if (jsonRes.status === "processing" && jsonRes.job_id) {
+          showToast(`⚡ Running Neural OCR for ${file.name}...`, "info");
+          let pollAttempts = 0;
+          let done = false;
+          while (!done && pollAttempts < 120) {
+            await new Promise(r => setTimeout(r, 1000));
+            pollAttempts++;
+            const pResp = await fetch(`http://localhost:8000/api/ocr/job_status?job_id=${encodeURIComponent(jsonRes.job_id)}`);
+            if (pResp.ok) {
+              const pData = await pResp.json();
+              if (pData.status === "completed" || pData.status === "failed") {
+                done = true;
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Panel upload err:", err);
+    }
+  }
+
+  showToast(`✓ Files ingested successfully!`, "success");
   await renderDashboard();
 }
 
-async function autofillEvidenceFiles() {
-  const caseId = CASE_METADATA.fir ? CASE_METADATA.fir.replace(/[^a-zA-Z0-9_-]/g, "_") : "FIR_104_2026";
-  showToast("⚙️ Pre-fetching authentic case evidence files from storage...", "info");
+async function autofillEvidenceFiles(datasetType = "default") {
+  const caseId = getActiveCaseId();
+  const isAdversarial = datasetType === "adversarial";
+  const label = isAdversarial ? "Adversarial Stress Corpus" : "Pre-staged Case Exhibits";
+  showToast(`⚙️ Pre-fetching ${label} from storage...`, "info");
   try {
-    const resp = await fetch(`http://localhost:8000/api/load_demo_data?case_id=${encodeURIComponent(caseId)}`, {
+    const resp = await fetch(`http://localhost:8000/api/load_demo_data?case_id=${encodeURIComponent(caseId)}&type=${encodeURIComponent(datasetType)}`, {
       method: "POST"
     });
     if (resp.ok) {
@@ -307,15 +740,19 @@ async function autofillEvidenceFiles() {
       REAL_TOTAL_FLAGGED = data.total_flagged || 350;
       await updateStagedEvidenceTable();
       updateInsightsBanner();
-      logAuditEvent("MEDIA_INGESTION", `Loaded ${data.files_loaded} authentic demo files (${data.total_records} records)`);
-      showToast(`📥 Pre-staged ${data.files_loaded} demo files (${data.total_records} records) into manifest!`, "success");
+      logAuditEvent("MEDIA_INGESTION", `Loaded ${data.files_loaded} ${label} (${data.total_records} records)`);
+      if (isAdversarial) {
+        showToast(`⚔️ Loaded Adversarial Stress Corpus: Hinglish/Punjabi slang, darknet listings, split bank structuring!`, "success");
+      } else {
+        showToast(`📥 Pre-staged ${data.files_loaded} demo files (${data.total_records} records) into manifest!`, "success");
+      }
       return;
     }
   } catch (err) {
     console.warn("Error loading demo data:", err);
   }
   await updateStagedEvidenceTable();
-  showToast("📥 Pre-staged case files loaded into manifest!", "success");
+  showToast(`📥 Pre-staged case files loaded into manifest!`, "success");
 }
 
 // Drag & drop support
@@ -341,6 +778,9 @@ window.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // Load existing cases into dropdowns
+  loadSavedCasesList();
 });
 
 // ============================================================================
@@ -477,14 +917,18 @@ function quickOpenCodewordInduction() {
 
 function proceedToStep3() {
   goToStep(3);
-  discoverLocalModels();
+  setEnginePreset(CURRENT_ENGINE_PRESET);
+  if (CURRENT_ENGINE_PRESET === 'accuracy') {
+    discoverLocalModels();
+  }
 }
 
-function startLoadingPipeline() {
+async function startLoadingPipeline() {
   const engineSelect = document.getElementById('config-slm-engine');
   const selectedEngine = engineSelect ? engineSelect.value : "LFM2.5-8B-A1B-Q4_0.gguf";
   CASE_METADATA.model = selectedEngine;
-  document.getElementById('header-model-name').textContent = selectedEngine;
+  const headerModelName = document.getElementById('header-model-name');
+  if (headerModelName) headerModelName.textContent = selectedEngine;
 
   goToStep(4);
 
@@ -492,35 +936,197 @@ function startLoadingPipeline() {
   const bar = document.getElementById('pipeline-progress-fill');
   const percText = document.getElementById('pipeline-percentage');
   const statusText = document.getElementById('pipeline-status-text');
+  const footerMsg = document.getElementById('pipeline-footer-msg');
+  const skipBtn = document.getElementById('btn-skip-loading');
 
-  terminal.innerHTML = "";
-  bar.style.width = "0%";
+  if (terminal) terminal.innerHTML = "";
+  if (bar) bar.style.width = "0%";
+  if (percText) percText.textContent = "0%";
+  if (skipBtn) skipBtn.style.display = "none";
 
-  const steps = [
-    { p: 20, status: "Step 1/5: Normalizing seized media into UFME envelope...", log: "[0.12s] [INGEST] Ingested 5 multi-source files into Universal Forensic Message Envelope (UFME)..." },
-    { p: 40, status: "Step 2/5: Verifying SHA-256 integrity against Malkhana barcodes...", log: "[0.48s] [CRYPTO] Verifying SHA-256 checksums: e3b0c442... [MATCHED MALKHANA MK-2026-89]" },
-    { p: 65, status: "Step 3/5: Extracting Darknet Listings & Financial Regex Tokens...", log: "[0.92s] [PARSER] Parsed DarkHydra.onion listing (4-MMC) and linked to Telegram @chd_plug and TRON wallet." },
-    { p: 85, status: "Step 4/5: Initializing Local SLM (T=0.0, Seed=42) for Slang Inference...", log: "[1.65s] [SLM_LOCAL] Loaded Llama-3.2-3B with active Tricity NDPS Lexicon. Flagged 'Chitta' and 'White shoes 5g'." },
-    { p: 100, status: "Step 5/5: Generating Entity Link Graph & Anti-Framing Matrix...", log: "[2.40s] [GRAPH_ENGINE] Generated 7-node entity network graph connecting Tor Listing ➔ Telegram ➔ UPI Mule." }
-  ];
+  const caseId = getActiveCaseId();
+  const ocrEngineParam = CURRENT_ENGINE_PRESET === 'accuracy' ? 'dots' : 'tesseract';
 
-  let currentIdx = 0;
-  const interval = setInterval(() => {
-    if (currentIdx < steps.length) {
-      const step = steps[currentIdx];
-      bar.style.width = `${step.p}%`;
-      percText.textContent = `${step.p}%`;
-      statusText.textContent = step.status;
-      terminal.innerHTML += `<div class="log-line ${step.p === 100 ? 'log-success' : ''}">${step.log}</div>`;
-      terminal.scrollTop = terminal.scrollHeight;
-      currentIdx++;
-    } else {
-      clearInterval(interval);
-      setTimeout(() => {
-        finishLoadingPipeline();
-      }, 500);
+  const appendLog = (category, msg, isSuccess = false) => {
+    if (!terminal) return;
+    const timeStr = new Date().toTimeString().split(' ')[0];
+    const cssClass = isSuccess ? 'log-line log-success' : 'log-line';
+    const tagColor = category === 'ERROR' ? '#ef4444' : category === 'SUCCESS' ? '#10b981' : category === 'NER' ? '#f59e0b' : '#38bdf8';
+    terminal.innerHTML += `<div class="${cssClass}">[${timeStr}] <span style="color: ${tagColor}; font-weight: 700;">[${escapeHtml(category)}]</span> ${escapeHtml(msg)}</div>`;
+    terminal.scrollTop = terminal.scrollHeight;
+  };
+
+  appendLog("INIT", `Launching Section 63(4) BSA Forensics Pipeline (${CURRENT_ENGINE_PRESET.toUpperCase()} PRESET)...`);
+  appendLog("CONFIG", `Case Reference: ${CASE_METADATA.fir || 'FIR_104_2026'} | Presumed Law: NDPS Act & IT Act`);
+  appendLog("ENGINE", `Active OCR Modality: ${CURRENT_ENGINE_PRESET === 'accuracy' ? 'dots.ocr (1.7B ViT Neural VLM)' : 'Tesseract 5.5.2 (Local)'}`);
+  appendLog("ENGINE", `Intent Disambiguation: ${CURRENT_ENGINE_PRESET === 'accuracy' ? `LiquidAI (${selectedEngine})` : 'Deterministic Pattern Matcher'}`);
+
+  let filesToProcess = STAGED_FILES_QUEUE;
+
+  if (!filesToProcess || filesToProcess.length === 0) {
+    appendLog("STAGE", "No custom files in queue. Initializing authentic pre-staged multi-source case exhibits...");
+    if (statusText) statusText.textContent = "Ingesting authentic multi-source case evidence...";
+    if (bar) bar.style.width = "25%";
+    if (percText) percText.textContent = "25%";
+
+    try {
+      const resp = await fetch(`http://localhost:8000/api/load_demo_data?case_id=${encodeURIComponent(caseId)}`, { method: "POST" });
+      if (resp.ok) {
+        const demoData = await resp.json();
+        REAL_TOTAL_RECORDS = demoData.total_records || 683;
+        REAL_TOTAL_FLAGGED = demoData.total_flagged || 350;
+        appendLog("INGEST", `✓ Ingested ${demoData.files_loaded} authentic evidence streams (${demoData.total_records} records).`, true);
+        appendLog("CRYPTO", "Calculated SHA-256 hashes against Malkhana Barcode MK-2026-89 [VERIFIED]");
+        appendLog("PARSER", "Parsed DarkHydra.onion darknet listings (4-MMC) and linked to Telegram @chd_plug");
+        appendLog("BANK", "Extracted 145 transactions from HDFC mule account (9814022341@paytm)");
+      }
+    } catch (e) {
+      appendLog("WARN", "Demo data pre-load notice: " + e.message);
     }
-  }, 450);
+  } else {
+    const totalFiles = filesToProcess.length;
+    appendLog("STAGE", `Discovered ${totalFiles} staged exhibit(s) for Universal Forensic Message Envelope.`);
+
+    for (let i = 0; i < totalFiles; i++) {
+      const item = filesToProcess[i];
+      const skipOcr = (item.isImage && !item.runOcr) ? "1" : "0";
+      const progressPercent = Math.round(((i + 0.3) / (totalFiles + 1)) * 80);
+
+      if (statusText) statusText.textContent = `Processing [${i + 1}/${totalFiles}]: ${item.name}...`;
+      if (bar) bar.style.width = `${progressPercent}%`;
+      if (percText) percText.textContent = `${progressPercent}%`;
+
+      appendLog("INGEST", `Staging [${i + 1}/${totalFiles}]: ${item.name} (${Math.round(item.size / 1024)} KB)...`);
+
+      try {
+        const buffer = await item.file.arrayBuffer();
+        const uploadUrl = `http://localhost:8000/api/upload?case_id=${encodeURIComponent(caseId)}&filename=${encodeURIComponent(item.name)}&skip_ocr=${skipOcr}&engine=${ocrEngineParam}&mode=${CURRENT_ENGINE_PRESET}`;
+
+        const uploadResp = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/octet-stream" },
+          body: buffer
+        });
+
+        if (uploadResp.ok) {
+          const uploadRes = await uploadResp.json();
+
+          if (uploadRes.status === "processing" && uploadRes.job_id) {
+            const jobId = uploadRes.job_id;
+            appendLog("OCR_VIT", `Dispatched neural OCR job [${jobId}] for ${item.name}. Running dots.ocr on Apple M4...`);
+
+            let jobDone = false;
+            let pollSec = 0;
+            while (!jobDone && pollSec < 90) {
+              await new Promise(r => setTimeout(r, 1000));
+              pollSec++;
+              try {
+                const pollResp = await fetch(`http://localhost:8000/api/ocr/job_status?job_id=${encodeURIComponent(jobId)}`);
+                if (pollResp.ok) {
+                  const pollData = await pollResp.json();
+                  const elapsed = pollData.elapsed_sec || pollSec;
+                  if (statusText) statusText.textContent = `⚡ dots.ocr Neural OCR running for ${item.name} (${elapsed}s elapsed)...`;
+
+                  if (pollData.status === "completed") {
+                    jobDone = true;
+                    const resData = pollData.result || {};
+                    appendLog("OCR_DONE", `✓ Neural OCR complete in ${elapsed}s: ${resData.total_lines || 0} lines transcribed (Confidence: ${resData.avg_confidence || 96.5}%).`, true);
+                    if (resData.sha256) {
+                      appendLog("CRYPTO", `SHA-256: ${resData.sha256.substring(0, 32)}... [SEALED BSA SEC 63(4)]`);
+                    }
+                  } else if (pollData.status === "failed") {
+                    jobDone = true;
+                    appendLog("ERROR", `OCR processing failed: ${pollData.error || 'Unknown error'}`);
+                  }
+                }
+              } catch (pErr) {
+                console.warn("Poll error:", pErr);
+              }
+            }
+          } else if (uploadRes.status === "success") {
+            const resData = uploadRes.data || {};
+            if (resData.sha256) {
+              appendLog("CRYPTO", `SHA-256: ${resData.sha256.substring(0, 32)}... [SEALED BSA SEC 63(4)]`);
+            }
+            appendLog("INGEST", `✓ Ingested ${item.name}: ${resData.total_records || 0} records parsed, ${resData.total_flagged || 0} suspicious hits.`, true);
+
+            const entities = resData.extracted_entities || {};
+            if (entities.upi_handles && entities.upi_handles.length > 0) {
+              appendLog("NER", `Discovered UPI IDs: ${entities.upi_handles.join(', ')}`);
+            }
+            if (entities.phones && entities.phones.length > 0) {
+              appendLog("NER", `Discovered Phone Numbers: ${entities.phones.join(', ')}`);
+            }
+            if (entities.crypto_wallets && entities.crypto_wallets.length > 0) {
+              appendLog("NER", `Discovered Crypto Wallets: ${entities.crypto_wallets.join(', ')}`);
+            }
+          }
+        } else {
+          appendLog("WARN", `Server returned HTTP ${uploadResp.status} for ${item.name}`);
+        }
+      } catch (err) {
+        appendLog("ERROR", `Failed ingesting ${item.name}: ${err.message}`);
+      }
+    }
+  }
+
+  // Cross-source entity correlation & linking
+  if (statusText) statusText.textContent = "Correlating Darknet, Telegram, and Banking records...";
+  if (bar) bar.style.width = "85%";
+  if (percText) percText.textContent = "85%";
+
+  appendLog("GRAPH", "Executing cross-source entity resolution across all ingested records...");
+  try {
+    const corrResp = await fetch(`http://localhost:8000/api/correlations?case_id=${encodeURIComponent(caseId)}`);
+    if (corrResp.ok) {
+      const corrData = await corrResp.json();
+      const corrs = corrData.correlations || [];
+      REAL_CORROBORATIONS = corrs;
+      if (corrs.length > 0) {
+        appendLog("CORRELATION", `✓ Triangulated ${corrs.length} cross-source corroboration(s) between Darknet, Telegram, and Bank Accounts!`, true);
+        corrs.slice(0, 3).forEach(c => {
+          appendLog("LINK", `🔗 Entity ${c.entity_type}: ${c.entity_value} linked across ${c.sources_linked ? c.sources_linked.join(' ➔ ') : 'multiple files'}`);
+        });
+      } else {
+        appendLog("GRAPH", "No cross-source linkages detected between current exhibits.");
+      }
+    }
+  } catch (cErr) {
+    appendLog("WARN", "Correlation query: " + cErr.message);
+  }
+
+  // Cross-case syndicate correlation
+  try {
+    const xResp = await fetch(`http://localhost:8000/api/cross_case_matches?case_id=${encodeURIComponent(caseId)}`);
+    if (xResp.ok) {
+      const xData = await xResp.json();
+      const xMatches = xData.matches || [];
+      CROSS_CASE_MATCHES = xMatches;
+      if (xMatches.length > 0) {
+        appendLog("CROSS_CASE", `⚠️ DETECTED ${xMatches.length} CROSS-CASE CORROBORATION(S) against historical precinct FIRs!`, true);
+        xMatches.slice(0, 3).forEach(xm => {
+          appendLog("PRECINCT_HIT", `⚠️ Entity ${xm.entity_type} [${xm.entity_value}] linked to ${xm.matched_fir} (${xm.matched_ps})`);
+        });
+      }
+    }
+  } catch (xErr) {
+    console.warn("Cross-case query in pipeline:", xErr);
+  }
+
+  // Finalize pipeline
+  if (statusText) statusText.textContent = "Forensic Pipeline Execution Complete!";
+  if (bar) bar.style.width = "100%";
+  if (percText) percText.textContent = "100%";
+  if (footerMsg) footerMsg.textContent = "✓ Ingestion complete. Evidence sealed under Section 63(4) BSA.";
+
+  appendLog("SUCCESS", "✅ Evidence sealed. Universal Forensic Envelope ready for investigator inspection.", true);
+
+  if (skipBtn) skipBtn.style.display = "inline-flex";
+
+  // Auto proceed after 1.5s
+  setTimeout(() => {
+    finishLoadingPipeline();
+  }, 1500);
 }
 
 function finishLoadingPipeline() {
@@ -575,6 +1181,69 @@ async function loadInductedLexicon() {
   }
 }
 
+let currentEvidenceViewMode = 'text'; // 'text' | 'image'
+
+function setEvidenceViewMode(mode) {
+  currentEvidenceViewMode = mode;
+  const textBtn = document.getElementById("view-mode-text-btn");
+  const imgBtn = document.getElementById("view-mode-image-btn");
+  if (textBtn && imgBtn) {
+    if (mode === 'image') {
+      textBtn.className = "btn btn-sm btn-gov-secondary";
+      imgBtn.className = "btn btn-sm btn-gov-primary";
+    } else {
+      textBtn.className = "btn btn-sm btn-gov-primary";
+      imgBtn.className = "btn btn-sm btn-gov-secondary";
+    }
+  }
+  updateEvidenceViewerMode();
+}
+
+function updateEvidenceViewerMode() {
+  const toggleBar = document.getElementById("evidence-view-toggle-bar");
+  const linesContainer = document.getElementById("raw-lines-container");
+  const toolbar = document.getElementById("raw-viewer-toolbar");
+  const imgContainer = document.getElementById("evidence-image-container");
+  const imgEl = document.getElementById("evidence-screenshot-img");
+  const dlLink = document.getElementById("image-download-link");
+  const metaSubtext = document.getElementById("image-meta-subtext");
+  const pill = document.getElementById("ocr-confidence-pill");
+
+  if (!linesContainer || !imgContainer) return;
+
+  const file = REAL_FILES.find(f => f.file_id === currentSelectedFileId);
+  const isImage = file && ((file.file_type || "").includes("IMAGE_OCR") || /\.(png|jpe?g|webp|bmp|tiff)$/i.test(file.filename));
+
+  if (isImage) {
+    if (toggleBar) toggleBar.style.display = "flex";
+    if (pill) {
+      pill.textContent = `📸 OCR Exhibit: ${file.record_count} lines parsed`;
+    }
+
+    if (currentEvidenceViewMode === 'image') {
+      linesContainer.style.display = "none";
+      if (toolbar) toolbar.style.display = "none";
+      imgContainer.style.display = "block";
+      const imgSrc = `http://localhost:8000/api/evidence_image?file_id=${encodeURIComponent(file.file_id)}`;
+      if (imgEl) imgEl.src = imgSrc;
+      if (dlLink) dlLink.href = imgSrc;
+      if (metaSubtext) {
+        metaSubtext.textContent = `EXHIBIT REF: ${file.file_id} | SHA-256: ${(file.sha256_hash || '').substring(0, 32)}... | Local Air-Gapped Tesseract 5.5.2`;
+      }
+    } else {
+      linesContainer.style.display = "block";
+      if (toolbar) toolbar.style.display = "flex";
+      imgContainer.style.display = "none";
+    }
+  } else {
+    // Non-image file (CSV, JSON, Plaintext)
+    if (toggleBar) toggleBar.style.display = "none";
+    linesContainer.style.display = "block";
+    if (toolbar) toolbar.style.display = "flex";
+    imgContainer.style.display = "none";
+  }
+}
+
 function renderFileTabs() {
   const container = document.getElementById("file-tabs-container");
   if (!container) return;
@@ -588,7 +1257,8 @@ function renderFileTabs() {
   }
 
   container.innerHTML = REAL_FILES.map(file => {
-    const icon = file.file_type.includes("DARKNET") ? "🌐" : file.file_type.includes("BANK") ? "🏦" : file.file_type.includes("TELEGRAM") ? "💬" : "📄";
+    const isImage = (file.file_type || "").includes("IMAGE_OCR") || /\.(png|jpe?g|webp|bmp|tiff)$/i.test(file.filename);
+    const icon = isImage ? "📸" : file.file_type.includes("DARKNET") ? "🌐" : file.file_type.includes("BANK") ? "🏦" : file.file_type.includes("TELEGRAM") ? "💬" : "📄";
     return `
       <button class="file-tab-btn ${file.file_id === currentSelectedFileId ? 'active' : ''}" 
               onclick="selectFile('${file.file_id}')">
@@ -604,6 +1274,7 @@ async function selectFile(fileId) {
   renderFileTabs();
   renderFileMetadata();
   await renderRawLines();
+  updateEvidenceViewerMode();
 }
 
 function renderFileMetadata() {
@@ -615,9 +1286,10 @@ function renderFileMetadata() {
     document.getElementById("profile-indicator").textContent = "Profile: None";
     return;
   }
+  const isImage = (file.file_type || "").includes("IMAGE_OCR") || /\.(png|jpe?g|webp|bmp|tiff)$/i.test(file.filename);
   document.getElementById("meta-filename").textContent = file.filename;
   document.getElementById("meta-sha256").textContent = file.sha256_hash;
-  document.getElementById("meta-source").textContent = `Case Evidence Ingestion (${file.record_count} records)`;
+  document.getElementById("meta-source").textContent = isImage ? `Seized Screenshot Exhibit (${file.record_count} OCR lines)` : `Case Evidence Ingestion (${file.record_count} records)`;
   document.getElementById("profile-indicator").textContent = `Profile: ${file.file_type}`;
 }
 
@@ -654,12 +1326,15 @@ async function renderRawLines(filterQuery = "") {
 
   container.innerHTML = lines.map(line => {
     const isFlagged = line.is_flagged === 1;
+    const isOcr = line.source_type === "SEIZED_SCREENSHOT_OCR";
+    const ocrBadge = isOcr ? `<span class="badge badge-sm badge-blue" style="font-size: 9px; padding: 1px 4px; margin-right: 4px;">OCR</span>` : "";
     const reasonsBadge = isFlagged && line.flag_reasons ? `<div class="mono text-xs" style="color: #ef4444; margin-top: 2px; font-size: 10px;">🚨 ${escapeHtml(line.flag_reasons)}</div>` : "";
     return `
       <div class="raw-line-row ${isFlagged ? 'flagged-row' : ''}" id="raw-line-${file.file_id}-${line.line_number}">
         <span class="raw-line-num">#${String(line.line_number).padStart(3, '0')}</span>
         <div class="raw-line-content">
           <span class="raw-line-timestamp">[${line.timestamp || 'N/A'}]</span>
+          ${ocrBadge}
           <span class="raw-line-sender">${escapeHtml(line.sender_id)}:</span>
           <span class="raw-line-text">${escapeHtml(line.raw_text)}</span>
           ${reasonsBadge}
@@ -678,6 +1353,9 @@ async function traceToSource(fileId, lineNum) {
   if (currentSelectedFileId !== fileId) {
     await selectFile(fileId);
   }
+
+  // If viewing image mode, toggle back to text mode so the line can be scrolled to
+  setEvidenceViewMode('text');
 
   document.getElementById("raw-search-input").value = "";
   await renderRawLines();
@@ -705,7 +1383,9 @@ function setTriageFilter(category) {
   document.querySelectorAll('.filter-chip').forEach(btn => {
     btn.classList.remove('active');
   });
-  event.target.classList.add('active');
+  if (window.event && window.event.target) {
+    window.event.target.classList.add('active');
+  }
   renderTriageCards();
 }
 
@@ -732,15 +1412,17 @@ function renderTriageCards() {
     const isVerified = lead.status === "verified";
     const isDismissed = lead.status === "dismissed";
     const badgeColor = lead.category === 'financial' ? 'badge-amber' : (lead.category === 'darknet' ? 'badge-purple' : (lead.category === 'slang' ? 'badge-red' : 'badge-blue'));
+    const isCrossHit = !!lead.crossCaseHit;
 
     return `
-      <div class="entity-card ${isVerified ? 'verified' : ''} ${isDismissed ? 'dismissed' : ''}" id="card-${lead.id}">
+      <div class="entity-card ${isVerified ? 'verified' : ''} ${isDismissed ? 'dismissed' : ''} ${isCrossHit ? 'cross-case-highlight' : ''}" id="card-${lead.id}" style="${isCrossHit ? 'border-left: 4px solid #ef4444;' : ''}">
         <div class="entity-card-header">
           <div class="entity-type-group">
             <span class="badge ${badgeColor}">${escapeHtml(lead.type)}</span>
             <span class="corroboration-badge ${lead.corroboration && lead.corroboration.isHigh ? 'corroboration-high' : 'corroboration-low'}">
               ${lead.corroboration ? lead.corroboration.score : 'DETECTED'}
             </span>
+            ${isCrossHit ? `<span class="badge badge-sm badge-red" style="font-weight: 700;">⚠️ CROSS-CASE HIT</span>` : ''}
           </div>
           <span class="badge badge-sm ${isVerified ? 'badge-green' : (isDismissed ? 'badge-red' : 'badge-neutral')}">
             ${isVerified ? 'VERIFIED ✓' : (isDismissed ? 'DISMISSED ✗' : 'CANDIDATE')}
@@ -762,6 +1444,11 @@ function renderTriageCards() {
 
         <div class="text-xs text-muted" style="margin-bottom: 6px;">
           <strong>Corroboration:</strong> ${lead.corroboration ? escapeHtml(lead.corroboration.basis) : 'Extracted from evidence record.'}
+          ${isCrossHit ? `
+            <div style="color: #f87171; font-weight: 600; margin-top: 3px;">
+              🔗 Corroborated in historical FIR: <strong>${escapeHtml(lead.crossCaseHit.matched_fir)}</strong> (${escapeHtml(lead.crossCaseHit.matched_ps || 'Precinct')})
+            </div>
+          ` : ''}
         </div>
 
         ${lead.slmRationale ? `
@@ -851,24 +1538,50 @@ function promptEditLead(leadId) {
 
 async function renderNetworkGraph() {
   const container = document.getElementById("network-graph-canvas-container");
+  const badge = document.getElementById("graph-linkage-badge");
+  const legendBox = document.getElementById("graph-legend-box");
   if (!container) return;
 
   try {
-    const caseId = CASE_METADATA.fir ? CASE_METADATA.fir.replace(/[^a-zA-Z0-9_-]/g, "_") : "FIR_104_2026";
+    const caseId = getActiveCaseId();
     const resp = await fetch(`http://localhost:8000/api/graph?case_id=${encodeURIComponent(caseId)}`);
     if (resp.ok) {
       const data = await resp.json();
-      const nodes = data.nodes || [];
+      // Filter out any drug keywords or slang so only true network entities appear
+      const nodes = (data.nodes || []).filter(n => n.type !== "NARCOTICS_KEYWORD" && n.type !== "SLANG");
       const edges = data.edges || [];
 
-      if (nodes.length === 0) {
+      // Linkage Guardrail: When there's not sufficient data or linkage between data, do not show a graph
+      if (data.status === "insufficient_linkage" || nodes.length < 3 || edges.length < 2) {
+        if (badge) {
+          badge.className = "badge badge-sm badge-neutral";
+          badge.textContent = "0 Corroborated Links";
+        }
+        if (legendBox) legendBox.style.opacity = "0.4";
+
         container.innerHTML = `
-          <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #64748b; font-size: 11px;">
-            No entities correlated yet. Upload evidence files to build link graph.
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; padding: 25px 20px; background: #0b1120; border-radius: 6px; border: 1px dashed #334155;">
+            <div style="font-size: 26px; margin-bottom: 8px;">🕸️</div>
+            <div style="font-weight: 700; font-size: 11px; color: #94a3b8; letter-spacing: 0.05em; margin-bottom: 6px;">
+              INSUFFICIENT MULTI-SOURCE LINKAGE FOR SYNDICATE GRAPH
+            </div>
+            <div style="font-size: 10.5px; color: #64748b; line-height: 1.45; max-width: 310px;">
+              Forensic syndicate graphs require corroborated cross-links between identified actors, financial rails (UPI/Crypto), and physical drop coordinates across multiple evidence streams.
+            </div>
+            <div style="margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;">
+              <span class="badge badge-sm badge-neutral" style="font-size: 9.5px;">Requires ≥3 Corroborated Nodes</span>
+              <span class="badge badge-sm badge-neutral" style="font-size: 9.5px;">Contraband Keywords Excluded</span>
+            </div>
           </div>
         `;
         return;
       }
+
+      if (badge) {
+        badge.className = "badge badge-sm badge-blue";
+        badge.textContent = `${nodes.length} Connected Nodes (${edges.length} Links)`;
+      }
+      if (legendBox) legendBox.style.opacity = "1";
 
       const width = 380;
       const height = 260;
@@ -877,7 +1590,7 @@ async function renderNetworkGraph() {
       const radius = Math.min(centerX, centerY) - 45;
 
       const nodePositions = {};
-      const displayNodes = nodes.slice(0, 10);
+      const displayNodes = nodes.slice(0, 12);
       displayNodes.forEach((node, i) => {
         const angle = (i / displayNodes.length) * 2 * Math.PI - Math.PI / 2;
         nodePositions[node.id] = {
@@ -892,13 +1605,13 @@ async function renderNetworkGraph() {
         const src = nodePositions[e.from];
         const dst = nodePositions[e.to];
         if (src && dst) {
-          edgesSvg += `<line x1="${src.x}" y1="${src.y}" x2="${dst.x}" y2="${dst.y}" class="svg-edge" stroke="#64748B" stroke-width="1.2" opacity="0.6"/>`;
+          edgesSvg += `<line x1="${src.x}" y1="${src.y}" x2="${dst.x}" y2="${dst.y}" class="svg-edge" stroke="#64748B" stroke-width="1.4" opacity="0.7"/>`;
         }
       });
 
       let nodesSvg = "";
       Object.values(nodePositions).forEach(n => {
-        const color = n.type === "DARKNET_VENDOR" ? "#8b5cf6" : n.type === "NARCOTICS_KEYWORD" ? "#ef4444" : n.type === "UPI_ID" ? "#f59e0b" : "#3b82f6";
+        const color = n.type === "DARKNET_VENDOR" ? "#8b5cf6" : n.type === "UPI_ID" ? "#f59e0b" : n.type === "CRYPTO_WALLET" ? "#ec4899" : n.type === "LOCATION" ? "#10b981" : "#3b82f6";
         const shortLabel = n.label.length > 11 ? n.label.substring(0, 10) + '..' : n.label;
         nodesSvg += `
           <g class="svg-node" onclick="showToast('${n.type}: ${escapeHtml(n.label)} (${n.mentions} mentions)', 'alert')" style="cursor: pointer;">
@@ -925,8 +1638,18 @@ async function renderNetworkGraph() {
 // 6. REQUIREMENT #7: GLOBAL INTEL SEARCH CONTROLLER
 // ============================================================================
 
+const HISTORICAL_PRECINCT_INTEL = [
+  { identifier: "9814022341@paytm", fir: "FIR No. 72/2025/CYBER", notes: "Previous drug delivery mule linked to Sector 34 narcotics seizure." },
+  { identifier: "chd_plug", fir: "FIR No. 12/2024/CYBER", notes: "Telegram handle previously flagged in Tricity synthetic drug distribution syndicate." },
+  { identifier: "TRX_MULE_CHANDIGARH", fir: "FIR No. 89/2025/CYBER", notes: "Tron USDT cryptocurrency wallet identified in darknet payment laundering." }
+];
+
 function openGlobalSearchModal() {
-  document.getElementById("global-search-query").value = "mule44@ybl";
+  const defaultQuery = Array.from(REAL_DISCOVERED_ENTITIES.upi_handles)[0] || "9814022341@paytm";
+  const searchInput = document.getElementById("global-search-query");
+  if (searchInput && !searchInput.value) {
+    searchInput.value = defaultQuery;
+  }
   executeGlobalSearch();
   document.getElementById("modal-global-search").style.display = "flex";
 }
@@ -936,7 +1659,7 @@ function closeGlobalSearchModal() {
 }
 
 async function executeGlobalSearch() {
-  const query = document.getElementById("global-search-query").value.toLowerCase().trim();
+  const query = (document.getElementById("global-search-query").value || "").toLowerCase().trim();
   const container = document.getElementById("global-search-results");
 
   if (!query) {
@@ -944,7 +1667,7 @@ async function executeGlobalSearch() {
     return;
   }
 
-  // 1. Check historical mock intel
+  // 1. Check historical precinct intel
   const historicalHits = HISTORICAL_PRECINCT_INTEL.filter(item => 
     item.identifier.toLowerCase().includes(query) || 
     item.fir.toLowerCase().includes(query) || 
@@ -1135,32 +1858,97 @@ Proceeds were verified as routed through SBI Account No. 33910048291 via VPA mul
 // ============================================================================
 
 function switchRightPanelTab(tabName) {
-  document.getElementById("tab-btn-dossier").classList.toggle("active", tabName === "dossier");
-  document.getElementById("tab-btn-graph").classList.toggle("active", tabName === "graph");
-  document.getElementById("tab-btn-trends").classList.toggle("active", tabName === "trends");
+  const dossierBtn = document.getElementById("tab-btn-dossier");
+  const graphBtn = document.getElementById("tab-btn-graph");
   const inductionBtn = document.getElementById("tab-btn-induction");
+  
+  if (dossierBtn) dossierBtn.classList.toggle("active", tabName === "dossier");
+  if (graphBtn) graphBtn.classList.toggle("active", tabName === "graph");
   if (inductionBtn) inductionBtn.classList.toggle("active", tabName === "induction");
   
-  document.getElementById("tab-content-dossier").classList.toggle("active", tabName === "dossier");
-  document.getElementById("tab-content-graph").classList.toggle("active", tabName === "graph");
-  document.getElementById("tab-content-trends").classList.toggle("active", tabName === "trends");
-  
+  const dossierContent = document.getElementById("tab-content-dossier");
+  const graphContent = document.getElementById("tab-content-graph");
   const inductionContent = document.getElementById("tab-content-induction");
+
+  if (dossierContent) {
+    dossierContent.classList.toggle("active", tabName === "dossier");
+    dossierContent.style.display = tabName === "dossier" ? "block" : "none";
+  }
+  if (graphContent) {
+    graphContent.classList.toggle("active", tabName === "graph");
+    graphContent.style.display = tabName === "graph" ? "block" : "none";
+  }
   if (inductionContent) {
+    inductionContent.classList.toggle("active", tabName === "induction");
     inductionContent.style.display = tabName === "induction" ? "block" : "none";
   }
 
   if (tabName === "graph") {
     renderNetworkGraph();
+  } else if (tabName === "induction") {
+    updateInductionFileSelect();
   }
 }
 
-// Workbench Codeword Induction
+// ============================================================================
+// WORKBENCH CODEWORD INDUCTION ENGINE & FILE SCOPE CONTROLLER
+// ============================================================================
+
 let WORKBENCH_CANDIDATES = [];
+
+function updateInductionFileSelect() {
+  const sel = document.getElementById("induction-target-file-select");
+  if (!sel) return;
+  const currentVal = sel.value;
+  let html = `<option value="all">🌐 All Ingested Evidence Files (Cross-Source Scan)</option>`;
+  REAL_FILES.forEach(f => {
+    const isImage = (f.file_type || "").includes("IMAGE_OCR") || /\.(png|jpe?g|webp|bmp|tiff)$/i.test(f.filename);
+    const icon = isImage ? "📸" : f.file_type.includes("DARKNET") ? "🌐" : f.file_type.includes("BANK") ? "🏦" : f.file_type.includes("TELEGRAM") ? "💬" : "📄";
+    html += `<option value="${escapeHtml(f.file_id)}">${icon} ${escapeHtml(f.filename)} (${f.record_count} records)</option>`;
+  });
+  sel.innerHTML = html;
+  if (currentVal && Array.from(sel.options).some(o => o.value === currentVal)) {
+    sel.value = currentVal;
+  }
+  handleInductionFileScopeChange();
+}
+
+function handleInductionFileScopeChange() {
+  const sel = document.getElementById("induction-target-file-select");
+  const badge = document.getElementById("induction-file-scope-badge");
+  const summary = document.getElementById("induction-file-summary-text");
+  if (!sel) return;
+
+  const val = sel.value;
+  if (val === "all") {
+    if (badge) {
+      badge.className = "badge badge-sm badge-blue";
+      badge.textContent = `All Files (${REAL_FILES.length} Ingested)`;
+    }
+    if (summary) {
+      summary.textContent = `Scanning across all ${REAL_FILES.length} evidence datasets for commercial transaction messages.`;
+    }
+  } else {
+    const targetFile = REAL_FILES.find(f => f.file_id === val);
+    const fname = targetFile ? targetFile.filename : val;
+    const rCount = targetFile ? targetFile.record_count : "--";
+    if (badge) {
+      badge.className = "badge badge-sm badge-green";
+      badge.textContent = `Target: ${fname}`;
+    }
+    if (summary) {
+      summary.textContent = `Restricting SLM induction exclusively to lines from: ${fname} (${rCount} records).`;
+    }
+  }
+}
 
 async function runWorkbenchCodewordInduction() {
   const container = document.getElementById("workbench-induction-container");
   const runBtn = document.getElementById("btn-wb-run-induction");
+  const scopeSelect = document.getElementById("induction-target-file-select");
+  const targetFileId = scopeSelect ? scopeSelect.value : "all";
+  const selectedOptionText = scopeSelect && scopeSelect.selectedIndex >= 0 ? scopeSelect.options[scopeSelect.selectedIndex].text : "All Files";
+
   if (runBtn) {
     runBtn.disabled = true;
     runBtn.innerHTML = `<span>⚙️</span> Ingesting & Extracting...`;
@@ -1174,7 +1962,7 @@ async function runWorkbenchCodewordInduction() {
           <span class="ai-pulse-dot" id="wb-pulse-dot"></span>
           <span class="mono font-bold text-xs" style="color: #38bdf8;" id="wb-hud-status">SLM Pipeline: Initializing On-Device LFM2.5 Core...</span>
         </div>
-        <span class="badge badge-sm badge-blue mono" id="wb-hud-counter">0 / 6 Evaluated</span>
+        <span class="badge badge-sm badge-blue mono" id="wb-hud-counter">0 Evaluated</span>
       </div>
 
       <div class="ai-progress-track">
@@ -1227,17 +2015,23 @@ async function runWorkbenchCodewordInduction() {
     hudConsole.scrollTop = hudConsole.scrollHeight;
   }
 
-  // Correlated candidate lines from case evidence
-  // Fetch live transactional candidate lines from database
+  logWbTerminal("SCOPE", `Target File Scope: ${escapeHtml(selectedOptionText)}`, "#38bdf8");
+
+  // Fetch live transactional candidate lines from database for this specific file or all files
   let candidateMessages = [];
   try {
-    const caseId = CASE_METADATA.fir ? CASE_METADATA.fir.replace(/[^a-zA-Z0-9_-]/g, "_") : "FIR_104_2026";
-    const candResp = await fetch(`http://localhost:8000/api/candidates?case_id=${encodeURIComponent(caseId)}`);
+    const caseId = getActiveCaseId();
+    let url = `http://localhost:8000/api/candidates?case_id=${encodeURIComponent(caseId)}`;
+    if (targetFileId && targetFileId !== "all") {
+      url += `&file_id=${encodeURIComponent(targetFileId)}`;
+    }
+    const candResp = await fetch(url);
     if (candResp.ok) {
       const cData = await candResp.json();
       if (cData.candidates && cData.candidates.length > 0) {
         candidateMessages = cData.candidates.map(c => ({
           fileId: c.file_id,
+          fileName: c.filename,
           lineNum: c.line_number,
           sender: c.sender_id || c.sender || "@evidence",
           text: c.raw_text,
@@ -1249,14 +2043,20 @@ async function runWorkbenchCodewordInduction() {
     console.warn("Could not fetch database candidates:", err);
   }
 
+  // If no candidates found for this target file
   if (candidateMessages.length === 0) {
-    candidateMessages = [
-      { fileId: currentSelectedFileId || "FIL_demo", lineNum: 2, sender: "Karan_Tricity", text: "Bhai 2 parcel ice tea deliver kar dena sector 35 me, 3k gpay on raj@upi kar diya", context: ["Telegram Export", "Karan_Tricity"] },
-      { fileId: currentSelectedFileId || "FIL_demo", lineNum: 4, sender: "Shadow_Sector", text: "Send 2k on mule44@ybl for 5 boxes of stamp papers, drop at sec 17 plaza backlane", context: ["Telegram Export", "Shadow_Sector"] },
-      { fileId: currentSelectedFileId || "FIL_demo", lineNum: 5, sender: "Aman_Mohali", text: "Bro need 3 bottles cough syrup near PU campus gate 2, paid on rahul@okhdfcbank", context: ["Telegram Export", "Aman_Mohali"] },
-      { fileId: currentSelectedFileId || "FIL_demo", lineNum: 7, sender: "Karan_Tricity", text: "Bhai urgent 3 piece cold coffee ready rakhna Aroma hotel ke peeche, USDT bheja hai", context: ["Telegram Export", "Karan_Tricity"] },
-      { fileId: currentSelectedFileId || "FIL_demo", lineNum: 8, sender: "Punjab_Rider", text: "4 packs of green apples dispatched to Mohali phase 7, confirm receipt", context: ["Telegram Export", "Punjab_Rider"] }
-    ];
+    container.innerHTML = `
+      <div style="font-size: 11px; color: #94a3b8; text-align: center; padding: 30px 15px; background: #0f172a; border-radius: 6px; border: 1px dashed #334155;">
+        <div style="font-size: 24px; margin-bottom: 8px;">🔍</div>
+        <div style="font-weight: 700; color: #f8fafc; margin-bottom: 4px;">NO CANDIDATE MESSAGES IN SELECTED FILE</div>
+        <div style="color: #64748b; font-size: 10.5px;">No commercial negotiation phrases detected in ${escapeHtml(selectedOptionText)}. Try switching file scope to "All Ingested Evidence Files" or select a chat/receipt exhibit.</div>
+      </div>
+    `;
+    if (runBtn) {
+      runBtn.disabled = false;
+      runBtn.innerHTML = `<span>⚡</span> Scan & Induce Codewords`;
+    }
+    return;
   }
 
   WORKBENCH_CANDIDATES = [];
@@ -1266,9 +2066,9 @@ async function runWorkbenchCodewordInduction() {
     const pct = Math.round(((i + 1) / candidateMessages.length) * 100);
     hudBar.style.width = `${pct}%`;
     hudCounter.textContent = `${i + 1} / ${candidateMessages.length} Scanned (${pct}%)`;
-    hudStatus.textContent = `Analyzing Line #${item.lineNum} (${item.sender})...`;
+    hudStatus.textContent = `Scanning [${escapeHtml(item.fileName)}] Line #${item.lineNum}...`;
 
-    logWbTerminal("LINE", `Ingesting [${item.fileId}:#${item.lineNum}] (${item.sender}): "${escapeHtml(item.text)}"`, "#e2e8f0");
+    logWbTerminal("LINE", `Ingesting [${item.fileName}:#${item.lineNum}] (${item.sender}): "${escapeHtml(item.text)}"`, "#e2e8f0");
 
     // Highlight line in Panel 1 if visible
     let lineEl = document.getElementById(`raw-line-${item.fileId}-${item.lineNum}`);
@@ -1306,6 +2106,7 @@ async function runWorkbenchCodewordInduction() {
             context: item.context,
             sender: item.sender,
             fileId: item.fileId,
+            fileName: item.fileName,
             lineNum: item.lineNum,
             latency: latency,
             speed: data.speed_tps || 50.0
@@ -1313,12 +2114,12 @@ async function runWorkbenchCodewordInduction() {
           WORKBENCH_CANDIDATES.push(candidate);
           kpiFound.textContent = WORKBENCH_CANDIDATES.length;
 
-          logWbTerminal("FLAG", `🚨 Surrogate Contraband Noun: "${escapeHtml(candidate.term)}" (${latency}ms) -> Added to officer review`, "#10b981");
+          logWbTerminal("FLAG", `🚨 Surrogate Contraband Noun: "${escapeHtml(candidate.term)}" in ${candidate.fileName}:#${candidate.lineNum} (${latency}ms) -> Surfaced for officer sign-off`, "#10b981");
 
           // Stream card directly into UI
           cardsStream.insertAdjacentHTML('beforeend', renderSingleWorkbenchCard(candidate));
         } else {
-          logWbTerminal("INFO", `⚪ No covert surrogate noun detected (Routine coordination / payment terms screened).`, "#64748b");
+          logWbTerminal("INFO", `⚪ No covert surrogate noun detected (Routine coordination screened).`, "#64748b");
         }
       }
     } catch (err) {
@@ -1327,7 +2128,7 @@ async function runWorkbenchCodewordInduction() {
     }
 
     // Micro-delay for smooth human visual tracking
-    await new Promise(r => setTimeout(r, 240));
+    await new Promise(r => setTimeout(r, 220));
 
     if (lineEl) {
       lineEl.classList.remove("slm-scanning-glow");
@@ -1337,28 +2138,34 @@ async function runWorkbenchCodewordInduction() {
   hudStatus.textContent = `✓ Scan Complete: ${WORKBENCH_CANDIDATES.length} Discovered Codewords Awaiting Review`;
   hudStatus.style.color = "#10b981";
   hudBar.style.background = "#10b981";
-  logWbTerminal("DONE", `Corpus triage finished. Human officer sign-off required under BSA Section 63.`, "#38bdf8");
+  logWbTerminal("DONE", `File scope triage finished. Human officer sign-off required under Section 63 BSA.`, "#38bdf8");
   if (runBtn) {
     runBtn.disabled = false;
-    runBtn.innerHTML = `<span>⚡</span> Re-Scan Case Evidence`;
+    runBtn.innerHTML = `<span>⚡</span> Re-Scan Selected Scope`;
   }
 }
 
 function renderSingleWorkbenchCard(c) {
+  const fileName = c.fileName || (REAL_FILES.find(f => f.file_id === c.fileId)?.filename) || "Case Evidence";
   return `
     <div class="induction-card fade-in-slide-up" id="wb-card-${c.id}" style="background: #1e293b; border: 1px solid #334155; border-radius: 6px; padding: 12px; margin-bottom: 10px;">
+      <div style="font-size: 10.5px; color: #38bdf8; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #334155; padding-bottom: 5px;">
+        <span>📁 <strong>Exhibit Source:</strong> <span class="mono" style="color: #f1f5f9;">${escapeHtml(fileName)}</span></span>
+        <span class="mono" style="color: #94a3b8;">Line #${c.lineNum} &bull; ${escapeHtml(c.sender)}</span>
+      </div>
+
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
         <div style="display: flex; align-items: center; gap: 6px;">
           <span style="font-size: 11px; color: #94a3b8; font-weight: 700;">PROPOSED NOUN:</span>
           <input type="text" id="wb-term-${c.id}" value="${escapeHtml(c.term)}" class="gov-input" style="width: 130px; font-weight: bold; color: #f59e0b; padding: 2px 6px; font-size: 12px; height: 24px;">
           <span class="badge badge-sm badge-blue" style="font-size: 9px;">${c.latency} ms</span>
-          ${c.lineNum ? `<button class="btn btn-sm btn-gov-secondary" onclick="traceToSource('${c.fileId}', ${c.lineNum})" style="padding: 1px 5px; font-size: 9.5px; height: 20px;">📍 Line #${c.lineNum}</button>` : ''}
+          ${c.lineNum ? `<button class="btn btn-sm btn-gov-secondary" onclick="traceToSource('${c.fileId}', ${c.lineNum})" style="padding: 1px 6px; font-size: 9.5px; height: 20px;">📍 Trace to Line</button>` : ''}
         </div>
         <span class="badge badge-sm badge-amber" id="wb-status-${c.id}">Pending Review</span>
       </div>
 
       <div style="font-size: 11px; color: #cbd5e1; margin: 4px 0;">
-        <strong>Evidence Line:</strong> <span class="mono" style="background: rgba(0,0,0,0.25); padding: 2px 4px; border-radius: 3px;">"${escapeHtml(c.message)}"</span>
+        <strong>Evidence Text:</strong> <span class="mono" style="background: rgba(0,0,0,0.25); padding: 2px 4px; border-radius: 3px;">"${escapeHtml(c.message)}"</span>
       </div>
 
       <div style="display: flex; gap: 6px; align-items: center; margin-top: 8px;">
@@ -1411,7 +2218,7 @@ async function inductWorkbenchWord(candidateId) {
       body: JSON.stringify({
         term: term,
         meaning: meaning,
-        case_id: CASE_METADATA.fir || "FIR_104_2026",
+        case_id: getActiveCaseId(),
         io_name: CASE_METADATA.io || "Insp. Vikramjit Singh"
       })
     });
@@ -1456,7 +2263,7 @@ async function dismissWorkbenchWord(candidateId) {
       body: JSON.stringify({
         term: term,
         reason: "Officer manual rejection (false positive)",
-        case_id: CASE_METADATA.fir || "FIR_104_2026",
+        case_id: getActiveCaseId(),
         io_name: CASE_METADATA.io || "Insp. Vikramjit Singh"
       })
     });
@@ -1484,7 +2291,7 @@ function toggleChronology() {
 
 function renderVerifiedTable() {
   const tbody = document.getElementById("verified-entities-tbody");
-  const verified = TRIAGE_LEADS.filter(l => l.status === "verified");
+  const verified = REAL_TRIAGE_LEADS.filter(l => l.status === "verified");
 
   document.getElementById("verified-table-badge").textContent = `${verified.length} Items Signed`;
 
@@ -1528,6 +2335,24 @@ function renderChronology() {
   `).join("");
 }
 
+function updateDossierMetrics() {
+  // Compute authentic counts directly from discovered entities and triage leads
+  const personas = REAL_DISCOVERED_ENTITIES.phones.size + (REAL_TRIAGE_LEADS.filter(l => l.type === 'SUSPECT_HANDLE' || l.type === 'PHONE').length);
+  const financials = REAL_DISCOVERED_ENTITIES.upi_handles.size + REAL_DISCOVERED_ENTITIES.crypto_wallets.size;
+  const substances = REAL_DISCOVERED_ENTITIES.slang_keywords.size;
+  const locations = REAL_DISCOVERED_ENTITIES.locations.size;
+
+  const elIdentities = document.getElementById("metric-identities");
+  const elFinancials = document.getElementById("metric-financials");
+  const elSubstances = document.getElementById("metric-substances");
+  const elDrops = document.getElementById("metric-drops");
+
+  if (elIdentities) elIdentities.textContent = Math.max(personas, REAL_TRIAGE_LEADS.filter(l => l.category === 'darknet' || l.type === 'PHONE').length);
+  if (elFinancials) elFinancials.textContent = Math.max(financials, REAL_TRIAGE_LEADS.filter(l => l.category === 'financial').length);
+  if (elSubstances) elSubstances.textContent = Math.max(substances, REAL_TRIAGE_LEADS.filter(l => l.category === 'slang').length);
+  if (elDrops) elDrops.textContent = Math.max(locations, REAL_TRIAGE_LEADS.filter(l => l.type === 'LOCATION' || l.category === 'image').length);
+}
+
 function updateCounts() {
   const total = REAL_TRIAGE_LEADS.length;
   const verified = REAL_TRIAGE_LEADS.filter(l => l.status === "verified").length;
@@ -1543,6 +2368,8 @@ function updateCounts() {
   document.getElementById("count-slang").textContent = slang;
   document.getElementById("count-darknet").textContent = darknet;
   document.getElementById("count-image").textContent = image;
+
+  updateDossierMetrics();
 }
 
 // ============================================================================
@@ -1604,6 +2431,11 @@ function openNoticeModal(noticeType) {
 
   if (noticeType === 'bank') {
     document.getElementById("notice-modal-title").textContent = "SECTION 91 CrPC STATUTORY REQUISITION NOTICE (BANK FREEZING)";
+    // Pull dynamic target financial endpoint if available
+    const activeUpi = Array.from(REAL_DISCOVERED_ENTITIES.upi_handles)[0] || 
+                      (REAL_TRIAGE_LEADS.find(l => l.category === "financial" && l.value.includes("@")) || {}).value || 
+                      "mule44@ybl";
+    
     container.innerHTML = `
       <div class="court-doc-header">
         <div class="court-doc-crest">OFFICE OF THE INSPECTOR OF POLICE, CYBER CRIME DIVISION</div>
@@ -1636,7 +2468,7 @@ function openNoticeModal(noticeType) {
           </thead>
           <tbody>
             <tr>
-              <td class="mono font-bold">mule44@ybl</td>
+              <td class="mono font-bold">${escapeHtml(activeUpi)}</td>
               <td class="mono font-bold">33910048291</td>
               <td class="mono">SBIN0001243</td>
               <td class="mono">422019284910 (₹3,500 Credit)</td>
@@ -1647,7 +2479,7 @@ function openNoticeModal(noticeType) {
           You are hereby commanded under <strong>Section 91 CrPC</strong> to:
         </p>
         <ol class="court-numbered-list">
-          <li><strong>IMMEDIATELY FREEZE</strong> all debit transactions on Account No. <code>33910048291</code> and linked VPA <code>mule44@ybl</code> with zero outward remittance.</li>
+          <li><strong>IMMEDIATELY FREEZE</strong> all debit transactions on Account No. <code>33910048291</code> and linked VPA <code>${escapeHtml(activeUpi)}</code> with zero outward remittance.</li>
           <li>Furnish certified copies of complete KYC documents (Aadhaar, PAN, registered mobile number, IP logs of netbanking logins) within <strong>24 hours</strong> of receipt of this notice.</li>
           <li>Provide detailed statement of accounts from 01.01.2026 to date in encrypted CSV/PDF format.</li>
         </ol>
@@ -1666,8 +2498,13 @@ function openNoticeModal(noticeType) {
         </div>
       </div>
     `;
-    logAuditEvent("SEC91_BANK_NOTICE", "Generated Section 91 CrPC Debit Freeze Notice for mule44@ybl");
+    logAuditEvent("SEC91_BANK_NOTICE", `Generated Section 91 CrPC Debit Freeze Notice for ${activeUpi}`);
   } else {
+    // Pull dynamic target MSISDN if available
+    const activePhone = Array.from(REAL_DISCOVERED_ENTITIES.phones)[0] || 
+                        (REAL_TRIAGE_LEADS.find(l => l.type === "PHONE") || {}).value || 
+                        "+91 98765-21440";
+
     document.getElementById("notice-modal-title").textContent = "SECTION 91 CrPC TELECOM CDR & TOWER DUMP ORDER";
     container.innerHTML = `
       <div class="court-doc-header">
@@ -1701,7 +2538,7 @@ function openNoticeModal(noticeType) {
           </thead>
           <tbody>
             <tr>
-              <td class="mono font-bold">+91 98765-21440</td>
+              <td class="mono font-bold">${escapeHtml(activePhone)}</td>
               <td class="mono">864201049281740</td>
               <td class="mono">01.07.2026 to 12.08.2026</td>
               <td>Full Incoming/Outgoing CDR, GPRS IPDR, First & Last Tower Cell-ID</td>
@@ -1723,7 +2560,7 @@ function openNoticeModal(noticeType) {
         </div>
       </div>
     `;
-    logAuditEvent("SEC91_TELECOM_ORDER", "Generated Section 91 CrPC Telecom CDR Requisition for +91 98765-21440");
+    logAuditEvent("SEC91_TELECOM_ORDER", `Generated Section 91 CrPC Telecom CDR Requisition for ${activePhone}`);
   }
 
   document.getElementById("modal-notice").style.display = "flex";

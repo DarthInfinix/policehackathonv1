@@ -11,12 +11,19 @@ import urllib.request
 import json
 import os
 import re
+import time
+import uuid
+import threading
+import hashlib
 import storage
 
 PORT = 8000
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 LLAMA_PORTS = [8012, 8080]
+
+# Async Background Job Tracking for Heavy Operations (OCR, Large Dumps)
+OCR_JOBS = {} # job_id -> {status, filename, started_at, elapsed_sec, result, error}
 
 def get_active_llama_port():
     for p in LLAMA_PORTS:
@@ -53,7 +60,9 @@ class ForensicHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         # API: Full-Text Search
         if path == '/api/search':
             q = params.get('q', [''])[0]
-            case_id = params.get('case_id', ['FIR_104_2026'])[0]
+            case_id = params.get('case_id', [None])[0]
+            if case_id in ('all', '', 'null', 'undefined'):
+                case_id = None
             limit = int(params.get('limit', [50])[0])
             results = storage.search_records_fts(q, case_id=case_id, limit=limit)
             self._set_json_headers(200)
@@ -76,9 +85,24 @@ class ForensicHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(json.dumps({"case_id": case_id, "correlations": correlations}).encode('utf-8'))
             return
 
+        # API: List all Stored Forensic Cases
+        if path == '/api/cases':
+            cases = storage.get_all_cases()
+            self._set_json_headers(200)
+            self.wfile.write(json.dumps({"count": len(cases), "cases": cases}).encode('utf-8'))
+            return
+
+        # API: Cross-Case Intelligence Matches
+        if path == '/api/cross_case_matches':
+            case_id = params.get('case_id', ['FIR_104_2026'])[0]
+            matches = storage.get_cross_case_matches(case_id)
+            self._set_json_headers(200)
+            self.wfile.write(json.dumps({"case_id": case_id, "count": len(matches), "matches": matches}).encode('utf-8'))
+            return
+
         # API: Case Files Ingested (Real Uploads)
         if path == '/api/files':
-            case_id = params.get('case_id', ['FIR_104_2026'])[0]
+            case_id = params.get('case_id', [None])[0]
             files = storage.get_case_files(case_id)
             self._set_json_headers(200)
             self.wfile.write(json.dumps({"case_id": case_id, "count": len(files), "files": files}).encode('utf-8'))
@@ -99,6 +123,83 @@ class ForensicHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             leads = storage.get_dynamic_triage_leads(case_id)
             self._set_json_headers(200)
             self.wfile.write(json.dumps({"case_id": case_id, "count": len(leads), "leads": leads}).encode('utf-8'))
+            return
+
+        # API: Seized Evidence Image Serving
+        if path == '/api/evidence_image':
+            file_id = params.get('file_id', [''])[0]
+            img_path = storage.get_evidence_image_path(file_id)
+            if not img_path or not os.path.isfile(img_path):
+                self._set_json_headers(404)
+                self.wfile.write(b'{"status": "error", "message": "Evidence image not found"}')
+                return
+            
+            ext = os.path.splitext(img_path)[1].lower()
+            mime_type = "image/png"
+            if ext in [".jpg", ".jpeg"]:
+                mime_type = "image/jpeg"
+            elif ext == ".webp":
+                mime_type = "image/webp"
+            elif ext == ".bmp":
+                mime_type = "image/bmp"
+
+            try:
+                with open(img_path, "rb") as f:
+                    data = f.read()
+                self.send_response(200)
+                self.send_header('Content-Type', mime_type)
+                self.send_header('Content-Length', str(len(data)))
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.send_header('Cache-Control', 'public, max-age=3600')
+                self.end_headers()
+                self.wfile.write(data)
+                return
+            except Exception as e:
+                self._set_json_headers(500)
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+                return
+
+        # API: Local Air-Gapped OCR Status Check (dots.ocr + Tesseract)
+        if path == '/api/ocr_status':
+            import ocr_worker
+            dots_cfg = ocr_worker.get_dots_ocr_config()
+            tess_bin = ocr_worker.get_tesseract_binary()
+            
+            primary_engine = "dots.ocr (Qwen2-1.7B ViT Neural VLM)" if dots_cfg else "Tesseract 5.5.2 (Local Air-Gapped)"
+            available = bool(dots_cfg or tess_bin)
+
+            self._set_json_headers(200)
+            self.wfile.write(json.dumps({
+                "status": "available" if available else "unavailable",
+                "primary_engine": primary_engine,
+                "dots_ocr": bool(dots_cfg),
+                "dots_model": dots_cfg["model"] if dots_cfg else None,
+                "tesseract": bool(tess_bin),
+                "tesseract_path": tess_bin,
+                "supported_formats": ["png", "jpg", "jpeg", "webp", "bmp", "tiff"],
+                "compliance": "Section 63(4) Bharatiya Sakshya Adhiniyam, 2023 Forensic Standard"
+            }).encode('utf-8'))
+            return
+
+        # API: Async OCR / Ingest Job Polling
+        if path == '/api/ocr/job_status':
+            job_id = params.get('job_id', [''])[0]
+            if not job_id or job_id not in OCR_JOBS:
+                self._set_json_headers(404)
+                self.wfile.write(json.dumps({"status": "not_found", "message": f"Job {job_id} not found"}).encode('utf-8'))
+                return
+            
+            job = OCR_JOBS[job_id]
+            elapsed = round(time.time() - job["started_at"], 1)
+            self._set_json_headers(200)
+            self.wfile.write(json.dumps({
+                "job_id": job_id,
+                "status": job["status"],
+                "filename": job["filename"],
+                "elapsed_sec": elapsed,
+                "result": job.get("result"),
+                "error": job.get("error")
+            }).encode('utf-8'))
             return
 
         # API: SLM Status Check
@@ -181,10 +282,11 @@ class ForensicHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         # API: Transactional Candidates for Codeword Induction
         if path == '/api/candidates':
             case_id = params.get('case_id', [None])[0]
-            limit = int(params.get('limit', [15])[0])
-            cands = storage.get_transactional_candidates(case_id, limit=limit)
+            file_id = params.get('file_id', [None])[0]
+            limit = int(params.get('limit', [25])[0])
+            cands = storage.get_transactional_candidates(case_id, file_id=file_id, limit=limit)
             self._set_json_headers(200)
-            self.wfile.write(json.dumps({"status": "success", "count": len(cands), "candidates": cands}).encode('utf-8'))
+            self.wfile.write(json.dumps({"status": "success", "count": len(cands), "file_id": file_id, "candidates": cands}).encode('utf-8'))
             return
 
         # API: Confirmed Inducted Slang Dictionary
@@ -347,11 +449,13 @@ Evasion Code Word:"""
 
                 storage.log_audit(case_id, "CODEWORD_INDUCTED", f"Investigator inducted new evasion codeword: '{term}' (Meaning: {meaning}) into precinct dictionary.", performed_by=io_name)
 
+                hash_digest = hashlib.sha256(f"{term}:{meaning}:{now_str}".encode('utf-8')).hexdigest()
                 self._set_json_headers(200)
                 self.wfile.write(json.dumps({
                     "status": "success",
                     "term": term,
                     "meaning": meaning,
+                    "hash": hash_digest,
                     "audit": f"Recorded under Section 63 BSA audit trail."
                 }).encode('utf-8'))
                 return
@@ -408,7 +512,8 @@ Evasion Code Word:"""
             try:
                 params = urllib.parse.parse_qs(parsed.query)
                 case_id = params.get('case_id', ['FIR_104_2026'])[0]
-                result = storage.load_default_demo_datasets(case_id)
+                dataset_type = params.get('type', ['default'])[0]
+                result = storage.load_default_demo_datasets(case_id, dataset_type=dataset_type)
                 self._set_json_headers(200)
                 self.wfile.write(json.dumps(result).encode('utf-8'))
                 return
@@ -465,6 +570,27 @@ Evasion Code Word:"""
                 }).encode('utf-8'))
                 return
 
+        if path == '/api/cases/create':
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length) if content_length > 0 else b'{}'
+                data = json.loads(body.decode('utf-8')) if body else {}
+                case_id = data.get('case_id') or f"FIR_{uuid.uuid4().hex[:8].upper()}"
+                fir_number = data.get('fir_number') or f"FIR No. {uuid.uuid4().hex[:4].upper()}/2026/CYBER"
+                police_station = data.get('police_station', "PS Cyber Crime, Sector 17, Chandigarh")
+                io_name = data.get('io_name', "Insp. Vikramjit Singh")
+                io_belt = data.get('io_belt', "Belt #788-UT")
+                category = data.get('category', "NDPS_CYBER")
+
+                res = storage.create_or_update_case(case_id, fir_number, police_station, io_name, io_belt, category)
+                self._set_json_headers(200)
+                self.wfile.write(json.dumps({"status": "success", "case": res}).encode('utf-8'))
+                return
+            except Exception as e:
+                self._set_json_headers(500)
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+                return
+
         if path == '/api/upload':
             try:
                 content_length = int(self.headers.get('Content-Length', 0))
@@ -487,8 +613,53 @@ Evasion Code Word:"""
                     filename = params.get('filename', [self.headers.get('X-Filename', 'evidence_dump.txt')])[0]
                     content_bytes = raw_body
 
-                # Ingest through storage engine
-                result = storage.parse_and_ingest_file(case_id, filename, content_bytes)
+                # Check query options: skip_ocr and engine preference
+                params = urllib.parse.parse_qs(parsed.query)
+                skip_ocr = params.get('skip_ocr', ['0'])[0] in ('1', 'true', 'yes')
+                engine_pref = params.get('engine', ['auto'])[0]
+
+                # Check if async execution is requested or if it's an image file requiring OCR
+                is_async = params.get('async', ['0'])[0] == '1'
+                import ocr_worker
+                is_image = ocr_worker.is_image_data(filename, content_bytes[:32])
+
+                if not skip_ocr and (is_async or is_image):
+                    job_id = f"JOB_{uuid.uuid4().hex[:10]}"
+                    OCR_JOBS[job_id] = {
+                        "status": "processing",
+                        "filename": filename,
+                        "started_at": time.time(),
+                        "result": None,
+                        "error": None
+                    }
+
+                    def run_async_ingest(j_id, c_id, f_name, b_bytes, eng):
+                        try:
+                            res = storage.parse_and_ingest_file(c_id, f_name, b_bytes, skip_ocr=False, engine_preference=eng)
+                            corrs = storage.get_cross_source_correlations(c_id)
+                            res["active_correlations"] = corrs
+                            OCR_JOBS[j_id]["status"] = "completed"
+                            OCR_JOBS[j_id]["result"] = res
+                        except Exception as ex:
+                            import traceback
+                            traceback.print_exc()
+                            OCR_JOBS[j_id]["status"] = "failed"
+                            OCR_JOBS[j_id]["error"] = str(ex)
+
+                    thread = threading.Thread(target=run_async_ingest, args=(job_id, case_id, filename, content_bytes, engine_pref), daemon=True)
+                    thread.start()
+
+                    self._set_json_headers(200)
+                    self.wfile.write(json.dumps({
+                        "status": "processing",
+                        "job_id": job_id,
+                        "filename": filename,
+                        "message": f"Processing {filename} asynchronously via {engine_pref} neural engine."
+                    }).encode('utf-8'))
+                    return
+
+                # Ingest synchronous text/CSV or image with skip_ocr through storage engine
+                result = storage.parse_and_ingest_file(case_id, filename, content_bytes, skip_ocr=skip_ocr, engine_preference=engine_pref)
 
                 # Discover any correlations
                 correlations = storage.get_cross_source_correlations(case_id)

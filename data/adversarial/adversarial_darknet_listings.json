@@ -1,0 +1,43 @@
+{
+  "marketplace": "DarkHydra V3 Onion Marketplace",
+  "onion_url": "http://darkhydra7v6x9qwer2p0kmnztasdf12345.onion",
+  "generated_at": "2026-09-04T12:00:00Z",
+  "pgp_signed": true,
+  "messages": [
+    {
+      "id": "item_101",
+      "type": "message",
+      "from": "DarkHydra_Admin",
+      "date": "2026-09-04 10:00:00",
+      "text": "MARKET BULLETIN: Tricity Regional Node (Chandigarh / Panchkula / Mohali) active. Fast escrow release upon tracking receipt. All vendors must follow stealth packaging."
+    },
+    {
+      "id": "item_102",
+      "type": "message",
+      "from": "chd_plug_official",
+      "date": "2026-09-04 10:15:00",
+      "text": "[LISTING #9021] High Purity Research Reagent 4-MMC (Mephedrone / Meow Meow) - 10g Pack. Vacuum sealed in metallic foil coffee bag. Purity tested 99.2%. Escrow accepted. Price: 145 USDT (TRC-20)."
+    },
+    {
+      "id": "item_103",
+      "type": "message",
+      "from": "chd_plug_official",
+      "date": "2026-09-04 10:20:00",
+      "text": "[PAYMENT ADVISORY] Send TRON USDT strictly to: TJ4V87qR984b2cNmQ7yXkL99pQ12345678 or BTC to 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa. For local fiat wire, ping Telegram @chd_plug with order number."
+    },
+    {
+      "id": "item_104",
+      "type": "message",
+      "from": "tricity_distro",
+      "date": "2026-09-04 10:45:00",
+      "text": "[LISTING #9022] Grade-4 White Canvas Shoes (Heroin / Chitta Afghan Origin) - 5g Samples. Hand to hand dead-drop at Sector 22, Sector 17, and Phase 7 Mohali. No UPI on-market, strictly escrow."
+    },
+    {
+      "id": "item_105",
+      "type": "message",
+      "from": "chd_plug_official",
+      "date": "2026-09-04 11:10:00",
+      "text": "CUSTOMER NOTICE: For UPI settlement through domestic payment aggregators, contact our dispatch coordinator at phone 9814022341 or WhatsApp runner. Payment handle: 9814022341@paytm."
+    }
+  ]
+}

@@ -22,6 +22,7 @@
           <div class="gov-dept-name">CHANDIGARH POLICE &bull; CYBER CRIME INVESTIGATION DIVISION</div>
           <div class="gov-case-info">
             <span class="case-tag" id="header-case-tag">NEW CASE FILE</span>
+            <select id="header-case-select" class="gov-input mono" style="font-size: 11px; padding: 2px 6px; height: 24px; background: #0f172a; color: #38bdf8; border: 1px solid #334155; display: none;" onchange="handleHeaderCaseSwitch(this.value)"></select>
             <span class="case-detail" id="header-case-meta">Air-Gapped Forensic Triage System (BSA 2023 Compliant)</span>
           </div>
         </div>
@@ -81,10 +82,31 @@
         <div class="wizard-card-header">
           <span class="wizard-step-label">STEP 1 OF 4</span>
           <h1 class="wizard-card-title">Case Registration & Officer Intake</h1>
-          <p class="wizard-card-sub">Enter statutory case details for Section 63 BSA legal chain of custody.</p>
+          <p class="wizard-card-sub">Select an existing FIR from the precinct repository or register a new case for Section 63 BSA chain of custody.</p>
         </div>
 
         <div class="wizard-form-body">
+          <!-- Case Selection & Randomization Banner -->
+          <div style="background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label class="form-label" style="margin-bottom: 0; font-size: 11px; font-weight: 700; color: #38bdf8;">
+                SELECT ACTIVE / HISTORICAL PRECINCT CASE:
+              </label>
+              <span class="badge badge-sm badge-blue" id="intake-case-status-badge">New Case</span>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <select id="select-existing-case" class="gov-input" style="flex: 1; font-size: 11.5px; background: #1e293b; color: #f8fafc; border: 1px solid #475569;" onchange="handleSelectExistingCase(this.value)">
+                <option value="NEW">＋ [Create New Investigation Case]</option>
+              </select>
+              <button type="button" class="btn btn-gov-secondary btn-sm" onclick="randomizeNewCase()" title="Generate unique randomized FIR & IO credentials" style="white-space: nowrap;">
+                <span>🎲</span> Randomize Case
+              </button>
+            </div>
+            <div id="selected-case-summary" class="mono text-xs text-muted" style="margin-top: 6px; font-size: 10px;">
+              Cross-case referencing active: entities will auto-link across all precinct FIRs in SQLite.
+            </div>
+          </div>
+
           <div class="form-grid-2col">
             <div class="form-group">
               <label class="form-label">FIR / Case Reference Number *</label>
@@ -123,9 +145,14 @@
         </div>
 
         <div class="wizard-card-footer flex-between">
-          <button class="btn btn-autofill btn-sm" onclick="autofillCaseDetails()">
-            <span>⚡</span> Autofill Demo Case (FIR-104 Sector 17)
-          </button>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-autofill btn-sm" onclick="autofillCaseDetails()">
+              <span>⚡</span> Autofill Demo (FIR-104)
+            </button>
+            <button class="btn btn-gov-secondary btn-sm" onclick="randomizeNewCase()">
+              <span>🎲</span> Randomize
+            </button>
+          </div>
           <button class="btn btn-gov-primary" onclick="proceedToStep2()">
             Proceed to Evidence Media Intake ➔
           </button>
@@ -145,18 +172,35 @@
         </div>
 
         <div class="wizard-form-body">
-          <input type="file" id="real-file-input" multiple style="display: none;" onchange="handleRealFilesSelected(this.files)">
+          <input type="file" id="real-file-input" multiple accept="image/*,.png,.jpg,.jpeg,.webp,.csv,.json,.txt" style="display: none;" onchange="handleRealFilesSelected(this.files)">
           <div class="drop-zone-large" id="main-drop-zone" onclick="document.getElementById('real-file-input').click()">
             <div class="drop-zone-icon">📥</div>
-            <div class="drop-zone-title font-bold">Select or Drop Seized Evidence & Darknet Feeds</div>
-            <div class="drop-zone-desc text-muted">Supports Tor .onion HTML/JSON, Telegram dumps, WhatsApp exports, and Bank CSVs</div>
-            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 12px;">
+            <div class="drop-zone-desc text-muted">Supports Seized Screenshots (WhatsApp/Telegram chats, Paytm/PhonePe receipts), Tor .onion HTML/JSON, Telegram dumps, and Bank CSVs</div>
+            <div style="margin-top: 8px; display: flex; gap: 8px; justify-content: center; align-items: center;">
+              <span class="badge badge-sm badge-blue" id="active-ocr-engine-badge">📸 Neural OCR: dots.ocr (Qwen2-1.7B ViT) Active</span>
+              <span class="badge badge-sm badge-green">Air-Gapped Local Inference</span>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 12px; flex-wrap: wrap;">
               <button type="button" class="btn btn-gov-primary btn-sm" onclick="event.stopPropagation(); document.getElementById('real-file-input').click();">
-                <span>📂</span> Browse Seized Files
+                <span>📂</span> Browse Seized Files / Images
               </button>
-              <button type="button" class="btn btn-gov-secondary btn-sm" onclick="event.stopPropagation(); autofillEvidenceFiles();">
-                <span>⚡</span> Load Pre-Staged Datasets
+              <button type="button" class="btn btn-gov-secondary btn-sm" onclick="event.stopPropagation(); autofillEvidenceFiles('default');">
+                <span>⚡</span> Load Pre-Staged Datasets & OCR
               </button>
+              <button type="button" class="btn btn-sm" onclick="event.stopPropagation(); autofillEvidenceFiles('adversarial');" style="background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #f87171; font-weight: 600;" title="Stress test with Hinglish, l33tspeak, split structuring, and darknet listings">
+                <span>⚔️</span> Load Adversarial Stress Corpus
+              </button>
+            </div>
+          </div>
+
+          <!-- Staged Media & Exhibits Review Queue with Previews & OCR Toggles -->
+          <div id="staged-preview-section" style="display: none; margin-top: 14px;">
+            <div class="section-subhead flex-between" style="margin-bottom: 6px;">
+              <span>STAGED EXHIBITS (PREVIEWS & OCR SELECTION)</span>
+              <span class="badge badge-sm badge-blue" id="staged-count-badge">0 Files Staged</span>
+            </div>
+            <div id="staged-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px;">
+              <!-- Staged file preview cards dynamically rendered by JS -->
             </div>
           </div>
 
@@ -242,8 +286,42 @@
         </div>
 
         <div class="wizard-form-body">
+          <!-- Engine Preset Selection: Light vs Accuracy -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label class="form-label" style="margin-bottom: 6px;">Pipeline Execution Preset *</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <!-- Light Mode (Default Preset) -->
+              <div id="preset-card-light" class="preset-mode-card active" onclick="setEnginePreset('light')" style="cursor: pointer; padding: 12px; border: 2px solid #10b981; background: rgba(16, 185, 129, 0.08); border-radius: 6px; transition: all 0.2s; box-shadow: 0 0 10px rgba(16, 185, 129, 0.15);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <span style="font-weight: 700; font-size: 12px; color: #10b981;">⚡ LIGHT MODE (FAST / ZERO GPU)</span>
+                  <span class="badge badge-sm badge-green">Default Preset</span>
+                </div>
+                <p style="font-size: 11px; color: #94a3b8; margin: 0 0 8px 0; line-height: 1.35;">
+                  Deterministic regex & financial NER + fast Tesseract OCR. Zero model token latency, ideal for low-spec precinct workstations or instant initial triage.
+                </p>
+                <div style="font-size: 10px; color: #10b981; font-weight: 600;">
+                  ⚡ Tesseract 5.5.2 + Deterministic Financial Regex
+                </div>
+              </div>
+
+              <!-- Accuracy Mode (Neural SLM) -->
+              <div id="preset-card-accuracy" class="preset-mode-card" onclick="setEnginePreset('accuracy')" style="cursor: pointer; padding: 12px; border: 1px solid #334155; background: rgba(15, 23, 42, 0.6); border-radius: 6px; transition: all 0.2s;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <span style="font-weight: 700; font-size: 12px; color: #38bdf8;">🧠 ACCURACY MODE (DEEP INFERENCE)</span>
+                  <span class="badge badge-sm badge-blue">LiquidAI + dots.ocr</span>
+                </div>
+                <p style="font-size: 11px; color: #94a3b8; margin: 0 0 8px 0; line-height: 1.35;">
+                  Deep contextual triage using LiquidAI (LFM2.5) for multilingual drug slang & intent disambiguation + dots.ocr (1.7B ViT) for complex dark-mode chats & handwriting.
+                </p>
+                <div style="font-size: 10px; color: #38bdf8; font-weight: 600;">
+                  ⚡ LiquidAI (Port 8012) + dots.ocr ViT Neural VLM
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- SillyTavern-style Local Server Endpoint Configuration -->
-          <div class="form-group">
+          <div class="form-group" id="group-slm-endpoint">
             <div class="flex-between" style="margin-bottom: 4px;">
               <label class="form-label" style="margin-bottom: 0;">Offline SLM Inference Server URL *</label>
               <span id="server-ping-badge" class="badge badge-sm badge-neutral">● Not Connected</span>
@@ -341,22 +419,21 @@
         <div class="wizard-form-body">
           <div class="pipeline-progress-bar-wrapper">
             <div class="flex-between text-xs mono" style="margin-bottom: 5px;">
-              <span id="pipeline-status-text">Step 1/5: Verifying SHA-256 Checksums...</span>
-              <span id="pipeline-percentage">20%</span>
+              <span id="pipeline-status-text">Initializing local inference pipeline...</span>
+              <span id="pipeline-percentage">0%</span>
             </div>
             <div class="bar-track">
-              <div class="bar-fill bar-blue" id="pipeline-progress-fill" style="width: 20%;"></div>
+              <div class="bar-fill bar-blue" id="pipeline-progress-fill" style="width: 0%;"></div>
             </div>
           </div>
 
-          <div class="pipeline-terminal-box mono" id="pipeline-terminal-logs">
-            <div class="log-line">[0.01s] [INGEST] Ingested 5 multi-source files into Universal Forensic Message Envelope (UFME).</div>
-            <div class="log-line">[0.04s] [CRYPTO] Calculated SHA-256 hash: e3b0c44298fc1c14... [VERIFIED]</div>
+          <div class="pipeline-terminal-box mono" id="pipeline-terminal-logs" style="max-height: 240px; overflow-y: auto; background: #020617; border: 1px solid #1e293b; padding: 10px; border-radius: 4px; font-size: 11px; line-height: 1.45;">
+            <div class="log-line text-muted">[00:00:00] [SYSTEM] Ready to ingest evidence into Universal Forensic Message Envelope (UFME).</div>
           </div>
         </div>
 
         <div class="wizard-card-footer flex-between">
-          <span class="text-xs text-muted">Estimated processing time: ~3 seconds</span>
+          <span class="text-xs text-muted" id="pipeline-footer-msg">Air-gapped execution: local Apple M4 GPU & CPU</span>
           <button class="btn btn-gov-primary btn-sm" id="btn-skip-loading" onclick="finishLoadingPipeline()" style="display: none;">
             Enter Investigative Workbench ➔
           </button>
@@ -382,7 +459,7 @@
             <button class="btn btn-sm btn-gov-primary" onclick="document.getElementById('panel-file-input').click()" style="padding: 3px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">
               <span>＋ Ingest File</span>
             </button>
-            <input type="file" id="panel-file-input" multiple style="display: none;" onchange="handlePanelFilesSelected(this.files)">
+            <input type="file" id="panel-file-input" multiple accept="image/*,.png,.jpg,.jpeg,.webp,.csv,.json,.txt" style="display: none;" onchange="handlePanelFilesSelected(this.files)">
             <span class="record-counter" id="evidence-files-count">0 Files Loaded</span>
           </div>
         </div>
@@ -412,7 +489,20 @@
           </div>
         </div>
 
-        <div class="raw-viewer-toolbar">
+        <!-- Evidence View Mode Toggle Bar (Visible for Image OCR Exhibits) -->
+        <div class="evidence-view-toggle" id="evidence-view-toggle-bar" style="display: none; padding: 6px 12px; background: #0f172a; border-bottom: 1px solid var(--border-color); align-items: center; justify-content: space-between;">
+          <div style="display: flex; gap: 6px;">
+            <button id="view-mode-text-btn" class="btn btn-sm btn-gov-primary" onclick="setEvidenceViewMode('text')" style="padding: 3px 8px; font-size: 11px;">
+              📄 OCR Stream
+            </button>
+            <button id="view-mode-image-btn" class="btn btn-sm btn-gov-secondary" onclick="setEvidenceViewMode('image')" style="padding: 3px 8px; font-size: 11px;">
+              📸 Seized Screenshot Original
+            </button>
+          </div>
+          <span id="ocr-confidence-pill" class="badge badge-sm badge-blue" style="font-size: 10px;">OCR Engine: Tesseract 5.5.2</span>
+        </div>
+
+        <div class="raw-viewer-toolbar" id="raw-viewer-toolbar">
           <div class="search-input-wrapper">
             <span class="search-icon">🔍</span>
             <input type="text" id="raw-search-input" placeholder="Search line text (UPI, phone, slang)..." oninput="filterRawLines()">
@@ -422,6 +512,18 @@
 
         <div class="raw-line-viewer" id="raw-lines-container">
           <!-- Rendered by JS -->
+        </div>
+
+        <!-- Seized Screenshot Exhibit Viewer -->
+        <div class="evidence-image-viewer" id="evidence-image-container" style="display: none; height: calc(100% - 210px); overflow-y: auto; text-align: center; padding: 12px; background: #0b1120;">
+          <div style="margin-bottom: 8px; font-size: 11px; color: #94a3b8; display: flex; justify-content: space-between; align-items: center;">
+            <span class="font-bold text-xs" style="color: #38bdf8;">SEIZED EXHIBIT (SECTION 63(4) BSA FORENSIC PREVIEW)</span>
+            <a id="image-download-link" href="#" target="_blank" class="text-blue" style="text-decoration: underline; font-size: 11px;">Full Resolution ↗</a>
+          </div>
+          <div class="evidence-img-wrapper" style="position: relative; display: inline-block; max-width: 100%; border: 1px solid #334155; border-radius: 6px; overflow: hidden; background: #020617; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+            <img id="evidence-screenshot-img" src="" alt="Seized Evidence Screenshot" style="max-width: 100%; max-height: 480px; display: block; object-fit: contain; margin: 0 auto;">
+          </div>
+          <div id="image-meta-subtext" class="text-muted text-xs mono" style="margin-top: 8px;">--</div>
         </div>
       </section>
 
@@ -452,6 +554,17 @@
           <span>🛡️ <strong>Anti-Framing Guardrail:</strong> Multi-factor scoring cross-checks chat text against bank CSVs to prevent malicious false reporting.</span>
         </div>
 
+        <!-- Cross-Case Corroboration Alert Banner -->
+        <div id="cross-case-banner" style="display: none; margin-bottom: 10px; background: rgba(239, 68, 68, 0.08); border: 1px solid #ef4444; border-radius: 6px; padding: 10px 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span class="font-bold text-xs" style="color: #ef4444; display: flex; align-items: center; gap: 6px;">
+              <span>⚠️</span> CROSS-CASE INTELLIGENCE CORROBORATIONS (<span id="cross-case-match-count">0</span> MATCHES DETECTED)
+            </span>
+            <span class="badge badge-sm badge-red">PRECINCT SYNDICATE LINK</span>
+          </div>
+          <div id="cross-case-match-list" style="display: flex; flex-direction: column; gap: 6px; font-size: 11px;"></div>
+        </div>
+
         <div class="triage-cards-container" id="triage-cards-container">
           <!-- Rendered by JS -->
         </div>
@@ -469,7 +582,6 @@
           <div class="view-switch-tabs">
             <button class="view-tab active" id="tab-btn-dossier" onclick="switchRightPanelTab('dossier')">Target Summary</button>
             <button class="view-tab" id="tab-btn-graph" onclick="switchRightPanelTab('graph')">Network Graph</button>
-            <button class="view-tab" id="tab-btn-trends" onclick="switchRightPanelTab('trends')">Corpus Trends</button>
             <button class="view-tab" id="tab-btn-induction" onclick="switchRightPanelTab('induction')">⚡ Slang Induction</button>
           </div>
         </div>
@@ -510,23 +622,28 @@
             <div class="antifragile-candidate-card" id="harvester-candidate-box">
               <div class="flex-between">
                 <div>
-                  <span class="mono font-bold text-purple" style="font-size: 12px;">Candidate: "Ice Tea"</span>
-                  <span class="badge badge-sm badge-neutral" style="margin-left: 6px;">Frequency: 3</span>
+                  <span class="mono font-bold text-purple" style="font-size: 12px;">Active Lexicon Induction Core</span>
                 </div>
-                <span class="badge badge-sm badge-amber">Syntactic Anomaly (89%)</span>
+                <span class="badge badge-sm badge-green">Zero Cloud Dependencies</span>
               </div>
-              <p class="text-xs text-muted" style="margin: 4px 0;">
-                Inferred: Liquid Synthetic Stimulant / Ketamine. Appeared in commodity slot with rate ₹1500 (Line 6).
+              <p class="text-xs text-muted" style="margin: 6px 0;">
+                Review, confirm, or reject AI-induced evasive contraband nouns with full Line-to-Source evidence tracing.
               </p>
-              <div class="flex-gap" style="margin-top: 6px;">
-                <button class="btn btn-sm btn-gov-primary" onclick="approveHarvestedCodeword('Ice Tea', 'Liquid Synthetic Stimulant / Ketamine', 'Stimulant / Synthetic')">
-                  ✓ Approve & Add to Lexicon
-                </button>
-                <button class="btn btn-sm btn-gov-secondary" onclick="dismissHarvestedCodeword()">
-                  ✗ Dismiss
+              <div class="flex-gap" style="margin-top: 8px;">
+                <button class="btn btn-sm btn-gov-primary" onclick="switchRightPanelTab('induction')">
+                  ⚡ Open Slang Induction Workbench ➔
                 </button>
               </div>
             </div>
+          </div>
+
+          <!-- CROSS-CASE INTELLIGENCE & SYNDICATE NETWORK SECTION -->
+          <div class="dossier-section" id="dossier-cross-case-section" style="display: none; border-left: 3px solid #ef4444;">
+            <div class="section-subhead">
+              <span>⚠️ CROSS-CASE CRIME SYNDICATE LINKS</span>
+              <span class="badge badge-sm badge-red" id="dossier-cross-case-badge">0 Corroborations</span>
+            </div>
+            <div id="dossier-cross-case-content" style="font-size: 11px; margin-top: 6px; line-height: 1.45;"></div>
           </div>
 
           <!-- TACTICAL FIELD DISPATCH & WHATSAPP MODALITY -->
@@ -607,10 +724,10 @@
           <div class="graph-header-banner">
             <div class="flex-between">
               <span class="font-bold text-xs">ENTITY-RELATIONSHIP LINK GRAPH</span>
-              <span class="badge badge-sm badge-blue">6 Connected Nodes</span>
+              <span class="badge badge-sm badge-neutral" id="graph-linkage-badge">Corroborated Links</span>
             </div>
             <p class="text-xs text-muted" style="margin-top: 2px;">
-              Visual cross-correlation between Tor Darknet listings, Telegram syndicate handles, crypto wallets, and domestic bank accounts.
+              Visual cross-correlation between Tor Darknet vendors, encrypted messenger handles, crypto wallets, and domestic banking endpoints.
             </p>
           </div>
 
@@ -618,7 +735,7 @@
             <!-- Minimalist Interactive SVG Graph Rendered by JS -->
           </div>
 
-          <div class="graph-legend-box">
+          <div class="graph-legend-box" id="graph-legend-box">
             <div class="legend-item"><span class="legend-dot dot-purple"></span> Tor Marketplace</div>
             <div class="legend-item"><span class="legend-dot dot-blue"></span> Target Persona</div>
             <div class="legend-item"><span class="legend-dot dot-amber"></span> Financial / Wallet</div>
@@ -626,138 +743,36 @@
           </div>
         </div>
 
-        <!-- VIEW C: EVOLVING TRENDS RADAR (CORPUS ANALYTICS) -->
-        <div class="tab-content" id="tab-content-trends">
-          <div class="trends-summary-banner">
-            <div>
-              <h3 class="trends-banner-title">CORPUS INTELLIGENCE: 1,870 CHATS ANALYZED</h3>
-              <p class="trends-banner-desc">Observed shifts in payment rails, surrogate slang terminology, and active time windows.</p>
-            </div>
-          </div>
-
-          <div class="dossier-section">
-            <div class="section-subhead">
-              <span>PAYMENT METHODS OBSERVED IN CORPUS</span>
-            </div>
-            <div class="trend-bars-container">
-              <div class="trend-bar-row">
-                <div class="trend-bar-meta">
-                  <span class="trend-name">UPI / Domestic Accounts</span>
-                  <span class="trend-val mono">52% (972 mentions)</span>
-                </div>
-                <div class="bar-track"><div class="bar-fill bar-blue" style="width: 52%;"></div></div>
-              </div>
-              <div class="trend-bar-row">
-                <div class="trend-bar-meta">
-                  <span class="trend-name">TRON USDT (TRC-20 Stablecoin)</span>
-                  <span class="trend-val mono text-blue">28% (523 mentions)</span>
-                </div>
-                <div class="bar-track"><div class="bar-fill bar-amber" style="width: 28%;"></div></div>
-              </div>
-              <div class="trend-bar-row">
-                <div class="trend-bar-meta">
-                  <span class="trend-name">E-Commerce Gift Cards (Amazon/Flipkart)</span>
-                  <span class="trend-val mono">14% (261 mentions)</span>
-                </div>
-                <div class="bar-track"><div class="bar-fill bar-purple" style="width: 14%;"></div></div>
-              </div>
-              <div class="trend-bar-row">
-                <div class="trend-bar-meta">
-                  <span class="trend-name">Cash on Dead-Drop</span>
-                  <span class="trend-val mono text-muted">6% (114 mentions)</span>
-                </div>
-                <div class="bar-track"><div class="bar-fill bar-muted" style="width: 6%;"></div></div>
-              </div>
-            </div>
-            <div class="trend-insight-box">
-              <strong>Pattern Note:</strong> Bulk transactions (>₹15,000) consistently request TRON USDT or e-gift cards rather than direct UPI transfers to avoid 1930 freezing notices.
-            </div>
-          </div>
-
-          <div class="dossier-section">
-            <div class="section-subhead">
-              <span>SURROGATE CODEWORD & SLANG OCCURRENCES</span>
-            </div>
-            <table class="gov-table">
-              <thead>
-                <tr>
-                  <th>CODEWORD / EMOJI</th>
-                  <th>RESOLVED MEANING</th>
-                  <th>COUNT</th>
-                  <th>STATUS</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><span class="mono font-bold">"Chitta" / "White"</span></td>
-                  <td>Heroin (Diacetylmorphine)</td>
-                  <td class="mono">412</td>
-                  <td><span class="badge badge-sm badge-red">High Volume</span></td>
-                </tr>
-                <tr>
-                  <td><span class="mono font-bold">"Stamp Paper" / 📄</span></td>
-                  <td>LSD Blotter Sheets</td>
-                  <td class="mono">189</td>
-                  <td><span class="badge badge-sm badge-amber">Active</span></td>
-                </tr>
-                <tr>
-                  <td><span class="mono font-bold">"White Shoes (Size 5g)"</span></td>
-                  <td>Cocaine / Meth Surrogate</td>
-                  <td class="mono">94</td>
-                  <td><span class="badge badge-sm badge-blue">New Code</span></td>
-                </tr>
-                <tr>
-                  <td><span class="mono font-bold">"Meow / 4-MMC"</span></td>
-                  <td>Mephedrone (Synthetic)</td>
-                  <td class="mono">76</td>
-                  <td><span class="badge badge-sm badge-neutral">Stable</span></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="dossier-section">
-            <div class="section-subhead">
-              <span>HOURLY ACTIVITY DISTRIBUTION (24-HOUR IST)</span>
-            </div>
-            <div class="temporal-chart-wrapper">
-              <div class="temporal-hour-bars">
-                <div class="hour-col"><div class="hour-fill" style="height: 80%;"></div><span>00h</span></div>
-                <div class="hour-col"><div class="hour-fill" style="height: 95%;"></div><span>02h</span></div>
-                <div class="hour-col"><div class="hour-fill" style="height: 60%;"></div><span>04h</span></div>
-                <div class="hour-col"><div class="hour-fill" style="height: 20%;"></div><span>06h</span></div>
-                <div class="hour-col"><div class="hour-fill" style="height: 10%;"></div><span>08h</span></div>
-                <div class="hour-col"><div class="hour-fill" style="height: 15%;"></div><span>10h</span></div>
-                <div class="hour-col"><div class="hour-fill" style="height: 25%;"></div><span>12h</span></div>
-                <div class="hour-col"><div class="hour-fill" style="height: 35%;"></div><span>14h</span></div>
-                <div class="hour-col"><div class="hour-fill" style="height: 45%;"></div><span>16h</span></div>
-                <div class="hour-col"><div class="hour-fill" style="height: 70%;"></div><span>18h</span></div>
-                <div class="hour-col"><div class="hour-fill" style="height: 85%;"></div><span>20h</span></div>
-                <div class="hour-col"><div class="hour-fill" style="height: 90%;"></div><span>22h</span></div>
-              </div>
-              <div class="temporal-label mono text-muted">
-                Peak transaction handoff window: <strong>22:00 – 03:30 IST</strong>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- VIEW D: ACTIVE CODEWORD INDUCTION & LEXICON GOVERNANCE -->
+        <!-- VIEW C: ACTIVE CODEWORD INDUCTION & LEXICON GOVERNANCE -->
         <div class="tab-content" id="tab-content-induction" style="display: none;">
-          <div class="glass-box-notice" style="margin-bottom: 12px; border-left: 3px solid #38bdf8;">
-            <span>⚡ <strong>On-Device Induction Copilot:</strong> Local LFM2.5 model analyzes prior chat threads to surface covert surrogate nouns. Officers can manually edit, confirm, or reject candidates.</span>
+          <div class="glass-box-notice" style="margin-bottom: 10px; border-left: 3px solid #38bdf8;">
+            <span>⚡ <strong>On-Device Induction Copilot:</strong> Local LFM2.5 model analyzes prior chat threads and receipts to surface covert surrogate nouns. Officers can inspect source lines, edit, confirm, or reject candidates.</span>
           </div>
 
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <span class="font-bold text-xs" style="color: #38bdf8;">DISCOVERED CANDIDATES (PENDING REVIEW)</span>
-            <button id="btn-wb-run-induction" class="btn btn-gov-primary btn-sm" onclick="runWorkbenchCodewordInduction()">
-              <span>⚡</span> Scan & Induce from Case Evidence
-            </button>
+          <!-- Target Evidence File Selector for Codeword Induction -->
+          <div style="background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 10px 12px; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label class="control-label" style="margin-bottom: 0; font-size: 11px; font-weight: 700; color: #94a3b8;">
+                SELECT TARGET EVIDENCE FILE TO SCAN:
+              </label>
+              <span class="badge badge-sm badge-blue" id="induction-file-scope-badge">All Ingested Files</span>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <select id="induction-target-file-select" class="gov-input" style="font-size: 11px; padding: 4px 8px; flex: 1; background: #1e293b; color: #f8fafc; border: 1px solid #475569;" onchange="handleInductionFileScopeChange()">
+                <option value="all">🌐 All Ingested Evidence Files (Cross-Source Scan)</option>
+              </select>
+              <button id="btn-wb-run-induction" class="btn btn-gov-primary btn-sm" onclick="runWorkbenchCodewordInduction()" style="white-space: nowrap;">
+                <span>⚡</span> Scan & Induce Codewords
+              </button>
+            </div>
+            <div id="induction-file-summary-text" class="mono text-xs" style="color: #64748b; margin-top: 6px; font-size: 10px;">
+              Analyzing transaction messages across all ingested files for covert narcotics codewords.
+            </div>
           </div>
 
           <div id="workbench-induction-container">
             <div style="font-size: 11px; color: #64748b; text-align: center; padding: 25px 0;">
-              Click "Scan & Induce" to analyze transaction messages with local SLM.
+              Select an evidence file above and click "Scan & Induce Codewords" to analyze messages with local SLM.
             </div>
           </div>
 
