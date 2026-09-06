@@ -309,6 +309,21 @@ async function uploadScreenshotForOCR(file) {
   }
 }
 
+async function uploadCdrFile(file) {
+  if (!file) return;
+  const caseId = window.currentCaseId || 'FIR_104_2026';
+  const url = `/api/upload_cdr?case_id=${encodeURIComponent(caseId)}`;
+  const arrayBuffer = await file.arrayBuffer();
+  const resp = await fetch(url, { method: 'POST', body: arrayBuffer });
+  const result = await resp.json();
+  console.log('CDR result:', result);
+  if (result.status === 'success') {
+    alert(`CDR parsed: ${result.records_parsed} records, ${result.colocation_alerts.length} co-location alerts found.`);
+  } else {
+    alert('CDR upload failed: ' + result.message);
+  }
+}
+
 async function autofillEvidenceFiles() {
   const caseId = CASE_METADATA.fir ? CASE_METADATA.fir.replace(/[^a-zA-Z0-9_-]/g, "_") : "FIR_104_2026";
   showToast("⚙️ Pre-fetching authentic case evidence files from storage...", "info");
