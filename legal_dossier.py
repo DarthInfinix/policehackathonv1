@@ -225,14 +225,14 @@ def build_evidence_certificate(
     story.append(Spacer(1, 10))
 
     story.append(Paragraph("2. Evidence File Inventory & Chain of Custody", styles["SectionHead"]))
-    table_data = [["#", "Filename", "SHA-256 Hash", "Size", "Ingested At"]]
+    table_data = [["#", "Filename", "SHA-256 Hash", "Records", "Ingested At"]]
     for i, ef in enumerate(evidence_files, start=1):
         table_data.append(
             [
                 str(i),
                 Paragraph(ef.get("filename", ""), styles["Mono"]),
                 Paragraph(ef.get("sha256", ""), styles["Mono"]),
-                f"{ef.get('size_bytes', 0):,} B",
+                f"{ef.get('size_bytes', 0):,}",
                 ef.get("ingested_at", ""),
             ]
         )
@@ -449,16 +449,22 @@ def fetch_evidence_files_for_case(db_path, case_id):
     """
     Reads storage.py's `evidence_files` table for a given case_id and
     returns it in the shape build_evidence_certificate() expects.
-    Adjust column names here if your schema differs.
     """
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     cur = conn.execute(
-        "SELECT filename, sha256, size_bytes, ingested_at "
-        "FROM evidence_files WHERE case_id = ? ORDER BY ingested_at",
+        "SELECT filename, sha256_hash, record_count, uploaded_at "
+        "FROM evidence_files WHERE case_id = ? ORDER BY uploaded_at",
         (case_id,),
     )
-    rows = [dict(r) for r in cur.fetchall()]
+    rows = []
+    for r in cur.fetchall():
+        rows.append({
+            "filename": r["filename"],
+            "sha256": r["sha256_hash"],
+            "size_bytes": r["record_count"],  # your schema tracks record_count, not byte size
+            "ingested_at": r["uploaded_at"],
+        })
     conn.close()
     return rows
 
