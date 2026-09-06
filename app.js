@@ -293,6 +293,21 @@ async function handlePanelFilesSelected(fileList) {
   await handleRealFilesSelected(fileList);
   await renderDashboard();
 }
+async function uploadScreenshotForOCR(file) {
+  if (!file) return;
+  const caseId = window.currentCaseId || 'FIR_104_2026';
+  const url = `/api/upload_screenshot?case_id=${encodeURIComponent(caseId)}&filename=${encodeURIComponent(file.name)}`;
+  const arrayBuffer = await file.arrayBuffer();
+  const resp = await fetch(url, { method: 'POST', body: arrayBuffer });
+  const result = await resp.json();
+  console.log('OCR ingest result:', result);
+  if (result.status === 'success') {
+    alert(`Screenshot OCR'd and ingested as ${result.filename}`);
+    if (typeof loadCaseFiles === 'function') loadCaseFiles();
+  } else {
+    alert('OCR upload failed: ' + result.message);
+  }
+}
 
 async function autofillEvidenceFiles() {
   const caseId = CASE_METADATA.fir ? CASE_METADATA.fir.replace(/[^a-zA-Z0-9_-]/g, "_") : "FIR_104_2026";
