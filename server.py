@@ -202,6 +202,20 @@ class ForensicHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             }).encode('utf-8'))
             return
 
+        # API: Chunked Semantic Entity & Location Miner (SLM)
+        if path == '/api/mine_entities_slm':
+            case_id = params.get('case_id', [None])[0]
+            if not case_id:
+                self._set_json_headers(400)
+                self.wfile.write(b'{"status": "error", "message": "Missing case_id"}')
+                return
+            file_id = params.get('file_id', [None])[0]
+            max_chunks = int(params.get('max_chunks', [5])[0])
+            res = storage.mine_unstructured_entities_chunked(case_id, file_id=file_id, max_chunks=max_chunks)
+            self._set_json_headers(200)
+            self.wfile.write(json.dumps(res).encode('utf-8'))
+            return
+
         # API: SLM Status Check
         if path == '/api/slm_status':
             port = get_active_llama_port()
@@ -568,6 +582,28 @@ Evasion Code Word:"""
                     "error": str(e),
                     "content": "Deterministic fallback triage activated."
                 }).encode('utf-8'))
+                return
+
+        # API: Quick Tesseract OCR Preview (Instant ~0.3s)
+        if path == '/api/quick_ocr_preview':
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                content_bytes = self.rfile.read(content_length)
+                import ocr_worker
+                res = ocr_worker.process_image_bytes(content_bytes, "quick_preview.png", "TEMP_PREVIEW", engine_preference="tesseract")
+                lines = [r.get("raw_text", "") for r in res.get("records", []) if r.get("raw_text", "").strip()]
+                full_text = "\n".join(lines).strip()
+                self._set_json_headers(200)
+                self.wfile.write(json.dumps({
+                    "status": "success",
+                    "engine": "tesseract",
+                    "confidence": res.get("confidence", 85.0),
+                    "text": full_text if full_text else "[Tesseract detected no high-confidence text lines. Deep Neural OCR recommended for noisy/handwritten slips.]"
+                }).encode('utf-8'))
+                return
+            except Exception as e:
+                self._set_json_headers(500)
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
                 return
 
         if path == '/api/cases/create':

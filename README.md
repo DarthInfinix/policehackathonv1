@@ -17,13 +17,25 @@ The entire platform runs without `npm`, Node dependencies, Docker, or external c
 
 ### Launching the Platform
 
-#### Option A: 1-Click Complete Startup Script (Recommended)
+#### Option A: macOS/Linux 1-Click Startup Script
 Automatically checks and launches `llama-server` instances for LiquidAI (port 8012) and dots.ocr (port 8015), starts `server.py` on port 8000, and opens the browser:
 ```bash
 ./start.sh
 ```
 
-#### Option B: Standalone Web Server
+#### Option B: Windows PowerShell 1-Click Startup Script
+Checks dependencies (Python 3.9+, SQLite3, Tesseract OCR), probes neural model servers on ports 8012 & 8015, starts the backend, and opens the browser:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start.ps1
+```
+
+#### Option C: Windows PowerShell Direct One-Liner Command
+Run directly in any Windows PowerShell terminal without saving a file:
+```powershell
+powershell -ExecutionPolicy Bypass -Command "& { Write-Host '=== Probing Dependencies ===' -F Cyan; $p=(Get-Command python,py,python3 -EA SilentlyContinue | Select -First 1).Source; Write-Host ('Python: ' + (& $p --version 2>&1)) -F Green; $t=(Get-Command tesseract -EA SilentlyContinue); Write-Host ('Tesseract: ' + ($(if($t){'Found ('+$t.Source+')'}else{'Standby/Default paths'}))) -F $(if($t){'Green'}else{'Yellow'}); @(8012,8015)|ForEach-Object { $port=$_; try { $r=(Invoke-RestMethod -Uri \"http://127.0.0.1:$port/v1/models\" -TimeoutSec 2); Write-Host \"Port $port (LLM): ONLINE - $($r.data[0].id)\" -F Green } catch { Write-Host \"Port $port (LLM): OFFLINE (Fallback Mode)\" -F Yellow } }; Start-Process 'http://localhost:8000'; & $p server.py }"
+```
+
+#### Option D: Standalone Web Server
 ```bash
 python3 server.py
 ```

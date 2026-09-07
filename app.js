@@ -682,25 +682,229 @@ function setEnginePreset(preset) {
   }
 }
 
+let PANEL_INGEST_QUEUE = [];
+
 async function handlePanelFilesSelected(fileList) {
   if (!fileList || fileList.length === 0) return;
-  const caseId = getActiveCaseId();
-  const ocrEngineParam = CURRENT_ENGINE_PRESET === 'accuracy' ? 'dots' : 'tesseract';
+  PANEL_INGEST_QUEUE = [];
 
-  showToast(`Uploading ${fileList.length} file(s)...`, "info");
+  const defaultEngine = CURRENT_ENGINE_PRESET === 'accuracy' ? 'dots' : 'tesseract';
+
   for (let i = 0; i < fileList.length; i++) {
     const file = fileList[i];
+    const isImg = file.type.startsWith('image/') || /\.(png|jpe?g|webp|bmp)$/i.test(file.name);
+    const item = {
+      id: `panel-file-${Date.now()}-${i}`,
+      file: file,
+      name: file.name,
+      size: file.size,
+      isImage: isImg,
+      typeBadge: isImg ? 'IMAGE EXHIBIT' : file.name.endsWith('.csv') ? 'CSV SPREADSHEET' : file.name.endsWith('.json') ? 'JSON DATASET' : 'TEXT DUMP',
+      previewUrl: isImg ? URL.createObjectURL(file) : null,
+      textPreview: '',
+      ocrChoice: isImg ? defaultEngine : 'skip',
+      quickOcrText: null,
+      quickOcrLoading: false
+    };
+
+    if (!isImg) {
+      try {
+        const textSlice = await file.slice(0, 2048).text();
+        const previewLines = textSlice.split('\n').slice(0, 10).join('\n');
+        item.textPreview = previewLines || '[Empty or binary file]';
+      } catch (e) {
+        item.textPreview = '[Preview unavailable]';
+      }
+    }
+
+    PANEL_INGEST_QUEUE.push(item);
+  }
+
+  // Reset file input value so same files can be re-selected if needed
+  const inputEl = document.getElementById('panel-file-input');
+  if (inputEl) inputEl.value = '';
+
+  renderPanelIngestModal();
+}
+
+function renderPanelIngestModal() {
+  const modal = document.getElementById('modal-ingest-preview');
+  const body = document.getElementById('ingest-preview-modal-body');
+  const status = document.getElementById('ingest-modal-status');
+  if (!modal || !body) return;
+
+  if (status) {
+    status.textContent = `${PANEL_INGEST_QUEUE.length} exhibit(s) staged. Inspect content and choose OCR pipeline before sealing.`;
+  }
+
+  body.innerHTML = PANEL_INGEST_QUEUE.map(item => {
+    if (item.isImage) {
+      return `
+        <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid #334155; border-radius: 8px; padding: 14px; margin-bottom: 12px;">
+          <div style="display: flex; gap: 14px; align-items: flex-start;">
+            <div style="width: 90px; height: 90px; border-radius: 6px; overflow: hidden; background: #020617; border: 1px solid #475569; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <img src="${item.previewUrl}" alt="Evidence Thumbnail" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+            </div>
+            <div style="flex: 1;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                  <span style="font-weight: 700; font-size: 13px; color: #f8fafc; word-break: break-all;">${escapeHtml(item.name)}</span>
+                  <div style="margin-top: 3px; display: flex; gap: 8px; align-items: center;">
+                    <span class="badge badge-sm badge-blue">${item.typeBadge}</span>
+                    <span class="mono" style="font-size: 11px; color: #94a3b8;">${(item.size / 1024).toFixed(1)} KB</span>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-sm btn-gov-secondary" onclick="removePanelIngestItem('${item.id}')" style="padding: 2px 7px; color: #ef4444;" title="Remove this exhibit">✖</button>
+              </div>
+
+              <div style="margin-top: 10px; background: rgba(30, 41, 59, 0.6); padding: 8px 10px; border-radius: 6px; border: 1px solid #334155;">
+                <div style="font-size: 10.5px; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">SELECT OCR PIPELINE:</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 12px; font-size: 11px;">
+                  <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; color: ${item.ocrChoice === 'tesseract' ? '#10b981' : '#94a3b8'};">
+                    <input type="radio" name="ocr-choice-${item.id}" value="tesseract" ${item.ocrChoice === 'tesseract' ? 'checked' : ''} onchange="setPanelItemOcr('${item.id}', 'tesseract')">
+                    <span>⚡ Fast Tesseract (0.5s Instant)</span>
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; color: ${item.ocrChoice === 'dots' ? '#38bdf8' : '#94a3b8'};">
+                    <input type="radio" name="ocr-choice-${item.id}" value="dots" ${item.ocrChoice === 'dots' ? 'checked' : ''} onchange="setPanelItemOcr('${item.id}', 'dots')">
+                    <span>📸 Deep Neural dots.ocr ViT (~25s)</span>
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; color: ${item.ocrChoice === 'skip' ? '#f59e0b' : '#94a3b8'};">
+                    <input type="radio" name="ocr-choice-${item.id}" value="skip" ${item.ocrChoice === 'skip' ? 'checked' : ''} onchange="setPanelItemOcr('${item.id}', 'skip')">
+                    <span>📁 Archive Only (Skip OCR)</span>
+                  </label>
+                </div>
+              </div>
+
+              <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
+                <button type="button" class="btn btn-sm btn-gov-secondary" onclick="previewQuickOcr('${item.id}')" ${item.quickOcrLoading ? 'disabled' : ''} style="font-size: 10.5px; padding: 3px 8px;">
+                  <span>${item.quickOcrLoading ? '⏳ Running Tesseract...' : '👁️ Quick Tesseract Preview (Instant)'}</span>
+                </button>
+              </div>
+
+              ${item.quickOcrText ? `
+                <div style="margin-top: 8px; background: #020617; border: 1px solid #1e293b; border-radius: 4px; padding: 6px 10px; font-family: monospace; font-size: 10px; color: #a5f3fc; max-height: 90px; overflow-y: auto; white-space: pre-wrap;">
+                  <div style="font-size: 9px; color: #64748b; margin-bottom: 2px;">QUICK OCR PREVIEW RESULT:</div>
+                  ${escapeHtml(item.quickOcrText)}
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    } else {
+      return `
+        <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid #334155; border-radius: 8px; padding: 14px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              <span style="font-weight: 700; font-size: 13px; color: #f8fafc; word-break: break-all;">${escapeHtml(item.name)}</span>
+              <div style="margin-top: 3px; display: flex; gap: 8px; align-items: center;">
+                <span class="badge badge-sm badge-neutral">${item.typeBadge}</span>
+                <span class="mono" style="font-size: 11px; color: #94a3b8;">${(item.size / 1024).toFixed(1)} KB</span>
+              </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-gov-secondary" onclick="removePanelIngestItem('${item.id}')" style="padding: 2px 7px; color: #ef4444;" title="Remove this exhibit">✖</button>
+          </div>
+          <div style="margin-top: 8px; font-size: 10px; color: #94a3b8;">FIRST 10 LINES PREVIEW:</div>
+          <div style="margin-top: 4px; background: #020617; border: 1px solid #1e293b; border-radius: 4px; padding: 8px 10px; font-family: monospace; font-size: 10px; color: #cbd5e1; max-height: 100px; overflow-y: auto; white-space: pre-wrap; line-height: 1.35;">${escapeHtml(item.textPreview)}</div>
+        </div>
+      `;
+    }
+  }).join('');
+
+  modal.style.display = 'flex';
+}
+
+function setPanelItemOcr(itemId, choice) {
+  const item = PANEL_INGEST_QUEUE.find(x => x.id === itemId);
+  if (item) {
+    item.ocrChoice = choice;
+    renderPanelIngestModal();
+  }
+}
+
+function removePanelIngestItem(itemId) {
+  const idx = PANEL_INGEST_QUEUE.findIndex(x => x.id === itemId);
+  if (idx !== -1) {
+    const item = PANEL_INGEST_QUEUE[idx];
+    if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+    PANEL_INGEST_QUEUE.splice(idx, 1);
+    if (PANEL_INGEST_QUEUE.length === 0) {
+      closeIngestPreviewModal();
+    } else {
+      renderPanelIngestModal();
+    }
+  }
+}
+
+async function previewQuickOcr(itemId) {
+  const item = PANEL_INGEST_QUEUE.find(x => x.id === itemId);
+  if (!item || !item.file) return;
+
+  item.quickOcrLoading = true;
+  renderPanelIngestModal();
+
+  try {
+    const buffer = await item.file.arrayBuffer();
+    const resp = await fetch('http://localhost:8000/api/quick_ocr_preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: buffer
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      item.quickOcrText = data.text || '[No text detected]';
+    } else {
+      item.quickOcrText = '[Failed to run instant Tesseract preview]';
+    }
+  } catch (err) {
+    item.quickOcrText = `[Preview Error: ${err.message}]`;
+  } finally {
+    item.quickOcrLoading = false;
+    renderPanelIngestModal();
+  }
+}
+
+function closeIngestPreviewModal() {
+  const modal = document.getElementById('modal-ingest-preview');
+  if (modal) modal.style.display = 'none';
+  PANEL_INGEST_QUEUE.forEach(item => {
+    if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+  });
+  PANEL_INGEST_QUEUE = [];
+}
+
+async function executePanelIngest() {
+  if (PANEL_INGEST_QUEUE.length === 0) {
+    closeIngestPreviewModal();
+    return;
+  }
+
+  const caseId = getActiveCaseId();
+  const btn = document.getElementById('btn-confirm-panel-ingest');
+  const status = document.getElementById('ingest-modal-status');
+  if (btn) btn.disabled = true;
+
+  showToast(`Sealing ${PANEL_INGEST_QUEUE.length} exhibit(s) into ${caseId}...`, 'info');
+
+  for (let i = 0; i < PANEL_INGEST_QUEUE.length; i++) {
+    const item = PANEL_INGEST_QUEUE[i];
+    if (status) status.textContent = `Ingesting ${i + 1}/${PANEL_INGEST_QUEUE.length}: ${item.name}...`;
+
+    const skipOcr = item.ocrChoice === 'skip' ? 1 : 0;
+    const engineParam = item.ocrChoice === 'dots' ? 'dots' : 'tesseract';
+
     try {
-      const buffer = await file.arrayBuffer();
-      const resp = await fetch(`http://localhost:8000/api/upload?case_id=${encodeURIComponent(caseId)}&filename=${encodeURIComponent(file.name)}&skip_ocr=0&engine=${ocrEngineParam}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/octet-stream" },
+      const buffer = await item.file.arrayBuffer();
+      const resp = await fetch(`http://localhost:8000/api/upload?case_id=${encodeURIComponent(caseId)}&filename=${encodeURIComponent(item.name)}&skip_ocr=${skipOcr}&engine=${engineParam}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream' },
         body: buffer
       });
+
       if (resp.ok) {
         const jsonRes = await resp.json();
-        if (jsonRes.status === "processing" && jsonRes.job_id) {
-          showToast(`⚡ Running Neural OCR for ${file.name}...`, "info");
+        if (jsonRes.status === 'processing' && jsonRes.job_id) {
+          showToast(`⚡ Running Neural OCR for ${item.name}...`, 'info');
           let pollAttempts = 0;
           let done = false;
           while (!done && pollAttempts < 120) {
@@ -709,7 +913,7 @@ async function handlePanelFilesSelected(fileList) {
             const pResp = await fetch(`http://localhost:8000/api/ocr/job_status?job_id=${encodeURIComponent(jsonRes.job_id)}`);
             if (pResp.ok) {
               const pData = await pResp.json();
-              if (pData.status === "completed" || pData.status === "failed") {
+              if (pData.status === 'completed' || pData.status === 'failed') {
                 done = true;
               }
             }
@@ -717,12 +921,33 @@ async function handlePanelFilesSelected(fileList) {
         }
       }
     } catch (err) {
-      console.warn("Panel upload err:", err);
+      console.warn('Upload error:', err);
     }
   }
 
-  showToast(`✓ Files ingested successfully!`, "success");
+  closeIngestPreviewModal();
+  showToast('✓ Exhibits successfully sealed and indexed into case!', 'success');
   await renderDashboard();
+}
+
+async function triggerSlmMiner() {
+  const caseId = getActiveCaseId();
+  showToast(`🧠 Running Chunked Semantic Miner across ${caseId}...`, 'info');
+  try {
+    const resp = await fetch(`http://localhost:8000/api/mine_entities_slm?case_id=${encodeURIComponent(caseId)}&max_chunks=6`);
+    if (resp.ok) {
+      const data = await resp.json();
+      const locCount = (data.discovered_locations || []).length;
+      const slangCount = (data.discovered_slang || []).length;
+      const modelMode = data.llm_used ? 'Local SLM' : 'Spatial Semantic Engine';
+      showToast(`🎯 ${modelMode} discovered ${locCount} drop points/locations and ${slangCount} covert slang terms!`, 'success');
+      await renderDashboard();
+    } else {
+      showToast('⚠️ Semantic mining failed or returned no hits.', 'warning');
+    }
+  } catch (err) {
+    showToast(`Error running semantic miner: ${err.message}`, 'error');
+  }
 }
 
 async function autofillEvidenceFiles(datasetType = "default") {

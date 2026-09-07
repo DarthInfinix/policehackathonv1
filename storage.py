@@ -11,18 +11,69 @@ import re
 import csv
 import io
 import os
+import urllib.request
+import urllib.parse
 from datetime import datetime
 from typing import Dict, List, Any, Tuple, Optional
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "data", "case_evidence.db")
 
+# Expanded Indian PSP Bank handles for UPI
+UPI_PSP_HANDLES = (
+    r'okhdfcbank|okaxis|oksbi|okicici|ybl|ibl|axl|paytm|apl|barodampay|'
+    r'sbi|axisbank|icici|idfcbank|freecharge|upi|fbl|slice|jupiteraxis|'
+    r'kotak|fifederal|aubank|indus|yesbank|postbank|pnb|centralbank|'
+    r'allbank|cnrb|mahb|unionbank|psb|syndicate|uco|boi|vijayabank|'
+    r'dbs|hsbc|scb|rbl|dlb|kvb|kbl|cub|sib|federal|airtel|amazonpay|'
+    r'cred|fam|navi|timepay'
+)
+
 # Deterministic Regex Patterns for Indian Forensics
 REGEX_PATTERNS = {
-    "phone": re.compile(r'(?:(?:\+91|0091|0)[\s\-]?)?([6-9]\d{9})\b'),
-    "upi": re.compile(r'\b([a-zA-Z0-9.\-_]{2,50}@(okhdfcbank|okaxis|oksbi|okicici|ybl|paytm|apl|barodampay|sbi|axisbank|icici|idfcbank|freecharge|upi))\b', re.IGNORECASE),
-    "tron": re.compile(r'\b(T[1-9A-HJ-NP-Za-km-z]{33})\b'),
-    "btc": re.compile(r'\b(1[a-km-zA-HJ-NP-Z1-9]{25,34}|3[a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[a-z0-9]{39,59})\b'),
+    # Shielded Indian phone numbers: +91/0 prefix optional, accommodates spaced/dashed groupings,
+    # strictly bounded to prevent substring matches inside URLs, decimals, or WhatsApp user tags.
+    "phone": re.compile(
+        r'(?<![\w\d\.@])(?:(?:\+91|0091|91|0)[\s\-]?)?([6-9]\d{2,4}[\s\-]?\d{3,5})(?![\w\d\.])'
+    ),
+    "upi": re.compile(rf'(?<![\w\d@/])([a-zA-Z0-9.\-_]{{2,50}}@(?:{UPI_PSP_HANDLES}))\b', re.IGNORECASE),
+    "tron": re.compile(r'(?<![a-zA-Z0-9/])(T[1-9A-HJ-NP-Za-km-z]{33})(?![a-zA-Z0-9/])'),
+    "btc": re.compile(r'(?<![a-zA-Z0-9/])(1[a-km-zA-HJ-NP-Z1-9]{25,34}|3[a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[a-z0-9]{39,59})(?![a-zA-Z0-9/])'),
+    "eth": re.compile(r'(?<![a-zA-Z0-9/])(0x[a-fA-F0-9]{40})(?![a-zA-Z0-9/])'),
+    "transaction_ref": re.compile(r'(?<![\w\d])(?:utr|ref|txn|transaction|rrn)[\s:#\-_]*([0-9]{12})\b', re.IGNORECASE),
     "pricing": re.compile(r'(?:₹|rs\.?|inr)\s*(\d+(?:,\d+)*(?:\.\d+)?)|(\d+)\s*(?:k|thousand|hundred)\b|(\d+(?:\.\d+)?)\s*(?:g|gm|gram|grams|pudiya|tola|packet|strip)\b', re.IGNORECASE),
+}
+
+# Dynamic Geographic Regexes for Chandigarh Tricity
+LOCATION_DYNAMIC_PATTERNS = [
+    (re.compile(r'\b(?:sector|sec)\.?\s*([0-9]{1,3}(?:\s*[-/]?[a-zA-Z])?)\b', re.IGNORECASE), lambda m: f"Sector {m.group(1).upper().replace(' ', '')}"),
+    (re.compile(r'\bphase\s*([0-9]{1,2}(?:\s*[-/]?[a-zA-Z0-9]+)?)\b', re.IGNORECASE), lambda m: f"Phase {m.group(1).upper().replace(' ', '')}"),
+    (re.compile(r'\b(?:sco|booth|bay\s*shop)\s*#?\s*(\d+)\b', re.IGNORECASE), lambda m: m.group(0).upper()),
+    (re.compile(r'\b(1600\d{2}|14030\d|1341\d{2})\b'), lambda m: f"PIN-{m.group(1)}"),
+]
+
+# Curated Chandigarh Tricity Landmarks
+KNOWN_TRICITY_LANDMARKS = [
+    "sukhna lake", "rock garden", "rose garden", "elante mall", "elante",
+    "panjab university", "pu campus", "pgimer", "pgi", "isbt 17", "isbt 43", "isbt",
+    "tribune chowk", "housing board chowk", "aroma chowk", "aroma",
+    "shivalik hostel", "aravali hostel", "kurukshetra hostel", "himalaya hostel", "vindhya hostel",
+    "sector 17 plaza", "grain market 26", "timber market",
+    "mohali", "panchkula", "zirakpur", "kharar", "manimajra", "nayagaon", "baltana", "dhakoli"
+]
+
+# Non-narcotic chemical/biological adjectives preceding 'acid'
+ACID_NON_NARCOTIC_PREFIXES = {
+    "lead", "picric", "nitric", "sulfuric", "hydrochloric", "dicarboxylic",
+    "amino", "fatty", "boric", "citric", "lactic", "stomach", "salicylic",
+    "folic", "ascorbic", "acetic", "benzoic", "oxalic", "tartaric",
+    "phosphoric", "acrylic", "valeric", "formic", "chromic", "battery",
+    "rain", "reflux", "uric", "nucleic", "pantothenic", "retinoic"
+}
+
+# Innocent prefixes preceding 'paper'
+PAPER_INNOCENT_PREFIXES = {
+    "chem", "chemistry", "physics", "math", "maths", "exam", "sample",
+    "question", "graph", "sand", "tissue", "toilet", "news", "rough", "research"
 }
 
 # Suspicious Slang & Narcotics Keywords
@@ -156,48 +207,111 @@ def log_audit(case_id: str, action: str, details: str, performed_by: str = "IO V
     con.close()
 
 def extract_entities_from_text(text: str) -> Dict[str, List[str]]:
-    """Deterministic extractor for Phone, UPI, TRON, BTC, and pricing indicators."""
+    """Deterministic extractor for Phone, UPI, TRON, BTC, ETH, UTR, Locations, and Slang."""
     results = {
         "phones": [],
         "upi_handles": [],
         "crypto_wallets": [],
+        "transaction_refs": [],
         "locations": [],
         "slang_keywords": []
     }
 
-    # Phones
-    for m in REGEX_PATTERNS["phone"].finditer(text):
-        num = m.group(1)
-        if len(num) == 10 and num not in results["phones"]:
-            results["phones"].append(num)
+    # Shield URLs to prevent query params, doc IDs, and paths from triggering false phones/crypto
+    shielded_text = re.sub(r'https?://\S+', ' [URL_SHIELDED] ', text)
 
-    # UPI VPAs
-    for m in REGEX_PATTERNS["upi"].finditer(text):
+    # 1. Phones: Normalize and filter out invalid/accidental matches
+    for m in REGEX_PATTERNS["phone"].finditer(shielded_text):
+        raw_num = m.group(1)
+        clean_digits = re.sub(r'[\s\-]', '', raw_num)
+        if len(clean_digits) == 10 and clean_digits[0] in '6789' and clean_digits not in results["phones"]:
+            results["phones"].append(clean_digits)
+
+    # 2. UPI VPAs
+    for m in REGEX_PATTERNS["upi"].finditer(shielded_text):
         vpa = m.group(1).lower()
         if vpa not in results["upi_handles"]:
             results["upi_handles"].append(vpa)
 
-    # TRON Wallets
-    for m in REGEX_PATTERNS["tron"].finditer(text):
+    # 3. TRON Wallets
+    for m in REGEX_PATTERNS["tron"].finditer(shielded_text):
         wallet = m.group(1)
         if wallet not in results["crypto_wallets"]:
             results["crypto_wallets"].append(wallet)
 
-    # BTC Wallets
-    for m in REGEX_PATTERNS["btc"].finditer(text):
+    # 4. BTC Wallets
+    for m in REGEX_PATTERNS["btc"].finditer(shielded_text):
         wallet = m.group(1)
         if wallet not in results["crypto_wallets"]:
             results["crypto_wallets"].append(wallet)
 
-    # Slang & Keywords
+    # 5. ETH Wallets
+    for m in REGEX_PATTERNS["eth"].finditer(shielded_text):
+        wallet = m.group(1)
+        if wallet not in results["crypto_wallets"]:
+            results["crypto_wallets"].append(wallet)
+
+    # 6. Transaction Reference / UTR numbers (12-digit Indian banking ref)
+    for m in REGEX_PATTERNS["transaction_ref"].finditer(shielded_text):
+        ref = m.group(1)
+        if ref not in results["transaction_refs"]:
+            results["transaction_refs"].append(ref)
+
+    # 7. Dynamic Geographic Locations
     lower_text = text.lower()
+    for pat, formatter in LOCATION_DYNAMIC_PATTERNS:
+        for m in pat.finditer(text):
+            loc_label = formatter(m)
+            if loc_label not in results["locations"]:
+                results["locations"].append(loc_label)
+
+    # Tricity Landmarks
+    for lm in KNOWN_TRICITY_LANDMARKS:
+        if re.search(r'\b' + re.escape(lm) + r'\b', lower_text):
+            title_lm = lm.title()
+            if title_lm not in results["locations"]:
+                # Suppress shorter redundant substring if full landmark matched (e.g. 'Sukhna' vs 'Sukhna Lake')
+                if not any(title_lm in existing and existing != title_lm for existing in results["locations"]):
+                    results["locations"].append(title_lm)
+
+    # 8. Slang & Narcotics with Contextual Disambiguation
     for category, words in SUSPICIOUS_KEYWORDS.items():
         for w in words:
-            if re.search(r'\b' + re.escape(w) + r'\b', lower_text):
-                if category == "locations" and w.title() not in results["locations"]:
+            if not re.search(r'\b' + re.escape(w) + r'\b', lower_text):
+                continue
+
+            # Contextual filter for 'acid' (distinguish LSD from chemistry battery / homework)
+            if w == "acid":
+                is_chemistry = False
+                for match in re.finditer(r'(\b\w+[\s\-]*)?\b(acid)\b', lower_text):
+                    prefix = match.group(1)
+                    if prefix and prefix.strip().rstrip('-') in ACID_NON_NARCOTIC_PREFIXES:
+                        is_chemistry = True
+                        break
+                if is_chemistry or "acid-base" in lower_text or any(c in lower_text for c in ['hcl', 'hno3', 'h2so4', 'reaction', 'titration', 'molar', 'benzene', 'aniline', 'phenol', 'diazotization', 'equilibria', 'aqueous']):
+                    continue
+
+            # Contextual filter for 'ice tea' (distinguish iced beverage from meth)
+            elif w == "ice tea":
+                has_commercial = bool(re.search(r'(?:₹|rs\.?|inr|\/g|\/gm|\b(?:gm|gram|grams|pudiya|tola|stash|deaddrop|dead drop|parcel|plug|rate|delivery)\b)', lower_text))
+                if not has_commercial:
+                    continue
+
+            # Contextual filter for 'stamp paper' / 'paper' (distinguish exams / stationery)
+            elif "paper" in w:
+                is_innocent_paper = False
+                for p_pre in PAPER_INNOCENT_PREFIXES:
+                    if f"{p_pre} paper" in lower_text or f"{p_pre}paper" in lower_text:
+                        is_innocent_paper = True
+                        break
+                if is_innocent_paper:
+                    continue
+
+            if category == "locations":
+                if w.title() not in results["locations"]:
                     results["locations"].append(w.title())
-                elif category != "locations" and w not in results["slang_keywords"]:
-                    results["slang_keywords"].append(w)
+            elif category != "locations" and w not in results["slang_keywords"]:
+                results["slang_keywords"].append(w)
 
     return results
 
@@ -325,21 +439,63 @@ def parse_and_ingest_file(case_id: str, filename: str, content_bytes: bytes, db_
         except Exception:
             pass
 
-    # 3. Fallback to Plain Text (e.g. WhatsApp export or log file)
+    # 3. WhatsApp Chat Export & Fallback Plain Text Detect
     if not records_to_insert:
-        file_type = "PLAINTEXT_DUMP"
         lines = text_content.splitlines()
-        for idx, line in enumerate(lines[:1500]): # safety cap
-            line_str = line.strip()
-            if not line_str:
+        
+        wa_bracket_pat = re.compile(r'^\[?(\d{1,2}/\d{1,2}/\d{2,4},\s*[\d:]+(?:\s*[APap][Mm])?)\]?\s*[-:]?\s*([^:]+?):\s*(.*)$')
+        wa_dash_pat = re.compile(r'^(\d{1,2}/\d{1,2}/\d{2,4},\s*[\d:]+(?:\s*[APap][Mm])?)\s*-\s*([^:]+?):\s*(.*)$')
+
+        wa_records = []
+        sample_count = 0
+        wa_matches = 0
+        for l in lines[:100]:
+            clean_l = l.strip().replace('\u200e', '').replace('\u200f', '').replace('\ufeff', '')
+            if not clean_l:
                 continue
-            records_to_insert.append({
-                "source_type": "PLAINTEXT",
-                "sender_id": "SYSTEM",
-                "timestamp": now_str,
-                "raw_text": line_str,
-                "line_number": idx + 1
-            })
+            sample_count += 1
+            if wa_bracket_pat.match(clean_l) or wa_dash_pat.match(clean_l):
+                wa_matches += 1
+        
+        if sample_count > 0 and (wa_matches / sample_count) >= 0.2:
+            file_type = "WHATSAPP_CHAT_EXPORT"
+            line_idx = 0
+            current_record = None
+            for l in lines:
+                clean_l = l.strip().replace('\u200e', '').replace('\u200f', '').replace('\ufeff', '')
+                if not clean_l:
+                    continue
+                line_idx += 1
+                m = wa_bracket_pat.match(clean_l) or wa_dash_pat.match(clean_l)
+                if m:
+                    ts_str, sender, msg_text = m.groups()
+                    current_record = {
+                        "source_type": "WHATSAPP_CHAT",
+                        "sender_id": sender.strip(),
+                        "timestamp": ts_str.strip(),
+                        "raw_text": msg_text.strip(),
+                        "line_number": line_idx
+                    }
+                    wa_records.append(current_record)
+                elif current_record:
+                    # Multiline message continuation
+                    current_record["raw_text"] += "\n" + clean_l
+            records_to_insert = wa_records
+
+        # Fallback Plain Text (handles logs, memos, etc.)
+        if not records_to_insert:
+            file_type = "PLAINTEXT_DUMP"
+            for idx, line in enumerate(lines):
+                line_str = line.strip()
+                if not line_str:
+                    continue
+                records_to_insert.append({
+                    "source_type": "PLAINTEXT",
+                    "sender_id": "SYSTEM",
+                    "timestamp": now_str,
+                    "raw_text": line_str,
+                    "line_number": idx + 1
+                })
 
     # Insert into database
     con = get_db(db_path)
@@ -350,11 +506,19 @@ def parse_and_ingest_file(case_id: str, filename: str, content_bytes: bytes, db_
     VALUES (?, ?, ?, ?, ?, ?, ?)
     """, (file_id, case_id, filename, file_type, file_sha256, len(records_to_insert), now_str))
 
+    # Clean up prior records and mentions for this file in this case to ensure idempotent re-ingestion
+    cur.execute("""
+        DELETE FROM entity_mentions 
+        WHERE record_id IN (SELECT record_id FROM evidence_records WHERE file_id = ? AND case_id = ?)
+    """, (file_id, case_id))
+    cur.execute("DELETE FROM evidence_records WHERE file_id = ? AND case_id = ?", (file_id, case_id))
+
     total_flagged = 0
     extracted_summary = {
         "phones": set(),
         "upi_handles": set(),
         "crypto_wallets": set(),
+        "transaction_refs": set(),
         "locations": set(),
         "slang_keywords": set(),
     }
@@ -376,6 +540,9 @@ def parse_and_ingest_file(case_id: str, filename: str, content_bytes: bytes, db_
         if ents["crypto_wallets"]:
             flag_reasons.append(f"Crypto: {', '.join(ents['crypto_wallets'])}")
             extracted_summary["crypto_wallets"].update(ents["crypto_wallets"])
+        if ents.get("transaction_refs"):
+            flag_reasons.append(f"UTR: {', '.join(ents['transaction_refs'])}")
+            extracted_summary["transaction_refs"].update(ents["transaction_refs"])
         if ents["slang_keywords"]:
             flag_reasons.append(f"Slang: {', '.join(ents['slang_keywords'])}")
             extracted_summary["slang_keywords"].update(ents["slang_keywords"])
@@ -413,6 +580,7 @@ def parse_and_ingest_file(case_id: str, filename: str, content_bytes: bytes, db_
             [("PHONE", p) for p in ents["phones"]] +
             [("UPI_ID", u) for u in ents["upi_handles"]] +
             [("CRYPTO_WALLET", c) for c in ents["crypto_wallets"]] +
+            [("TRANSACTION_REF", t) for t in ents.get("transaction_refs", [])] +
             [("LOCATION", l) for l in ents["locations"]] +
             [("NARCOTICS_KEYWORD", s.title()) for s in ents["slang_keywords"]]
         )
@@ -422,7 +590,7 @@ def parse_and_ingest_file(case_id: str, filename: str, content_bytes: bytes, db_
         for ent_type, val in all_entities:
             clean_val = val.strip()
             ent_id = f"ENT_{hashlib.sha256(clean_val.lower().encode()).hexdigest()[:16]}"
-            risk = 90 if ent_type in ["UPI_ID", "CRYPTO_WALLET"] else 85 if ent_type == "NARCOTICS_KEYWORD" else 75 if ent_type == "DARKNET_VENDOR" else 50
+            risk = 90 if ent_type in ["UPI_ID", "CRYPTO_WALLET", "TRANSACTION_REF"] else 85 if ent_type == "NARCOTICS_KEYWORD" else 75 if ent_type == "DARKNET_VENDOR" else 50
             cur.execute("""
             INSERT INTO entities (entity_id, entity_type, raw_value, first_seen_case, risk_score, mention_count)
             VALUES (?, ?, ?, ?, ?, 1)
@@ -462,7 +630,7 @@ def get_cross_source_correlations(case_id: str, db_path: str = DB_PATH) -> List[
     FROM entities e
     JOIN entity_mentions em ON e.entity_id = em.entity_id
     JOIN evidence_records er ON em.record_id = er.record_id
-    WHERE er.case_id = ? AND e.entity_type IN ('UPI_ID', 'PHONE', 'CRYPTO_WALLET')
+    WHERE er.case_id = ? AND e.entity_type IN ('UPI_ID', 'PHONE', 'CRYPTO_WALLET', 'TRANSACTION_REF')
     GROUP BY e.raw_value
     HAVING distinct_sources > 1
     """, (case_id,))
@@ -550,7 +718,7 @@ def get_case_graph_data(case_id: str, db_path: str = DB_PATH) -> Dict[str, Any]:
     nodes_map = {}
     for row in cur.fetchall():
         ent_type = row["entity_type"]
-        color = "#8b5cf6" if ent_type == "DARKNET_VENDOR" else "#f59e0b" if ent_type in ["UPI_ID", "CRYPTO_WALLET"] else "#10b981" if ent_type == "LOCATION" else "#3b82f6"
+        color = "#8b5cf6" if ent_type == "DARKNET_VENDOR" else "#f59e0b" if ent_type in ["UPI_ID", "CRYPTO_WALLET", "TRANSACTION_REF"] else "#10b981" if ent_type == "LOCATION" else "#3b82f6"
         nodes_map[row["entity_id"]] = {
             "id": row["entity_id"],
             "label": row["raw_value"],
@@ -798,8 +966,8 @@ def get_dynamic_triage_leads(case_id: Optional[str] = None, db_path: str = DB_PA
         seen_values.add(val.lower())
         
         ent_type = row["entity_type"]
-        cat = "financial" if ent_type in ["UPI_ID", "CRYPTO_WALLET"] else "darknet" if ent_type == "DARKNET" else "slang" if ent_type == "SLANG" else "financial"
-        type_label = "UPI IDENTIFIER" if ent_type == "UPI_ID" else "CRYPTO WALLET" if ent_type == "CRYPTO_WALLET" else "PHONE IDENTIFIER" if ent_type == "PHONE" else "GEOGRAPHIC LANDMARK" if ent_type == "LOCATION" else "NARCOTICS CODEWORD"
+        cat = "financial" if ent_type in ["UPI_ID", "CRYPTO_WALLET", "TRANSACTION_REF"] else "darknet" if ent_type == "DARKNET" else "slang" if ent_type == "SLANG" else "financial"
+        type_label = "UPI IDENTIFIER" if ent_type == "UPI_ID" else "CRYPTO WALLET" if ent_type == "CRYPTO_WALLET" else "PHONE IDENTIFIER" if ent_type == "PHONE" else "TRANSACTION REF" if ent_type == "TRANSACTION_REF" else "GEOGRAPHIC LANDMARK" if ent_type == "LOCATION" else "NARCOTICS CODEWORD"
         
         # Check cross-case link in SQLite
         cross_case_hit = None
@@ -1022,5 +1190,166 @@ def load_default_demo_datasets(case_id: str = "FIR_104_2026", base_dir: Optional
         "total_records": total_records,
         "total_flagged": total_flagged,
         "details": ingested
+    }
+
+def mine_unstructured_entities_chunked(case_id: str, file_id: Optional[str] = None, max_chunks: int = 5, db_path: str = DB_PATH) -> Dict[str, Any]:
+    """
+    Extracts unstructured Indian physical addresses, landmarks, meet points,
+    and covert Hinglish slang using chunked LLM semantic analysis on high-signal conversational clusters.
+    """
+    con = get_db(db_path)
+    cur = con.cursor()
+
+    # Find candidate flagged/suspicious records or conversational anchors
+    sql = """
+    SELECT record_id, file_id, line_number, sender_id, timestamp, raw_text, is_flagged
+    FROM evidence_records
+    WHERE case_id = ?
+    """
+    params = [case_id]
+    if file_id:
+        sql += " AND file_id = ?"
+        params.append(file_id)
+    sql += " ORDER BY line_number ASC"
+
+    cur.execute(sql, params)
+    rows = [dict(r) for r in cur.fetchall()]
+    con.close()
+
+    if not rows:
+        return {"status": "no_records", "discovered_locations": [], "discovered_slang": []}
+
+    # Group records into conversational context windows (e.g. 8-12 records per chunk) around flagged lines
+    flagged_indices = [idx for idx, r in enumerate(rows) if r["is_flagged"]]
+    if not flagged_indices:
+        flagged_indices = list(range(0, min(len(rows), 40), 8))
+
+    selected_ranges = []
+    for f_idx in flagged_indices[:max_chunks * 2]:
+        start = max(0, f_idx - 3)
+        end = min(len(rows), f_idx + 5)
+        if not any(abs(start - prev_s) < 4 for prev_s, _ in selected_ranges):
+            selected_ranges.append((start, end))
+        if len(selected_ranges) >= max_chunks:
+            break
+
+    if not selected_ranges:
+        selected_ranges.append((0, min(len(rows), 10)))
+
+    chunks = []
+    for start, end in selected_ranges:
+        window_rows = rows[start:end]
+        snippet = "\n".join([f"[{r.get('sender_id', 'User')}]: {r.get('raw_text', '')}" for r in window_rows])
+        anchor_rec_id = window_rows[len(window_rows)//2]["record_id"]
+        chunks.append({
+            "anchor_record_id": anchor_rec_id,
+            "snippet": snippet
+        })
+
+    # Call local LLM or fallback semantic extractor
+    port = None
+    for p in [8012, 8015, 8080, 8081]:
+        try:
+            req = urllib.request.Request(f"http://localhost:{p}/v1/models")
+            with urllib.request.urlopen(req, timeout=0.5) as resp:
+                if resp.status == 200:
+                    port = p
+                    break
+        except Exception:
+            pass
+
+    discovered_locations = []
+    discovered_slang = []
+
+    for c in chunks:
+        if port:
+            try:
+                system_prompt = (
+                    "You are an expert Indian Cyber Narcotics intelligence copilot for Chandigarh Police. "
+                    "Analyze the given group chat / darknet conversation chunk. "
+                    "Extract:\n"
+                    "1. Unstructured physical locations, meeting drop points, landmarks, or street directions (e.g. 'near Aroma chowk', 'behind hostel 4', 'booth 12').\n"
+                    "2. Covert slang, disguised narcotics terms, or delivery code words with suspected meaning.\n"
+                    "Return strictly JSON with schema: {\"locations\": [\"...\"], \"slang\": [{\"term\": \"...\", \"meaning\": \"...\"}]}"
+                )
+                payload = json.dumps({
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": c["snippet"]}
+                    ],
+                    "temperature": 0.0,
+                    "max_tokens": 250
+                }).encode('utf-8')
+
+                req = urllib.request.Request(f"http://localhost:{port}/v1/chat/completions", data=payload, headers={"Content-Type": "application/json"})
+                with urllib.request.urlopen(req, timeout=12.0) as resp:
+                    data = json.loads(resp.read().decode('utf-8'))
+                    raw_ans = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                    json_match = re.search(r'\{.*\}', raw_ans, re.DOTALL)
+                    if json_match:
+                        parsed = json.loads(json_match.group(0))
+                        for loc in parsed.get("locations", []):
+                            if loc.strip() and loc.strip() not in [d["value"] for d in discovered_locations]:
+                                discovered_locations.append({"value": loc.strip(), "record_id": c["anchor_record_id"]})
+                        for s in parsed.get("slang", []):
+                            if isinstance(s, dict) and s.get("term"):
+                                discovered_slang.append({"term": s["term"].strip(), "meaning": s.get("meaning", "Suspected Codeword"), "record_id": c["anchor_record_id"]})
+                            elif isinstance(s, str) and s.strip():
+                                discovered_slang.append({"term": s.strip(), "meaning": "Suspected Codeword", "record_id": c["anchor_record_id"]})
+            except Exception:
+                pass
+
+        # If LLM offline or returned 0, run spatial & contextual candidate extractor
+        if not discovered_locations:
+            for m in re.finditer(r'\b(?:near|opp|opposite|behind|gate|chowk|market|road|sector|sec|phase|booth)\s+([a-zA-Z0-9\s\-]{3,25})\b', c["snippet"], re.IGNORECASE):
+                cand = m.group(0).strip().title()
+                if len(cand) > 5 and cand not in [d["value"] for d in discovered_locations]:
+                    discovered_locations.append({"value": cand, "record_id": c["anchor_record_id"]})
+
+    # Seal discovered entities into SQLite
+    con = get_db(db_path)
+    cur = con.cursor()
+    newly_added = 0
+
+    for item in discovered_locations:
+        loc_val = item["value"].title()
+        ent_id = f"ENT_{hashlib.sha256(loc_val.lower().encode()).hexdigest()[:16]}"
+        cur.execute("""
+        INSERT INTO entities (entity_id, entity_type, raw_value, first_seen_case, risk_score, mention_count)
+        VALUES (?, 'LOCATION', ?, ?, 65, 1)
+        ON CONFLICT(entity_id) DO UPDATE SET mention_count = mention_count + 1
+        """, (ent_id, loc_val, case_id))
+        cur.execute("""
+        INSERT OR IGNORE INTO entity_mentions (record_id, entity_id, context_snippet)
+        VALUES (?, ?, ?)
+        """, (item["record_id"], ent_id, "Discovered via Chunked Semantic Miner"))
+        newly_added += 1
+
+    for s in discovered_slang:
+        term_val = s["term"].title()
+        ent_id = f"ENT_{hashlib.sha256(term_val.lower().encode()).hexdigest()[:16]}"
+        cur.execute("""
+        INSERT INTO entities (entity_id, entity_type, raw_value, first_seen_case, risk_score, mention_count)
+        VALUES (?, 'NARCOTICS_KEYWORD', ?, ?, 75, 1)
+        ON CONFLICT(entity_id) DO UPDATE SET mention_count = mention_count + 1
+        """, (ent_id, term_val, case_id))
+        cur.execute("""
+        INSERT OR IGNORE INTO entity_mentions (record_id, entity_id, context_snippet)
+        VALUES (?, ?, ?)
+        """, (s["record_id"], ent_id, f"Inferred meaning: {s['meaning']}"))
+        newly_added += 1
+
+    con.commit()
+    con.close()
+
+    log_audit(case_id, "SLM_SEMANTIC_MINED", f"Chunked Miner analyzed {len(chunks)} windows, registered {newly_added} entities (LLM used: {bool(port)}).", db_path=db_path)
+
+    return {
+        "status": "success",
+        "chunks_analyzed": len(chunks),
+        "llm_used": bool(port),
+        "new_entities_added": newly_added,
+        "discovered_locations": [d["value"] for d in discovered_locations],
+        "discovered_slang": discovered_slang
     }
 

@@ -18,7 +18,10 @@ from typing import Dict, List, Any, Optional, Tuple
 TESSERACT_CANDIDATE_PATHS = [
     "/opt/homebrew/bin/tesseract",
     "/usr/local/bin/tesseract",
-    "/usr/bin/tesseract"
+    "/usr/bin/tesseract",
+    r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+    r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+    os.path.expandvars(r"%LOCALAPPDATA%\Programs\Tesseract-OCR\tesseract.exe"),
 ]
 
 LLAMA_MTMD_CLI_PATHS = [
