@@ -193,7 +193,7 @@ def convert_to_wav_16k_mono(input_path: str, output_path: str) -> bool:
         return False
 
 def run_whisper_cpp_transcription(wav_path: str, language: str = "auto") -> Optional[List[Dict[str, Any]]]:
-    """Runs local whisper-cpp executable with ggml model to produce timestamped transcript lines."""
+    """Runs local whisper-cpp executable with ggml model to produce timestamped transcript lines in the original spoken language."""
     whisper_bin = get_whisper_binary()
     model_path = get_whisper_model()
 
@@ -202,16 +202,18 @@ def run_whisper_cpp_transcription(wav_path: str, language: str = "auto") -> Opti
 
     out_prefix = wav_path + "_whisper_out"
 
+    # Always specify -l (defaults to 'auto' to auto-detect spoken language and transcribe verbatim in original tongue)
+    lang_arg = language if (language and language.strip()) else "auto"
+
     cmd = [
         whisper_bin,
         "-m", model_path,
         "-f", wav_path,
         "-oj", # output JSON format
         "-of", out_prefix,
-        "--print-colors", "0"
+        "-l", lang_arg,
+        "-np"  # suppress progress terminal printouts
     ]
-    if language and language != "auto":
-        cmd.extend(["-l", language])
 
     try:
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=45)
@@ -227,6 +229,7 @@ def run_whisper_cpp_transcription(wav_path: str, language: str = "auto") -> Opti
                 pass
 
             transcription = wdata.get("transcription", [])
+            detected_lang = wdata.get("result", {}).get("language", "auto")
             lines = []
             for seg in transcription:
                 t_str = seg.get("timestamps", {}).get("from", "00:00:00")
@@ -234,7 +237,8 @@ def run_whisper_cpp_transcription(wav_path: str, language: str = "auto") -> Opti
                 if text:
                     lines.append({
                         "timestamp_offset": t_str,
-                        "text": text
+                        "text": text,
+                        "language": detected_lang
                     })
             if lines:
                 return lines
@@ -287,13 +291,15 @@ def transcribe_audio_payload(
         is_casework_intercept = any(k in fname_lower for k in ["deal", "drop", "chitta", "voice", "pushkar", "seized", "intercept"])
 
         if filtered_whisper:
-            engine_used = "whisper-cpp (Local On-Device GGML)"
+            detected_lang = filtered_whisper[0].get("language", "auto")
+            lang_label = f" [Spoken: {detected_lang.upper()}]" if detected_lang and detected_lang != "auto" else ""
+            engine_used = f"whisper-cpp Local GGML{lang_label}"
             for idx, seg in enumerate(filtered_whisper, 1):
                 records.append({
                     "source_type": "VOICE_NOTE",
                     "sender_id": f"SUSPECT_VOICE (Speaker {1 if idx % 2 != 0 else 2})",
                     "timestamp": f"{now_iso[:10]} {seg.get('timestamp_offset', '00:00:00')}",
-                    "raw_text": seg.get("text", ""),
+                    "raw_text": seg.get("text", "").strip(),
                     "line_number": idx
                 })
         elif is_casework_intercept:
