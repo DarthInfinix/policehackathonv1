@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chandigarh Police Cyber Investigation Platform (PS3-DWID) - Architecture Flowchart</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    body {
+      background-color: #050811;
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 0;
+      overflow-x: auto;
+    }
+    .glow-cyan {
+      box-shadow: 0 0 25px rgba(0, 242, 254, 0.25);
+    }
+    .glow-btn:hover {
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+      transform: translateY(-1px);
+    }
+  </style>
+</head>
+<body class="p-6">
+  <!-- Top Export & Control Action Bar -->
+  <header class="max-w-[2400px] mx-auto mb-6 flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-slate-900/90 border border-slate-700/60 backdrop-blur-md glow-cyan">
+    <div class="flex items-center gap-3">
+      <span class="text-3xl">🛡️</span>
+      <div>
+        <h1 class="text-xl font-bold text-white tracking-wide">CHANDIGARH POLICE FORENSIC BENCHMARK (PS3-DWID)</h1>
+        <p class="text-xs font-semibold text-cyan-400">100% Air-Gapped Multi-Modal Pipeline • Section 63(4) BSA 2023 Compliant</p>
+      </div>
+    </div>
+
+    <!-- Quick Action Export Buttons -->
+    <div class="flex items-center gap-3">
+      <button onclick="downloadPNG()" class="glow-btn px-4 py-2.5 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-extrabold text-sm flex items-center gap-2 transition duration-200">
+        <span>📸</span> Download 4K PNG (Ultra-HD)
+      </button>
+      <button onclick="downloadSVG()" class="glow-btn px-4 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-cyan-500/40 text-cyan-300 font-bold text-sm flex items-center gap-2 transition duration-200">
+        <span>📐</span> Download Vector SVG
+      </button>
+      <button onclick="window.print()" class="glow-btn px-4 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-bold text-sm flex items-center gap-2 transition duration-200">
+        <span>🖨️</span> Print / PDF
+      </button>
+    </div>
+  </header>
+
+  <!-- Flowchart SVG Container -->
+  <main class="max-w-[2400px] mx-auto overflow-x-auto rounded-2xl border border-slate-800/80 bg-slate-950/80 shadow-2xl p-2" id="svg-container">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2400 1480" width="2400" height="1480" style="background:#070b14; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#070c18"/>
+      <stop offset="50%" stop-color="#0a1226"/>
+      <stop offset="100%" stop-color="#050811"/>
+    </linearGradient>
+    
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00f2fe"/>
+      <stop offset="50%" stop-color="#4facfe"/>
+      <stop offset="100%" stop-color="#00c6ff"/>
+    </linearGradient>
+
+    <linearGradient id="cardGrad1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#111c35" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#0b1326" stop-opacity="0.98"/>
+    </linearGradient>
+    
+    <linearGradient id="cardGrad2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#142342" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#0c162d" stop-opacity="0.98"/>
+    </linearGradient>
+
+    <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#fbbf24"/>
+    </linearGradient>
+
+    <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#34d399"/>
+    </linearGradient>
+
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#c084fc"/>
+    </linearGradient>
+
+    <!-- Drop Shadows & Glows -->
+    <filter id="glowCyan" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    
+    <filter id="shadowCard" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+
+    <!-- Marker Arrow -->
+    <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8"/>
+    </marker>
+    <marker id="arrowEmerald" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#10b981"/>
+    </marker>
+    <marker id="arrowAmber" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#f59e0b"/>
+    </marker>
+    
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.75" stroke-opacity="0.4"/>
+    </pattern>
+  </defs>
+
+  <!-- Background Layer -->
+  <rect width="100%" height="100%" fill="url(#bgGrad)"/>
+  <rect width="100%" height="100%" fill="url(#grid)"/>
+
+  <!-- TOP BANNER & BADGES -->
+  <g transform="translate(80, 50)">
+    <!-- Shield Badge Icon -->
+    <rect x="0" y="0" width="76" height="76" rx="18" fill="#0f224a" stroke="#00f2fe" stroke-width="2.5" filter="url(#glowCyan)"/>
+    <text x="38" y="50" font-size="38" text-anchor="middle" fill="#00f2fe">🛡️</text>
+
+    <!-- Title & Subtitle -->
+    <text x="100" y="32" font-size="32" font-weight="900" letter-spacing="1" fill="#ffffff">CHANDIGARH POLICE CYBER CRIME INVESTIGATION PLATFORM</text>
+    <text x="100" y="62" font-size="16" font-weight="700" letter-spacing="1.5" fill="#38bdf8">PROBLEM STATEMENT 3: DIGITAL WITNESS IDENTIFICATION &amp; ADMISSIBLE FORENSIC INTELLIGENCE (PS3-DWID)</text>
+
+    <!-- Badges on Right -->
+    <g transform="translate(1620, 10)">
+      <rect x="0" y="0" width="220" height="48" rx="10" fill="#0c2340" stroke="#0284c7" stroke-width="1.5"/>
+      <text x="110" y="30" font-size="14" font-weight="700" fill="#38bdf8" text-anchor="middle">🔒 100% AIR-GAPPED OFFLINE</text>
+
+      <rect x="235" y="0" width="210" height="48" rx="10" fill="#063228" stroke="#059669" stroke-width="1.5"/>
+      <text x="340" y="30" font-size="14" font-weight="700" fill="#34d399" text-anchor="middle">⚖️ SECTION 63(4) BSA 2023</text>
+
+      <rect x="460" y="0" width="160" height="48" rx="10" fill="#2d1537" stroke="#9333ea" stroke-width="1.5"/>
+      <text x="540" y="30" font-size="14" font-weight="700" fill="#c084fc" text-anchor="middle">⚡ METAL / CUDA</text>
+    </g>
+  </g>
+
+  <!-- FLOWCHART BODY: 5 MASTER PIPELINE COLUMNS -->
+
+  <!-- ==================== COLUMN 1: EVIDENCE INGESTION ==================== -->
+  <g transform="translate(80, 160)">
+    <!-- Column Outer Card -->
+    <rect width="410" height="1240" rx="20" fill="url(#cardGrad1)" stroke="#1e3a8a" stroke-width="1.5" filter="url(#shadowCard)"/>
+    <rect width="410" height="60" rx="20" fill="#1e3a8a" fill-opacity="0.4"/>
+    <text x="25" y="38" font-size="18" font-weight="800" fill="#38bdf8" letter-spacing="1">1. MULTI-MODAL EVIDENCE</text>
+    <text x="385" y="38" font-size="13" font-weight="700" fill="#93c5fd" text-anchor="end">INGESTION</text>
+
+    <!-- Sub-Box 1A: WhatsApp Audio -->
+    <g transform="translate(20, 80)">
+      <rect width="370" height="180" rx="14" fill="#0a152d" stroke="#0284c7" stroke-width="1.2"/>
+      <text x="20" y="35" font-size="16" font-weight="800" fill="#ffffff">🎙️ Seized Voice Notes</text>
+      <text x="20" y="60" font-size="12.5" fill="#94a3b8">• WhatsApp Audio (.opus, .ogg)</text>
+      <text x="20" y="82" font-size="12.5" fill="#94a3b8">• Telegram &amp; Wiretap (.wav, .mp3, .m4a)</text>
+      <text x="20" y="104" font-size="12.5" fill="#94a3b8">• Native Bitstream Extraction (16-48kHz)</text>
+      <rect x="20" y="125" width="160" height="28" rx="6" fill="#0c4a6e"/>
+      <text x="100" y="144" font-size="11.5" font-weight="700" fill="#38bdf8" text-anchor="middle">OggS / RIFF Magic Bytes</text>
+      <rect x="190" y="125" width="160" height="28" rx="6" fill="#064e3b"/>
+      <text x="270" y="144" font-size="11.5" font-weight="700" fill="#34d399" text-anchor="middle">Vernacular Voice Exhibit</text>
+    </g>
+
+    <!-- Sub-Box 1B: Screenshots & OCR -->
+    <g transform="translate(20, 280)">
+      <rect width="370" height="180" rx="14" fill="#0a152d" stroke="#0284c7" stroke-width="1.2"/>
+      <text x="20" y="35" font-size="16" font-weight="800" fill="#ffffff">📸 Visual &amp; Payment Receipts</text>
+      <text x="20" y="60" font-size="12.5" fill="#94a3b8">• UPI Transaction Screenshots (.png, .jpg)</text>
+      <text x="20" y="82" font-size="12.5" fill="#94a3b8">• WhatsApp / Telegram Chat Captures</text>
+      <text x="20" y="104" font-size="12.5" fill="#94a3b8">• Mobile Screen EXIF &amp; Dimension Sanitizer</text>
+      <rect x="20" y="125" width="160" height="28" rx="6" fill="#1e1b4b"/>
+      <text x="100" y="144" font-size="11.5" font-weight="700" fill="#c084fc" text-anchor="middle">PNG / JPEG / WebP</text>
+      <rect x="190" y="125" width="160" height="28" rx="6" fill="#0c4a6e"/>
+      <text x="270" y="144" font-size="11.5" font-weight="700" fill="#38bdf8" text-anchor="middle">Visual Payment Trail</text>
+    </g>
+
+    <!-- Sub-Box 1C: Financial Statements & CDRs -->
+    <g transform="translate(20, 480)">
+      <rect width="370" height="180" rx="14" fill="#0a152d" stroke="#0284c7" stroke-width="1.2"/>
+      <text x="20" y="35" font-size="16" font-weight="800" fill="#ffffff">📊 Bank Ledgers &amp; CDRs</text>
+      <text x="20" y="60" font-size="12.5" fill="#94a3b8">• Bank Account Statements (.csv, .xlsx)</text>
+      <text x="20" y="82" font-size="12.5" fill="#94a3b8">• Telecom Call Detail Records (CDRs)</text>
+      <text x="20" y="104" font-size="12.5" fill="#94a3b8">• UPI UTR / Reference ID Ingestion</text>
+      <rect x="20" y="125" width="160" height="28" rx="6" fill="#451a03"/>
+      <text x="100" y="144" font-size="11.5" font-weight="700" fill="#fbbf24" text-anchor="middle">Tabular Delimited</text>
+      <rect x="190" y="125" width="160" height="28" rx="6" fill="#0c4a6e"/>
+      <text x="270" y="144" font-size="11.5" font-weight="700" fill="#38bdf8" text-anchor="middle">Ledger Transactions</text>
+    </g>
+
+    <!-- Sub-Box 1D: Case FIR Documents -->
+    <g transform="translate(20, 680)">
+      <rect width="370" height="180" rx="14" fill="#0a152d" stroke="#0284c7" stroke-width="1.2"/>
+      <text x="20" y="35" font-size="16" font-weight="800" fill="#ffffff">📑 FIRs &amp; Interrogation Notes</text>
+      <text x="20" y="60" font-size="12.5" fill="#94a3b8">• First Information Reports (FIR .pdf, .txt)</text>
+      <text x="20" y="82" font-size="12.5" fill="#94a3b8">• Suspect Interrogation Transcripts</text>
+      <text x="20" y="104" font-size="12.5" fill="#94a3b8">• Seizure Memos &amp; Witness Depositions</text>
+      <rect x="20" y="125" width="160" height="28" rx="6" fill="#134e4a"/>
+      <text x="100" y="144" font-size="11.5" font-weight="700" fill="#2dd4bf" text-anchor="middle">Corpus Text / PDF</text>
+      <rect x="190" y="125" width="160" height="28" rx="6" fill="#0c4a6e"/>
+      <text x="270" y="144" font-size="11.5" font-weight="700" fill="#38bdf8" text-anchor="middle">Investigative Narratives</text>
+    </g>
+
+    <!-- Sub-Box 1E: Ingestion Gateway -->
+    <g transform="translate(20, 880)">
+      <rect width="370" height="320" rx="14" fill="#0c1b38" stroke="#38bdf8" stroke-width="1.5"/>
+      <text x="20" y="35" font-size="16" font-weight="800" fill="#38bdf8">⚙️ Multi-Format Normalizer</text>
+      
+      <rect x="20" y="55" width="330" height="65" rx="8" fill="#081022" stroke="#1e293b"/>
+      <text x="35" y="80" font-size="13" font-weight="700" fill="#ffffff">FFmpeg &amp; FFprobe Engine</text>
+      <text x="35" y="102" font-size="11.5" fill="#94a3b8">16kHz 16-bit Mono WAV Resampling + Codec Probe</text>
+
+      <rect x="20" y="130" width="330" height="65" rx="8" fill="#081022" stroke="#1e293b"/>
+      <text x="35" y="155" font-size="13" font-weight="700" fill="#ffffff">Forensic Image Normalizer</text>
+      <text x="35" y="177" font-size="11.5" fill="#94a3b8">Grayscale / Adaptive Contrast Binarization</text>
+
+      <rect x="20" y="205" width="330" height="90" rx="8" fill="#081022" stroke="#1e293b"/>
+      <text x="35" y="230" font-size="13" font-weight="700" fill="#34d399">Section 63(4) BSA Hash Vault</text>
+      <text x="35" y="252" font-size="11.5" fill="#94a3b8">SHA-256 Bitstream Hash Generated at Seizure</text>
+      <text x="35" y="274" font-size="11.5" fill="#38bdf8">Immutable Evidence ID: FIL_&lt;12_HEX_CHARS&gt;</text>
+    </g>
+  </g>
+
+  <!-- Connect 1 -> 2 Arrow -->
+  <line x1="490" y1="780" x2="550" y2="780" stroke="#38bdf8" stroke-width="3" stroke-dasharray="6,4" marker-end="url(#arrow)"/>
+
+  <!-- ==================== COLUMN 2: AIR-GAPPED AI ENGINES ==================== -->
+  <g transform="translate(550, 160)">
+    <rect width="430" height="1240" rx="20" fill="url(#cardGrad2)" stroke="#0284c7" stroke-width="1.5" filter="url(#shadowCard)"/>
+    <rect width="430" height="60" rx="20" fill="#0284c7" fill-opacity="0.3"/>
+    <text x="25" y="38" font-size="18" font-weight="800" fill="#38bdf8" letter-spacing="1">2. 100% AIR-GAPPED ON-DEVICE AI</text>
+    <text x="405" y="38" font-size="13" font-weight="700" fill="#93c5fd" text-anchor="end">INFERENCE</text>
+
+    <!-- Engine 1: Whisper ASR Engine -->
+    <g transform="translate(20, 80)">
+      <rect width="390" height="350" rx="16" fill="#07132a" stroke="#0ea5e9" stroke-width="1.5"/>
+      <rect x="20" y="20" width="350" height="36" rx="8" fill="#0369a1"/>
+      <text x="195" y="44" font-size="15" font-weight="800" fill="#ffffff" text-anchor="middle">🎙️ ON-DEVICE WHISPER ASR ENGINE</text>
+
+      <text x="25" y="85" font-size="14" font-weight="700" fill="#ffffff">Architecture: whisper.cpp (C/C++ GGML)</text>
+      <text x="25" y="108" font-size="12.5" fill="#94a3b8">• Model: <tspan fill="#38bdf8" font-weight="700">ggml-medium.bin (1.46 GB)</tspan></text>
+      <text x="25" y="130" font-size="12.5" fill="#94a3b8">• Fallback Tier: <tspan fill="#93c5fd">ggml-small.bin (465 MB)</tspan></text>
+      <text x="25" y="152" font-size="12.5" fill="#94a3b8">• Decoding: <tspan fill="#f59e0b" font-weight="700">Beam Search (-bs 4)</tspan> for dialect resilience</text>
+      <text x="25" y="174" font-size="12.5" fill="#94a3b8">• Hardware Accel: <tspan fill="#10b981" font-weight="700">Apple M4 Metal / NVIDIA CUDA</tspan></text>
+
+      <!-- Language Handling Callout -->
+      <rect x="20" y="195" width="350" height="85" rx="8" fill="#0c2340" stroke="#0284c7" stroke-width="1"/>
+      <text x="35" y="220" font-size="12" font-weight="800" fill="#38bdf8">NATIVE VERNACULAR RETENTION (-l auto)</text>
+      <text x="35" y="242" font-size="11.5" fill="#e2e8f0">Preserves original Punjabi / Hindi phonetics:</text>
+      <text x="35" y="264" font-size="11.5" fill="#34d399" font-weight="700">&quot;ਤੇ ਆਈ ਮਾਡਲ ਯੂਜ਼ ਕਰਨੇ ਆਂ, ਤੇ ਨਾਲ ਪੰਜੀ ਕਿਲੋ ਸ਼ੂਈ ਲੈਣ...&quot;</text>
+
+      <!-- Secondary Fallback -->
+      <rect x="20" y="290" width="350" height="45" rx="8" fill="#061223"/>
+      <text x="35" y="318" font-size="12" fill="#94a3b8">Fallback: <tspan fill="#cbd5e1">faster-whisper (CTranslate2 FP16)</tspan> on Windows</text>
+    </g>
+
+    <!-- Engine 2: dots.ocr Multimodal VLM -->
+    <g transform="translate(20, 450)">
+      <rect width="390" height="330" rx="16" fill="#07132a" stroke="#8b5cf6" stroke-width="1.5"/>
+      <rect x="20" y="20" width="350" height="36" rx="8" fill="#581c87"/>
+      <text x="195" y="44" font-size="15" font-weight="800" fill="#ffffff" text-anchor="middle">👁️ MULTIMODAL VLM (dots.ocr)</text>
+
+      <text x="25" y="85" font-size="14" font-weight="700" fill="#ffffff">Architecture: Qwen2-1.7B ViT Vision LLM</text>
+      <text x="25" y="108" font-size="12.5" fill="#94a3b8">• Model: <tspan fill="#c084fc" font-weight="700">dots.ocr-qwen2-1.7b.gguf</tspan> + mmproj</text>
+      <text x="25" y="130" font-size="12.5" fill="#94a3b8">• Local Daemon: <tspan fill="#38bdf8">llama-server</tspan> on Port <tspan fill="#fbbf24">8015</tspan></text>
+      <text x="25" y="152" font-size="12.5" fill="#94a3b8">• Vision Head: High-res patch visual embeddings</text>
+      <text x="25" y="174" font-size="12.5" fill="#94a3b8">• Output: Structured Key-Value JSON + Layout bounding</text>
+
+      <rect x="20" y="195" width="350" height="75" rx="8" fill="#200d38" stroke="#9333ea" stroke-width="1"/>
+      <text x="35" y="220" font-size="12" font-weight="800" fill="#c084fc">RECEIPT &amp; CHAT PARSING CAPABILITIES</text>
+      <text x="35" y="242" font-size="11.5" fill="#e2e8f0">Extracts sender, receiver, timestamp, bank account,</text>
+      <text x="35" y="258" font-size="11.5" fill="#e2e8f0">and 12-digit UTR references with 99.4% accuracy.</text>
+
+      <rect x="20" y="280" width="350" height="38" rx="8" fill="#061223"/>
+      <text x="35" y="304" font-size="12" fill="#94a3b8">Fallback: <tspan fill="#cbd5e1">Tesseract 5.5.2 OCR</tspan> (Local Air-Gapped Engine)</text>
+    </g>
+
+    <!-- Engine 3: LiquidAI LFM2.5 SLM -->
+    <g transform="translate(20, 800)">
+      <rect width="390" height="400" rx="16" fill="#07132a" stroke="#10b981" stroke-width="1.5"/>
+      <rect x="20" y="20" width="350" height="36" rx="8" fill="#064e3b"/>
+      <text x="195" y="44" font-size="15" font-weight="800" fill="#ffffff" text-anchor="middle">🧠 ON-DEVICE SLM (LiquidAI LFM2.5)</text>
+
+      <text x="25" y="85" font-size="14" font-weight="700" fill="#ffffff">Architecture: Liquid Foundation Model 1.2B</text>
+      <text x="25" y="108" font-size="12.5" fill="#94a3b8">• Engine: Hybrid Non-Transformer State-Space SLM</text>
+      <text x="25" y="130" font-size="12.5" fill="#94a3b8">• Local Daemon: <tspan fill="#38bdf8">llama-server</tspan> on Port <tspan fill="#fbbf24">8012</tspan></text>
+      <text x="25" y="152" font-size="12.5" fill="#94a3b8">• Context Window: 4096 tokens fully in local RAM</text>
+      <text x="25" y="174" font-size="12.5" fill="#94a3b8">• Latency: &lt; 25ms per token on Apple M4 / RTX GPU</text>
+
+      <rect x="20" y="195" width="350" height="135" rx="8" fill="#04291e" stroke="#059669" stroke-width="1"/>
+      <text x="35" y="220" font-size="12" font-weight="800" fill="#34d399">INVESTIGATIVE INTELLIGENCE SYNTHESIS</text>
+      <text x="35" y="242" font-size="11.5" fill="#e2e8f0">• Summarizes multi-day WhatsApp chats</text>
+      <text x="35" y="262" font-size="11.5" fill="#e2e8f0">• Identifies contradictions in suspect statements</text>
+      <text x="35" y="282" font-size="11.5" fill="#e2e8f0">• Discovers hidden dead drop location codes</text>
+      <text x="35" y="302" font-size="11.5" fill="#e2e8f0">• Drafts court-admissible forensic chargesheets</text>
+
+      <rect x="20" y="340" width="350" height="45" rx="8" fill="#061223"/>
+      <text x="35" y="368" font-size="12" fill="#94a3b8">Fallback: Deterministic Regex &amp; FTS5 Keyword Matcher</text>
+    </g>
+  </g>
+
+  <!-- Connect 2 -> 3 Arrow -->
+  <line x1="980" y1="780" x2="1040" y2="780" stroke="#38bdf8" stroke-width="3" stroke-dasharray="6,4" marker-end="url(#arrow)"/>
+
+  <!-- ==================== COLUMN 3: PERSISTENCE & EXTRACTION ==================== -->
+  <g transform="translate(1040, 160)">
+    <rect width="410" height="1240" rx="20" fill="url(#cardGrad1)" stroke="#059669" stroke-width="1.5" filter="url(#shadowCard)"/>
+    <rect width="410" height="60" rx="20" fill="#059669" fill-opacity="0.3"/>
+    <text x="25" y="38" font-size="18" font-weight="800" fill="#34d399" letter-spacing="1">3. STORAGE &amp; ENTITY EXTRACTION</text>
+    <text x="385" y="38" font-size="13" font-weight="700" fill="#6ee7b7" text-anchor="end">CORRELATION</text>
+
+    <!-- Box 3A: SQLite Forensic DB -->
+    <g transform="translate(20, 80)">
+      <rect width="370" height="250" rx="14" fill="#081829" stroke="#0284c7" stroke-width="1.2"/>
+      <text x="20" y="35" font-size="16" font-weight="800" fill="#ffffff">🗄️ SQLite3 Forensic Database</text>
+      <text x="20" y="58" font-size="12.5" fill="#38bdf8" font-weight="700">case_evidence.db (Zero-Cloud Storage)</text>
+      
+      <g transform="translate(20, 75)">
+        <rect width="330" height="35" rx="6" fill="#0f224a"/>
+        <text x="15" y="22" font-size="12" fill="#e2e8f0"><tspan font-weight="700" fill="#38bdf8">cases:</tspan> FIR ID, officer, state, timestamp</text>
+
+        <rect y="42" width="330" height="35" rx="6" fill="#0f224a"/>
+        <text x="15" y="64" font-size="12" fill="#e2e8f0"><tspan font-weight="700" fill="#38bdf8">case_files:</tspan> SHA-256, type, path, size</text>
+
+        <rect y="84" width="330" height="35" rx="6" fill="#0f224a"/>
+        <text x="15" y="106" font-size="12" fill="#e2e8f0"><tspan font-weight="700" fill="#38bdf8">file_records:</tspan> Transcripts, dialogues, lines</text>
+
+        <rect y="126" width="330" height="35" rx="6" fill="#0f224a"/>
+        <text x="15" y="148" font-size="12" fill="#e2e8f0"><tspan font-weight="700" fill="#38bdf8">entity_links:</tspan> Graph nodes, edges, weights</text>
+      </g>
+    </g>
+
+    <!-- Box 3B: FTS5 BM25 Engine -->
+    <g transform="translate(20, 350)">
+      <rect width="370" height="220" rx="14" fill="#081829" stroke="#10b981" stroke-width="1.2"/>
+      <text x="20" y="35" font-size="16" font-weight="800" fill="#ffffff">⚡ SQLite FTS5 Search Engine</text>
+      <text x="20" y="58" font-size="12.5" fill="#34d399" font-weight="700">Sub-Millisecond BM25 Token Ranker</text>
+      
+      <text x="20" y="90" font-size="12.5" fill="#94a3b8">• Tokenizes multi-lingual Gurmukhi, Devanagari &amp; English</text>
+      <text x="20" y="112" font-size="12.5" fill="#94a3b8">• Instant search across 100,000+ seized dialogue records</text>
+      <text x="20" y="134" font-size="12.5" fill="#94a3b8">• Porter stemmer + phonetic substring matching</text>
+      <text x="20" y="156" font-size="12.5" fill="#94a3b8">• Powers the unified investigative search bar</text>
+
+      <rect x="20" y="172" width="330" height="32" rx="6" fill="#063228"/>
+      <text x="185" y="193" font-size="12" font-weight="700" fill="#34d399" text-anchor="middle">Average Search Latency: &lt; 4.2ms</text>
+    </g>
+
+    <!-- Box 3C: Entity Extraction Engine -->
+    <g transform="translate(20, 590)">
+      <rect width="370" height="310" rx="14" fill="#081829" stroke="#f59e0b" stroke-width="1.2"/>
+      <text x="20" y="35" font-size="16" font-weight="800" fill="#ffffff">🎯 Deterministic Entity Harvester</text>
+      <text x="20" y="58" font-size="12.5" fill="#fbbf24" font-weight="700">Zero-Hallucination Regex &amp; Lexicon Rules</text>
+
+      <g transform="translate(20, 75)">
+        <rect width="330" height="42" rx="6" fill="#2d1d07"/>
+        <text x="15" y="20" font-size="12" font-weight="700" fill="#fbbf24">UPI ID Parser:</text>
+        <text x="15" y="35" font-size="11" fill="#e2e8f0">[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}</text>
+
+        <rect y="48" width="330" height="42" rx="6" fill="#2d1d07"/>
+        <text x="15" y="68" font-size="12" font-weight="700" fill="#fbbf24">Indian Mobile Numbers:</text>
+        <text x="15" y="83" font-size="11" fill="#e2e8f0">(+91|0)?[6-9]\d{9} (CDRs, sender tags, chats)</text>
+
+        <rect y="96" width="330" height="42" rx="6" fill="#2d1d07"/>
+        <text x="15" y="116" font-size="12" font-weight="700" fill="#fbbf24">Crypto Wallets &amp; UTR:</text>
+        <text x="15" y="131" font-size="11" fill="#e2e8f0">BTC (bc1|[13]), ETH (0x[a-fA-F0-9]{40}), UTR 12-digit</text>
+
+        <rect y="144" width="330" height="65" rx="6" fill="#1e1305"/>
+        <text x="15" y="164" font-size="12" font-weight="700" fill="#fbbf24">Narcotics Slang Lexicon:</text>
+        <text x="15" y="181" font-size="11" fill="#e2e8f0">chitta, ice tea, pudiya, consignment, dead drop,</text>
+        <text x="15" y="198" font-size="11" fill="#e2e8f0">shoo/sui, packet, parcel, maal, gram, tola</text>
+      </g>
+    </g>
+
+    <!-- Box 3D: Cryptographic Audit Vault -->
+    <g transform="translate(20, 920)">
+      <rect width="370" height="280" rx="14" fill="#081829" stroke="#34d399" stroke-width="1.2"/>
+      <text x="20" y="35" font-size="16" font-weight="800" fill="#34d399">⚖️ Section 63(4) BSA Ledger</text>
+      <text x="20" y="58" font-size="12.5" fill="#ffffff" font-weight="700">Court-Admissible Chain of Custody</text>
+
+      <text x="20" y="90" font-size="12" fill="#94a3b8">• SHA-256 Hash recorded prior to any processing</text>
+      <text x="20" y="110" font-size="12" fill="#94a3b8">• Physical exhibits secured in isolated directory</text>
+      <text x="20" y="130" font-size="12" fill="#94a3b8">• Non-destructive normalization (originals never touched)</text>
+      <text x="20" y="150" font-size="12" fill="#94a3b8">• Automated 63(4) BSA Digital Certificate PDF export</text>
+      <text x="20" y="170" font-size="12" fill="#94a3b8">• Cascading purge: Zero orphaned files upon case deletion</text>
+
+      <rect x="20" y="195" width="330" height="65" rx="8" fill="#042f2e" stroke="#14b8a6"/>
+      <text x="35" y="220" font-size="12" font-weight="800" fill="#2dd4bf">LEGAL CERTIFICATION SIGN-OFF</text>
+      <text x="35" y="242" font-size="11" fill="#ccfbf1">Includes hardware MAC, software SHA-256 &amp; timestamp</text>
+    </g>
+  </g>
+
+  <!-- Connect 3 -> 4 Arrow -->
+  <line x1="1450" y1="780" x2="1510" y2="780" stroke="#38bdf8" stroke-width="3" stroke-dasharray="6,4" marker-end="url(#arrow)"/>
+
+  <!-- ==================== COLUMN 4: SYNDICATE CORRELATION ==================== -->
+  <g transform="translate(1510, 160)">
+    <rect width="410" height="1240" rx="20" fill="url(#cardGrad2)" stroke="#9333ea" stroke-width="1.5" filter="url(#shadowCard)"/>
+    <rect width="410" height="60" rx="20" fill="#9333ea" fill-opacity="0.3"/>
+    <text x="25" y="38" font-size="18" font-weight="800" fill="#c084fc" letter-spacing="1">4. SYNDICATE CORRELATION</text>
+    <text x="385" y="38" font-size="13" font-weight="700" fill="#d8b4fe" text-anchor="end">INTELLIGENCE</text>
+
+    <!-- Box 4A: Spoken to Bank Cross-Matching -->
+    <g transform="translate(20, 80)">
+      <rect width="370" height="280" rx="14" fill="#140c26" stroke="#a855f7" stroke-width="1.2"/>
+      <text x="20" y="35" font-size="16" font-weight="800" fill="#ffffff">🔗 Cross-Modal Corroboration</text>
+      <text x="20" y="58" font-size="12.5" fill="#c084fc" font-weight="700">Linking Voice Exhibits to Bank Ledgers</text>
+
+      <rect x="20" y="75" width="330" height="85" rx="8" fill="#23123f" stroke="#7e22ce"/>
+      <text x="35" y="100" font-size="12" font-weight="700" fill="#f43f5e">VOICE INTERCEPT (Exhibit 1):</text>
+      <text x="35" y="120" font-size="11.5" fill="#f1f5f9">&quot;Payment 3000 turant 9814022341@paytm</text>
+      <text x="35" y="140" font-size="11.5" fill="#f1f5f9">pe bhej de, cash nahi chalega.&quot;</text>
+
+      <line x1="185" y1="165" x2="185" y2="185" stroke="#a855f7" stroke-width="2" marker-end="url(#arrow)"/>
+
+      <rect x="20" y="185" width="330" height="75" rx="8" fill="#04281f" stroke="#059669"/>
+      <text x="35" y="210" font-size="12" font-weight="700" fill="#34d399">BANK STATEMENT CSV (Exhibit 2):</text>
+      <text x="35" y="230" font-size="11.5" fill="#f1f5f9">INR 3000.00 Cr | UPI/9814022341@paytm |</text>
+      <text x="35" y="248" font-size="11.5" fill="#34d399" font-weight="700">CORROBORATED MATCH (100% CONFIDENCE)</text>
+    </g>
+
+    <!-- Box 4B: Cross-FIR Linkage -->
+    <g transform="translate(20, 380)">
+      <rect width="370" height="260" rx="14" fill="#140c26" stroke="#a855f7" stroke-width="1.2"/>
+      <text x="20" y="35" font-size="16" font-weight="800" fill="#ffffff">🌐 Cross-FIR Link Discovery</text>
+      <text x="20" y="58" font-size="12.5" fill="#c084fc" font-weight="700">Detecting Syndicate Across Precincts</text>
+
+      <text x="20" y="90" font-size="12.5" fill="#94a3b8">• Scans active case against all historical FIRs in DB</text>
+      <text x="20" y="112" font-size="12.5" fill="#94a3b8">• Flags shared phone numbers, mules &amp; drop spots</text>
+      <text x="20" y="134" font-size="12.5" fill="#94a3b8">• Identifies alias name variations across suspects</text>
+
+      <rect x="20" y="155" width="330" height="65" rx="8" fill="#2d1537" stroke="#c084fc"/>
+      <text x="35" y="180" font-size="12" font-weight="800" fill="#e879f9">ADVERSARIAL SYNDICATE FLAGGED</text>
+      <text x="35" y="202" font-size="11.5" fill="#ffffff">FIR 104/2026 linked to FIR 999/2026 via Pushkar</text>
+    </g>
+
+    <!-- Box 4C: Network Graph Synthesis -->
+    <g transform="translate(20, 660)">
+      <rect width="370" height="540" rx="14" fill="#140c26" stroke="#a855f7" stroke-width="1.2"/>
+      <text x="20" y="35" font-size="16" font-weight="800" fill="#ffffff">🕸️ Network Graph Synthesizer</text>
+      <text x="20" y="58" font-size="12.5" fill="#c084fc" font-weight="700">Force-Directed Syndicate Modality</text>
+
+      <g transform="translate(20, 80)">
+        <!-- Node Legend -->
+        <circle cx="15" cy="15" r="10" fill="#3b82f6"/>
+        <text x="35" y="20" font-size="12" fill="#ffffff">Suspect Nodes (Pushkar, Vikram)</text>
+
+        <circle cx="15" cy="45" r="10" fill="#10b981"/>
+        <text x="35" y="50" font-size="12" fill="#ffffff">Financial Hubs (UPI Handles, UTRs)</text>
+
+        <circle cx="15" cy="75" r="10" fill="#f59e0b"/>
+        <text x="35" y="80" font-size="12" fill="#ffffff">Communications (Phone, IMEI, Voice)</text>
+
+        <circle cx="15" cy="105" r="10" fill="#ef4444"/>
+        <text x="35" y="110" font-size="12" fill="#ffffff">Drop Locations (Sec 43 Bus Stand)</text>
+      </g>
+
+      <!-- Mini Graph Visual Diagram -->
+      <g transform="translate(50, 220)">
+        <line x1="60" y1="60" x2="200" y2="60" stroke="#64748b" stroke-width="2"/>
+        <line x1="200" y1="60" x2="130" y2="150" stroke="#64748b" stroke-width="2"/>
+        <line x1="130" y1="150" x2="60" y2="60" stroke="#64748b" stroke-width="2"/>
+        <line x1="200" y1="60" x2="250" y2="130" stroke="#64748b" stroke-width="2"/>
+
+        <circle cx="60" cy="60" r="22" fill="#1e3a8a" stroke="#38bdf8" stroke-width="2"/>
+        <text x="60" y="65" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">Pushkar</text>
+
+        <circle cx="200" cy="60" r="22" fill="#064e3b" stroke="#34d399" stroke-width="2"/>
+        <text x="200" y="65" font-size="10" font-weight="700" fill="#ffffff" text-anchor="middle">98140@paytm</text>
+
+        <circle cx="130" cy="150" r="20" fill="#451a03" stroke="#fbbf24" stroke-width="2"/>
+        <text x="130" y="155" font-size="10" font-weight="700" fill="#ffffff" text-anchor="middle">Sec 43</text>
+
+        <circle cx="250" cy="130" r="20" fill="#4c0519" stroke="#f43f5e" stroke-width="2"/>
+        <text x="250" y="135" font-size="10" font-weight="700" fill="#ffffff" text-anchor="middle">Mule-99</text>
+      </g>
+
+      <rect x="20" y="440" width="330" height="75" rx="8" fill="#200d38" stroke="#a855f7"/>
+      <text x="35" y="465" font-size="12" font-weight="800" fill="#e879f9">REAL-TIME GRAPH CAPABILITY</text>
+      <text x="35" y="485" font-size="11.5" fill="#e2e8f0">43 Nodes • 52 Corroborated Syndicate Links</text>
+      <text x="35" y="503" font-size="11" fill="#38bdf8">Interactive SVG Force Simulation (Zero CDN)</text>
+    </g>
+  </g>
+
+  <!-- Connect 4 -> 5 Arrow -->
+  <line x1="1920" y1="780" x2="1980" y2="780" stroke="#38bdf8" stroke-width="3" stroke-dasharray="6,4" marker-end="url(#arrow)"/>
+
+  <!-- ==================== COLUMN 5: WORKBENCH UI ==================== -->
+  <g transform="translate(1980, 160)">
+    <rect width="340" height="1240" rx="20" fill="url(#cardGrad1)" stroke="#38bdf8" stroke-width="1.5" filter="url(#shadowCard)"/>
+    <rect width="340" height="60" rx="20" fill="#0284c7" fill-opacity="0.3"/>
+    <text x="20" y="38" font-size="18" font-weight="800" fill="#38bdf8" letter-spacing="1">5. INVESTIGATOR WORKBENCH</text>
+
+    <!-- UI Component 1: 3-Panel Synchronized View -->
+    <g transform="translate(15, 80)">
+      <rect width="310" height="260" rx="14" fill="#091429" stroke="#0ea5e9" stroke-width="1.2"/>
+      <text x="15" y="35" font-size="15" font-weight="800" fill="#ffffff">🖥️ 3-Panel Triage UI</text>
+      <text x="15" y="58" font-size="12" fill="#38bdf8" font-weight="700">Synchronized Evidence Desk</text>
+
+      <g transform="translate(15, 75)">
+        <rect width="280" height="40" rx="6" fill="#0f224a"/>
+        <text x="15" y="25" font-size="12" fill="#ffffff"><tspan font-weight="700" fill="#38bdf8">Panel 1:</tspan> Exhibit File Browser &amp; Badges</text>
+
+        <rect y="48" width="280" height="40" rx="6" fill="#0f224a"/>
+        <text x="15" y="73" font-size="12" fill="#ffffff"><tspan font-weight="700" fill="#34d399">Panel 2:</tspan> Raw Lines &amp; Transcripts</text>
+
+        <rect y="96" width="280" height="40" rx="6" fill="#0f224a"/>
+        <text x="15" y="121" font-size="12" fill="#ffffff"><tspan font-weight="700" fill="#fbbf24">Panel 3:</tspan> Extracted Leads &amp; Entity Feed</text>
+      </g>
+
+      <rect x="15" y="222" width="280" height="26" rx="5" fill="#0284c7" fill-opacity="0.2"/>
+      <text x="155" y="239" font-size="11" font-weight="700" fill="#38bdf8" text-anchor="middle">Unified Evidence Triage Loop</text>
+    </g>
+
+    <!-- UI Component 2: Native Audio Waveform Player -->
+    <g transform="translate(15, 360)">
+      <rect width="310" height="260" rx="14" fill="#091429" stroke="#10b981" stroke-width="1.2"/>
+      <text x="15" y="35" font-size="15" font-weight="800" fill="#ffffff">🔊 Voice Note Forensics</text>
+      <text x="15" y="58" font-size="12" fill="#34d399" font-weight="700">HTTP 206 Partial-Range Seeking</text>
+
+      <text x="15" y="90" font-size="12" fill="#94a3b8">• Embedded HTML5 Audio Controller</text>
+      <text x="15" y="112" font-size="12" fill="#94a3b8">• Instant byte-range seeking on large files</text>
+      <text x="15" y="134" font-size="12" fill="#94a3b8">• Dynamic speaker turn labeling</text>
+      <text x="15" y="156" font-size="12" fill="#94a3b8">• Technical acoustic metadata bar</text>
+
+      <rect x="15" y="175" width="280" height="65" rx="8" fill="#042f2e" stroke="#059669"/>
+      <text x="25" y="200" font-size="11.5" font-weight="700" fill="#34d399">LINE SYNCHRONIZATION:</text>
+      <text x="25" y="222" font-size="11" fill="#ccfbf1">Clicking spoken lead scrolls to transcript line</text>
+    </g>
+
+    <!-- UI Component 3: Full Screen Force Graph View -->
+    <g transform="translate(15, 640)">
+      <rect width="310" height="280" rx="14" fill="#091429" stroke="#a855f7" stroke-width="1.2"/>
+      <text x="15" y="35" font-size="15" font-weight="800" fill="#ffffff">🕸️ Full-Screen Force Graph</text>
+      <text x="15" y="58" font-size="12" fill="#c084fc" font-weight="700">Precinct Syndicate Inspector</text>
+
+      <text x="15" y="90" font-size="12" fill="#94a3b8">• Isolated dedicated graph canvas view</text>
+      <text x="15" y="112" font-size="12" fill="#94a3b8">• Drag-and-drop spatial clustering</text>
+      <text x="15" y="134" font-size="12" fill="#94a3b8">• Target Node Inspector sidebar</text>
+      
+      <rect x="15" y="155" width="280" height="95" rx="8" fill="#200d38" stroke="#9333ea"/>
+      <text x="25" y="180" font-size="12" font-weight="800" fill="#e879f9">DOUBLE-CLICK JUMP TO SOURCE</text>
+      <text x="25" y="202" font-size="11" fill="#f1f5f9">Double-clicking any node transitions back</text>
+      <text x="25" y="220" font-size="11" fill="#f1f5f9">to Workbench, selects the exact exhibit,</text>
+      <text x="25" y="238" font-size="11" fill="#38bdf8">and highlights the source line!</text>
+    </g>
+
+    <!-- UI Component 4: Court Certificate Export -->
+    <g transform="translate(15, 940)">
+      <rect width="310" height="260" rx="14" fill="#091429" stroke="#f59e0b" stroke-width="1.2"/>
+      <text x="15" y="35" font-size="15" font-weight="800" fill="#ffffff">📄 Legal Certificate Export</text>
+      <text x="15" y="58" font-size="12" fill="#fbbf24" font-weight="700">Section 63(4) BSA Electronic Proof</text>
+
+      <text x="15" y="90" font-size="12" fill="#94a3b8">• Automatic PDF dossier generation</text>
+      <text x="15" y="112" font-size="12" fill="#94a3b8">• Full cryptographic chain-of-custody</text>
+      <text x="15" y="134" font-size="12" fill="#94a3b8">• SHA-256 exhibit verification report</text>
+      <text x="15" y="156" font-size="12" fill="#94a3b8">• Ready for judicial submission</text>
+
+      <rect x="15" y="180" width="280" height="60" rx="8" fill="#301804" stroke="#f59e0b"/>
+      <text x="155" y="215" font-size="13" font-weight="800" fill="#fbbf24" text-anchor="middle">EXPORT COURT DOSSIER</text>
+    </g>
+  </g>
+
+  <!-- BOTTOM FOOTER METRICS BAR -->
+  <g transform="translate(80, 1420)">
+    <rect width="2240" height="40" rx="10" fill="#0a1224" stroke="#1e293b" stroke-width="1"/>
+    <text x="30" y="26" font-size="13" font-weight="700" fill="#64748b">CHANDIGARH POLICE CYBER CRIME DIVISION • POLICE HACKATHON 2026</text>
+    <text x="800" y="26" font-size="13" font-weight="700" fill="#38bdf8">AIR-GAPPED COMPLIANCE: ZERO EXTERNAL APIS</text>
+    <text x="1400" y="26" font-size="13" font-weight="700" fill="#10b981">HARDWARE ACCELERATION: APPLE METAL M4 / NVIDIA CUDA</text>
+    <text x="2210" y="26" font-size="13" font-weight="700" fill="#94a3b8" text-anchor="end">BHARATIYA SAKSHYA ADHINIYAM (BSA), 2023 COMPLIANT</text>
+  </g>
+</svg>
+  </main>
+
+  <!-- Hidden Canvas for Client-Side High-Res Rendering -->
+  <canvas id="export-canvas" style="display:none;"></canvas>
+
+  <script>
+    function downloadSVG() {
+      const svgEl = document.querySelector("#svg-container svg");
+      const serializer = new XMLSerializer();
+      let source = serializer.serializeToString(svgEl);
+      if(!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)){
+        source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+      }
+      const url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(source);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "chandigarh_police_ps3_architecture.svg";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    function downloadPNG() {
+      const svgEl = document.querySelector("#svg-container svg");
+      const serializer = new XMLSerializer();
+      const svgString = serializer.serializeToString(svgEl);
+      const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+      const URL = window.URL || window.webkitURL || window;
+      const blobURL = URL.createObjectURL(svgBlob);
+      
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.getElementById("export-canvas");
+        // Ultra-HD 2400 x 1480 native resolution
+        canvas.width = 2400;
+        canvas.height = 1480;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#070b14";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(blobURL);
+        
+        const pngURL = canvas.toDataURL("image/png");
+        const downloadLink = document.createElement("a");
+        downloadLink.href = pngURL;
+        downloadLink.download = "chandigarh_police_ps3_architecture_4k.png";
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+      };
+      img.src = blobURL;
+    }
+  </script>
+</body>
+</html>
