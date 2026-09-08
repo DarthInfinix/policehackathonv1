@@ -25,72 +25,212 @@ import hashlib
 from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional, Tuple
 
+# Process flags for Windows: suppress cmd popup flashing
+SUBPROCESS_FLAGS: Dict[str, Any] = {}
+if sys.platform == "win32":
+    SUBPROCESS_FLAGS["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+
+_REPO_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Whisper binary search candidates (Windows .exe, portable tools, Homebrew, local builds)
 WHISPER_CPP_CANDIDATES = [
+    # Portable workspace folder
+    os.path.join(_REPO_DIR, "tools", "whisper", "whisper-cli.exe"),
+    os.path.join(_REPO_DIR, "tools", "whisper", "whisper-cli"),
+    os.path.join(_REPO_DIR, "tools", "whisper", "whisper.exe"),
+    os.path.join(_REPO_DIR, "tools", "whisper", "main.exe"),
+    # Windows standard / custom install paths
+    r"C:\whisper-cpp\whisper-cli.exe",
+    r"C:\whisper-cpp\whisper.exe",
+    r"C:\whisper-cpp\main.exe",
+    r"C:\whisper\whisper-cli.exe",
+    r"C:\whisper\whisper.exe",
+    r"C:\Program Files\whisper-cpp\whisper-cli.exe",
+    os.path.expandvars(r"%LOCALAPPDATA%\Programs\whisper\whisper-cli.exe"),
+    # macOS / Linux paths
     "/opt/homebrew/bin/whisper-cli",
     "/opt/homebrew/bin/whisper-cpp",
     "/usr/local/bin/whisper-cli",
     "/usr/local/bin/whisper-cpp",
     os.path.expanduser("~/whisper.cpp/build/bin/whisper-cli"),
     os.path.expanduser("~/whisper.cpp/main"),
-    r"C:\whisper-cpp\whisper.exe",
-    r"C:\whisper\whisper-cli.exe"
 ]
 
-WHISPER_MODEL_PATHS = [
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "whisper", "ggml-base.bin"),
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "whisper", "ggml-small.bin"),
-    "/Volumes/Offshore3/LlamaCpp/models/whisper/ggml-base.bin",
-    "/Volumes/Offshore3/LlamaCpp/models/whisper/ggml-small.bin",
-    os.path.expanduser("~/.cache/whisper/ggml-base.bin")
+# Model search directories & priority list (medium -> small -> base -> tiny)
+MODEL_PRIORITY_NAMES = [
+    "ggml-large-v3.bin",
+    "ggml-large-v3-turbo.bin",
+    "ggml-large.bin",
+    "ggml-medium.bin",
+    "ggml-small.bin",
+    "ggml-base.bin",
+    "ggml-tiny.bin"
+]
+
+MODEL_SEARCH_DIRS = [
+    os.path.join(_REPO_DIR, "models", "whisper"),
+    r"C:\whisper-cpp\models",
+    r"C:\whisper\models",
+    os.path.expandvars(r"%LOCALAPPDATA%\whisper\models"),
+    "/Volumes/Offshore3/LlamaCpp/models/whisper",
+    os.path.expanduser("~/.cache/whisper"),
 ]
 
 FFMPEG_PATHS = [
+    os.path.join(_REPO_DIR, "tools", "ffmpeg", "bin", "ffmpeg.exe"),
+    os.path.join(_REPO_DIR, "tools", "ffmpeg", "ffmpeg.exe"),
+    r"C:\ffmpeg\bin\ffmpeg.exe",
+    r"C:\Program Files\ffmpeg\bin\ffmpeg.exe",
+    os.path.expandvars(r"%LOCALAPPDATA%\Programs\ffmpeg\bin\ffmpeg.exe"),
     "/opt/homebrew/bin/ffmpeg",
     "/usr/local/bin/ffmpeg",
     "/usr/bin/ffmpeg",
-    r"C:\ffmpeg\bin\ffmpeg.exe",
-    shutil.which("ffmpeg")
 ]
 
 FFPROBE_PATHS = [
+    os.path.join(_REPO_DIR, "tools", "ffmpeg", "bin", "ffprobe.exe"),
+    os.path.join(_REPO_DIR, "tools", "ffmpeg", "ffprobe.exe"),
+    r"C:\ffmpeg\bin\ffprobe.exe",
+    r"C:\Program Files\ffmpeg\bin\ffprobe.exe",
+    os.path.expandvars(r"%LOCALAPPDATA%\Programs\ffmpeg\bin\ffprobe.exe"),
     "/opt/homebrew/bin/ffprobe",
     "/usr/local/bin/ffprobe",
     "/usr/bin/ffprobe",
-    r"C:\ffmpeg\bin\ffprobe.exe",
-    shutil.which("ffprobe")
 ]
 
 AUDIO_EXTENSIONS = {
     ".ogg", ".opus", ".wav", ".mp3", ".m4a", ".aac", ".flac", ".wma", ".webm"
 }
 
+def detect_gpu_acceleration() -> Dict[str, Any]:
+    """Detects available hardware acceleration (NVIDIA CUDA on Windows/Linux or Apple Silicon Metal on macOS)."""
+    # 1. Check NVIDIA GPU via nvidia-smi (Windows / Linux)
+    nvidia_smi = shutil.which("nvidia-smi")
+    if not nvidia_smi and sys.platform == "win32":
+        for cand in [
+            r"C:\Windows\System32\nvidia-smi.exe",
+            r"C:\Program Files\NVIDIA Corporation\NVSMI\nvidia-smi.exe"
+        ]:
+            if os.path.isfile(cand):
+                nvidia_smi = cand
+                break
+
+    if nvidia_smi:
+        try:
+            res = subprocess.run(
+                [nvidia_smi, "--query-gpu=name,memory.total", "--format=csv,noheader,nounits"],
+                capture_output=True,
+                text=True,
+                timeout=3,
+                **SUBPROCESS_FLAGS
+            )
+            if res.returncode == 0 and res.stdout.strip():
+                lines = [l.strip() for l in res.stdout.strip().split("\n") if l.strip()]
+                if lines:
+                    first_line = lines[0].split(",")
+                    gpu_name = first_line[0].strip()
+                    vram_mb = first_line[1].strip() if len(first_line) > 1 else "Unknown"
+                    return {
+                        "available": True,
+                        "type": "CUDA",
+                        "device": f"{gpu_name} ({vram_mb} MB VRAM)",
+                        "count": len(lines)
+                    }
+        except Exception:
+            pass
+
+    # 2. Check Apple Silicon Metal on macOS
+    if sys.platform == "darwin":
+        try:
+            res = subprocess.run(["sysctl", "-n", "machdep.cpu.brand_string"], capture_output=True, text=True, timeout=2)
+            brand = res.stdout.strip()
+            if "Apple" in brand:
+                return {
+                    "available": True,
+                    "type": "Metal (Apple Silicon Unified GPU)",
+                    "device": brand,
+                    "count": 1
+                }
+        except Exception:
+            pass
+
+    return {
+        "available": False,
+        "type": "CPU",
+        "device": "Standard CPU (Multi-threaded)",
+        "count": 1
+    }
+
 def get_ffmpeg_binary() -> Optional[str]:
     for p in FFMPEG_PATHS:
-        if p and os.path.isfile(p) and os.access(p, os.X_OK):
-            return p
-    return shutil.which("ffmpeg")
+        if p and os.path.isfile(p):
+            if sys.platform == "win32" or os.access(p, os.X_OK):
+                return p
+    w = shutil.which("ffmpeg")
+    return w if w else None
 
 def get_ffprobe_binary() -> Optional[str]:
     for p in FFPROBE_PATHS:
-        if p and os.path.isfile(p) and os.access(p, os.X_OK):
-            return p
-    return shutil.which("ffprobe")
+        if p and os.path.isfile(p):
+            if sys.platform == "win32" or os.access(p, os.X_OK):
+                return p
+    w = shutil.which("ffprobe")
+    return w if w else None
 
 def get_whisper_binary() -> Optional[str]:
     for p in WHISPER_CPP_CANDIDATES:
-        if os.path.isfile(p) and os.access(p, os.X_OK):
-            return p
-    for cmd in ["whisper-cli", "whisper-cpp", "whisper"]:
+        if p and os.path.isfile(p):
+            if sys.platform == "win32" or os.access(p, os.X_OK):
+                return p
+    for cmd in ["whisper-cli", "whisper-cpp", "whisper", "main"]:
         w = shutil.which(cmd)
-        if w and os.access(w, os.X_OK):
+        if w and (sys.platform == "win32" or os.access(w, os.X_OK)):
             return w
     return None
 
 def get_whisper_model() -> Optional[str]:
-    for p in WHISPER_MODEL_PATHS:
-        if os.path.isfile(p) and os.path.getsize(p) > 1024 * 1024:
-            return p
+    """Returns path to best available whisper model, searching priority: large -> medium -> small -> base -> tiny."""
+    # Check explicit env override
+    env_model = os.environ.get("WHISPER_MODEL_PATH")
+    if env_model and os.path.isfile(env_model) and os.path.getsize(env_model) > 1024 * 1024:
+        return env_model
+
+    # Search in order of priority (larger models preferred for higher accuracy on Punjabi/Hindi)
+    for model_name in MODEL_PRIORITY_NAMES:
+        for search_dir in MODEL_SEARCH_DIRS:
+            cand = os.path.join(search_dir, model_name)
+            if os.path.isfile(cand) and os.path.getsize(cand) > 1024 * 1024:
+                return cand
+
     return None
+
+def get_whisper_model_info() -> Dict[str, Any]:
+    """Returns metadata about the active Whisper model tier, path, and file size."""
+    model_path = get_whisper_model()
+    if not model_path:
+        return {
+            "tier": "None",
+            "filename": None,
+            "path": None,
+            "size_mb": 0.0,
+            "status": "missing"
+        }
+    
+    fname = os.path.basename(model_path).lower()
+    tier = "base"
+    for t in ["large-v3-turbo", "large-v3", "large", "medium", "small", "base", "tiny"]:
+        if t in fname:
+            tier = t
+            break
+            
+    size_mb = round(os.path.getsize(model_path) / (1024 * 1024), 2)
+    return {
+        "tier": tier,
+        "filename": os.path.basename(model_path),
+        "path": model_path,
+        "size_mb": size_mb,
+        "status": "ready"
+    }
 
 def is_audio_data(filename: str, header_bytes: bytes = b"") -> bool:
     """Accurately detects whether a file is an audio exhibit by extension and magic bytes."""
@@ -142,7 +282,7 @@ def probe_audio_metadata(audio_path: str) -> Dict[str, Any]:
     ]
 
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=8, **SUBPROCESS_FLAGS)
         if res.returncode == 0 and res.stdout:
             data = json.loads(res.stdout)
             streams = data.get("streams", [])
@@ -186,18 +326,60 @@ def convert_to_wav_16k_mono(input_path: str, output_path: str) -> bool:
     ]
 
     try:
-        res = subprocess.run(cmd, capture_output=True, timeout=15)
+        res = subprocess.run(cmd, capture_output=True, timeout=15, **SUBPROCESS_FLAGS)
         return res.returncode == 0 and os.path.isfile(output_path) and os.path.getsize(output_path) > 44
     except Exception as e:
         print(f"[FFMPEG CONVERT ERROR] {e}")
         return False
 
-def run_whisper_cpp_transcription(wav_path: str, language: str = "auto") -> Optional[List[Dict[str, Any]]]:
+def get_all_available_whisper_models() -> List[Tuple[str, str]]:
+    """Returns list of (tier, path) for all valid models present on disk in priority order."""
+    found: List[Tuple[str, str]] = []
+    seen = set()
+    env_model = os.environ.get("WHISPER_MODEL_PATH")
+    if env_model and os.path.isfile(env_model) and os.path.getsize(env_model) > 1024 * 1024:
+        found.append(("custom", env_model))
+        seen.add(os.path.abspath(env_model))
+
+    for m_name in MODEL_PRIORITY_NAMES:
+        for s_dir in MODEL_SEARCH_DIRS:
+            cand = os.path.join(s_dir, m_name)
+            if os.path.isfile(cand) and os.path.getsize(cand) > 1024 * 1024:
+                abs_p = os.path.abspath(cand)
+                if abs_p not in seen:
+                    tier = m_name.replace("ggml-", "").replace(".bin", "")
+                    found.append((tier, abs_p))
+                    seen.add(abs_p)
+    return found
+
+def is_degenerate_text(text: str) -> bool:
+    """Detects repeated character collapse (e.g. ਸਸਸਸਸ or aaaaaa) or pure sound effect brackets."""
+    t = text.strip()
+    if len(t) < 2:
+        return True
+    if re.match(r'^\([^\)]+\)$|^\[[^\]]+\]$', t):
+        return True
+    char_counts: Dict[str, int] = {}
+    for c in t:
+        if not c.isspace():
+            char_counts[c] = char_counts.get(c, 0) + 1
+    if char_counts:
+        max_c = max(char_counts.values())
+        total_chars = sum(char_counts.values())
+        if total_chars >= 6 and (max_c / total_chars) >= 0.55:
+            return True
+    return False
+
+def run_whisper_cpp_transcription(
+    wav_path: str, 
+    model_path: Optional[str] = None, 
+    language: str = "auto"
+) -> Optional[List[Dict[str, Any]]]:
     """Runs local whisper-cpp executable with ggml model to produce timestamped transcript lines in the original spoken language."""
     whisper_bin = get_whisper_binary()
-    model_path = get_whisper_model()
+    m_path = model_path or get_whisper_model()
 
-    if not whisper_bin or not model_path:
+    if not whisper_bin or not m_path or not os.path.isfile(m_path):
         return None
 
     out_prefix = wav_path + "_whisper_out"
@@ -207,16 +389,17 @@ def run_whisper_cpp_transcription(wav_path: str, language: str = "auto") -> Opti
 
     cmd = [
         whisper_bin,
-        "-m", model_path,
+        "-m", m_path,
         "-f", wav_path,
         "-oj", # output JSON format
         "-of", out_prefix,
         "-l", lang_arg,
-        "-np"  # suppress progress terminal printouts
+        "-np", # suppress progress terminal printouts
+        "-bs", "4" # beam size 4 for robust multi-hypothesis decoding across vernacular dialects
     ]
 
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=45)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=60, **SUBPROCESS_FLAGS)
         json_file = out_prefix + ".json"
         if os.path.isfile(json_file):
             with open(json_file, "r", encoding="utf-8") as jf:
@@ -234,7 +417,7 @@ def run_whisper_cpp_transcription(wav_path: str, language: str = "auto") -> Opti
             for seg in transcription:
                 t_str = seg.get("timestamps", {}).get("from", "00:00:00")
                 text = seg.get("text", "").strip()
-                if text:
+                if text and not is_degenerate_text(text):
                     lines.append({
                         "timestamp_offset": t_str,
                         "text": text,
@@ -244,6 +427,71 @@ def run_whisper_cpp_transcription(wav_path: str, language: str = "auto") -> Opti
                 return lines
     except Exception as e:
         print(f"[WHISPER EXEC ERROR] {e}")
+
+    return None
+
+def run_python_whisper_transcription(wav_path: str, language: str = "auto") -> Optional[Tuple[List[Dict[str, Any]], str]]:
+    """Fallback to faster-whisper or openai-whisper Python packages if whisper-cli binary is unavailable on Windows/Linux."""
+    gpu_info = detect_gpu_acceleration()
+    model_info = get_whisper_model_info()
+    tier = model_info.get("tier", "small")
+    model_path = model_info.get("path")
+    device = "cuda" if gpu_info.get("type") == "CUDA" else "cpu"
+
+    # 1. Try faster-whisper (high performance CTranslate2 engine on CUDA/CPU)
+    try:
+        from faster_whisper import WhisperModel
+        compute_type = "float16" if device == "cuda" else "int8"
+        m_target = model_path if (model_path and os.path.isfile(model_path)) else tier
+        model = WhisperModel(m_target, device=device, compute_type=compute_type)
+        lang_param = None if (not language or language == "auto") else language
+        segments, info = model.transcribe(wav_path, language=lang_param, beam_size=5)
+        
+        lines = []
+        for seg in segments:
+            text = seg.text.strip()
+            if text:
+                m, s = divmod(int(seg.start), 60)
+                h, m = divmod(m, 60)
+                lines.append({
+                    "timestamp_offset": f"{h:02d}:{m:02d}:{s:02d}",
+                    "text": text,
+                    "language": getattr(info, "language", "auto")
+                })
+        if lines:
+            engine_name = f"faster-whisper ({tier.upper()} on {gpu_info.get('type')})"
+            return lines, engine_name
+    except ImportError:
+        pass
+    except Exception as e:
+        print(f"[FASTER-WHISPER FALLBACK ERROR] {e}")
+
+    # 2. Try openai-whisper
+    try:
+        import whisper
+        m_name = tier if tier in ["tiny", "base", "small", "medium", "large"] else "base"
+        model = whisper.load_model(m_name, device=device)
+        lang_param = None if (not language or language == "auto") else language
+        res = model.transcribe(wav_path, language=lang_param)
+        lines = []
+        for seg in res.get("segments", []):
+            text = seg.get("text", "").strip()
+            if text:
+                start_sec = int(seg.get("start", 0))
+                m, s = divmod(start_sec, 60)
+                h, m = divmod(m, 60)
+                lines.append({
+                    "timestamp_offset": f"{h:02d}:{m:02d}:{s:02d}",
+                    "text": text,
+                    "language": res.get("language", "auto")
+                })
+        if lines:
+            engine_name = f"openai-whisper ({m_name.upper()} on {gpu_info.get('type')})"
+            return lines, engine_name
+    except ImportError:
+        pass
+    except Exception as e:
+        print(f"[OPENAI-WHISPER FALLBACK ERROR] {e}")
 
     return None
 
@@ -257,11 +505,14 @@ def transcribe_audio_payload(
     1. Writes audio bytes to temporary file.
     2. Probes technical audio metadata via ffprobe.
     3. Normalizes to 16kHz mono WAV via ffmpeg.
-    4. Executes on-device whisper-cpp ASR if available.
-    5. Falls back seamlessly to forensic context-aware intercept transcription for seized case exhibits.
+    4. Executes on-device whisper-cpp ASR with hardware acceleration (CUDA/Metal) if available.
+    5. Falls back to Python faster-whisper/whisper if standalone binary not present.
+    6. Falls back to forensic context-aware intercept transcription for seized exhibits.
     """
     file_sha256 = hashlib.sha256(content_bytes).hexdigest()
     now_iso = datetime.now(timezone.utc).isoformat()
+    gpu_info = detect_gpu_acceleration()
+    model_info = get_whisper_model_info()
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         input_file = os.path.join(tmp_dir, filename)
@@ -273,8 +524,24 @@ def transcribe_audio_payload(
         converted = convert_to_wav_16k_mono(input_file, wav_file)
 
         whisper_segments = None
+        engine_label = None
+
         if converted:
-            whisper_segments = run_whisper_cpp_transcription(wav_file)
+            # Try 1: whisper-cpp standalone executable cascading through available models
+            available_models = get_all_available_whisper_models()
+            for m_tier, m_path in available_models:
+                cand_segments = run_whisper_cpp_transcription(wav_file, model_path=m_path)
+                if cand_segments:
+                    whisper_segments = cand_segments
+                    gpu_tag = f" [{gpu_info.get('type')}]" if gpu_info.get("available") else ""
+                    engine_label = f"whisper-cpp Local GGML ({m_tier.upper()}){gpu_tag}"
+                    break
+
+            # Try 2: Python faster-whisper / openai-whisper if whisper-cpp produced no segments
+            if not whisper_segments:
+                py_res = run_python_whisper_transcription(wav_file)
+                if py_res:
+                    whisper_segments, engine_label = py_res
 
         records = []
         # Filter out purely non-speech audio hallucinations e.g. "(upbeat music)", "(bells chiming)", "[music]"
@@ -293,7 +560,7 @@ def transcribe_audio_payload(
         if filtered_whisper:
             detected_lang = filtered_whisper[0].get("language", "auto")
             lang_label = f" [Spoken: {detected_lang.upper()}]" if detected_lang and detected_lang != "auto" else ""
-            engine_used = f"whisper-cpp Local GGML{lang_label}"
+            engine_used = f"{engine_label}{lang_label}" if engine_label else f"Whisper ASR Local{lang_label}"
             for idx, seg in enumerate(filtered_whisper, 1):
                 records.append({
                     "source_type": "VOICE_NOTE",

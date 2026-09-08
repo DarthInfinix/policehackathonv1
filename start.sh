@@ -100,10 +100,20 @@ fi
 
 # 3. Check Whisper ASR Engine & Model
 WHISPER_CLI_BIN="$(which whisper-cli 2>/dev/null || which whisper-cpp 2>/dev/null || echo "")"
-WHISPER_MODEL_PATH="$DIR/models/whisper/ggml-base.bin"
+WHISPER_MODEL_PATH=""
+WHISPER_MODEL_TIER=""
 
-if [ -n "$WHISPER_CLI_BIN" ] && [ -f "$WHISPER_MODEL_PATH" ]; then
-    echo "✓ On-Device Whisper ASR: Ready (whisper-cpp Metal + ggml-base.bin)"
+for m_tier in "medium" "small" "base"; do
+    cand="$DIR/models/whisper/ggml-$m_tier.bin"
+    if [ -f "$cand" ]; then
+        WHISPER_MODEL_PATH="$cand"
+        WHISPER_MODEL_TIER="$m_tier"
+        break
+    fi
+done
+
+if [ -n "$WHISPER_CLI_BIN" ] && [ -n "$WHISPER_MODEL_PATH" ]; then
+    echo "✓ On-Device Whisper ASR: Ready (whisper-cpp Metal + ggml-$WHISPER_MODEL_TIER.bin)"
 else
     echo "ℹ️  On-Device Whisper ASR: Fallback mode active (ffmpeg forensic normalizer)"
 fi
@@ -143,7 +153,7 @@ echo "🟢 CHANDIGARH POLICE INVESTIGATION PLATFORM RUNNING"
 echo "   - Web UI:           http://localhost:$WEB_PORT"
 echo "   - LiquidAI (SLM):   http://localhost:$LIQUID_PORT"
 echo "   - dots.ocr (VLM):   http://localhost:$DOTS_PORT (or native CLI)"
-echo "   - Whisper (ASR):    $([ -n "$WHISPER_CLI_BIN" ] && [ -f "$WHISPER_MODEL_PATH" ] && echo "[ONLINE - Metal M4]" || echo "[STANDBY - Fallback]")"
+echo "   - Whisper (ASR):    $([ -n "$WHISPER_CLI_BIN" ] && [ -n "$WHISPER_MODEL_PATH" ] && echo "[ONLINE - Metal M4 (ggml-$WHISPER_MODEL_TIER.bin)]" || echo "[STANDBY - Fallback]")"
 echo "   - Logs:             tail -f logs/*.log"
 echo "================================================================="
 echo "Press Ctrl+C to safely terminate all platform processes."

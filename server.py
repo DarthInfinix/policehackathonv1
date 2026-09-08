@@ -265,11 +265,13 @@ class ForensicHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
                 return
 
-        # API: Local Air-Gapped Audio Engine Status Check (whisper-cpp + ffmpeg)
+        # API: Local Air-Gapped Audio Engine Status Check (whisper-cpp + ffmpeg + hardware acceleration)
         if path == '/api/audio_status':
             import audio_worker
             w_bin = audio_worker.get_whisper_binary()
             w_mod = audio_worker.get_whisper_model()
+            w_info = audio_worker.get_whisper_model_info()
+            gpu_accel = audio_worker.detect_gpu_acceleration()
             ff_bin = audio_worker.get_ffmpeg_binary()
             fp_bin = audio_worker.get_ffprobe_binary()
             available = bool(w_bin and w_mod and ff_bin)
@@ -278,8 +280,11 @@ class ForensicHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(json.dumps({
                 "status": "available" if available else "fallback",
                 "whisper_bin": w_bin,
-                "whisper_model": os.path.basename(w_mod) if w_mod else None,
+                "whisper_model": w_info.get("filename"),
                 "whisper_model_path": w_mod,
+                "whisper_tier": w_info.get("tier"),
+                "whisper_size_mb": w_info.get("size_mb"),
+                "hardware_acceleration": gpu_accel,
                 "ffmpeg_bin": ff_bin,
                 "ffprobe_bin": fp_bin,
                 "supported_formats": ["ogg", "opus", "wav", "mp3", "m4a", "aac", "flac"],
