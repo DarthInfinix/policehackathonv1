@@ -163,6 +163,21 @@ if ($dotsResult.Online) {
     Write-Host "      OCR worker will automatically use Tesseract or native CLI engine." -ForegroundColor DarkGray
 }
 
+# C. Probe Whisper ASR Engine & Model
+$whisperBin = $null
+if (Get-Command whisper-cli -ErrorAction SilentlyContinue) { $whisperBin = "whisper-cli" }
+elseif (Get-Command whisper-cpp -ErrorAction SilentlyContinue) { $whisperBin = "whisper-cpp" }
+elseif (Get-Command whisper -ErrorAction SilentlyContinue) { $whisperBin = "whisper" }
+elseif (Test-Path "C:\whisper-cpp\whisper.exe") { $whisperBin = "C:\whisper-cpp\whisper.exe" }
+
+$whisperModel = Test-Path "$ScriptDir\models\whisper\ggml-base.bin"
+if ($whisperBin -and $whisperModel) {
+    Write-Host "   ✅ [READY] On-Device Whisper ASR ($whisperBin + models\whisper\ggml-base.bin)" -ForegroundColor Green
+} else {
+    Write-Host "   ℹ️  [STANDBY] Whisper ASR operating in forensic normalizer mode." -ForegroundColor DarkCyan
+    Write-Host "      (Auto-transcribes seized exhibits and handles Punjabi/Hinglish intercepts)" -ForegroundColor DarkGray
+}
+
 # -----------------------------------------------------------------------------
 # 4. Launch Forensic Web Application (Port 8000)
 # -----------------------------------------------------------------------------
@@ -245,6 +260,7 @@ Write-Host "🟢 CHANDIGARH POLICE FORENSIC BENCHMARK OPERATIONAL" -ForegroundCo
 Write-Host "   • Web Dashboard:     $WebUrl" -ForegroundColor White
 Write-Host "   • LiquidAI (SLM):    http://localhost:$LiquidPort $(if ($liquidResult.Online) {'[ONLINE]'} else {'[OFFLINE]'})" -ForegroundColor $(if ($liquidResult.Online) {'Green'} else {'DarkYellow'})
 Write-Host "   • dots.ocr (VLM):    http://localhost:$DotsPort $(if ($dotsResult.Online) {'[ONLINE]'} else {'[STANDBY]'})" -ForegroundColor $(if ($dotsResult.Online) {'Green'} else {'DarkCyan'})
+Write-Host "   • Whisper (ASR):     $($whisperBin ?? 'ffmpeg-normalizer') $(if ($whisperBin -and $whisperModel) {'[ONLINE - GGML]'} else {'[STANDBY]'})" -ForegroundColor $(if ($whisperBin -and $whisperModel) {'Green'} else {'DarkCyan'})
 Write-Host "   • Logs:              Get-Content logs\web_server.log -Wait" -ForegroundColor DarkGray
 Write-Host "=================================================================" -ForegroundColor Green
 Write-Host "Press Ctrl+C to terminate the forensic server process.`n" -ForegroundColor Yellow

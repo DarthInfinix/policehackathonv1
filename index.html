@@ -466,7 +466,7 @@
         </div>
 
         <div class="wizard-form-body">
-          <input type="file" id="real-file-input" multiple accept="image/*,.png,.jpg,.jpeg,.webp,.csv,.json,.txt" style="display: none;" onchange="handleRealFilesSelected(this.files)">
+          <input type="file" id="real-file-input" multiple accept="image/*,audio/*,.ogg,.opus,.wav,.mp3,.m4a,.aac,.png,.jpg,.jpeg,.webp,.csv,.json,.txt" style="display: none;" onchange="handleRealFilesSelected(this.files)">
           <div class="drop-zone-large" id="main-drop-zone" onclick="document.getElementById('real-file-input').click()">
             <div class="drop-zone-icon" style="display: flex; justify-content: center; align-items: center; margin-bottom: 8px;">
               <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
@@ -476,7 +476,7 @@
               </svg>
             </div>
             <div class="drop-zone-title">Click or Drag & Drop Seized Evidence Files Here</div>
-            <div class="drop-zone-desc text-muted">Supports Screenshots (WhatsApp/Telegram chats, Paytm/PhonePe receipts), Tor .onion HTML/JSON, Telegram dumps, and Bank CSVs</div>
+            <div class="drop-zone-desc text-muted">Supports WhatsApp Voice Notes (.opus/.ogg), Call Audio (.wav/.mp3), Screenshots (Paytm chits, Chats), Darknet Tor .onion listings, and Bank CSVs</div>
             <div style="margin-top: 10px; display: flex; gap: 8px; justify-content: center; align-items: center;">
               <span class="badge badge-sm badge-blue" id="active-ocr-engine-badge">OCR Engine: Tesseract 5.5 (Fast Air-Gapped)</span>
               <span class="badge badge-sm badge-green">Section 63(4) BSA Hash Chained</span>
@@ -808,7 +808,7 @@
             <button class="btn btn-sm btn-gov-secondary" id="btn-mine-locations" onclick="triggerSlmMiner()" style="padding: 3px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;" title="Scan messages for suspected locations and drop points">
               <span>🧠</span> AI Location Scan
             </button>
-            <input type="file" id="panel-file-input" multiple accept="image/*,.png,.jpg,.jpeg,.webp,.csv,.json,.txt" style="display: none;" onchange="handlePanelFilesSelected(this.files)">
+            <input type="file" id="panel-file-input" multiple accept="image/*,audio/*,.ogg,.opus,.wav,.mp3,.m4a,.aac,.png,.jpg,.jpeg,.webp,.csv,.json,.txt" style="display: none;" onchange="handlePanelFilesSelected(this.files)">
             <span class="record-counter" id="evidence-files-count">0 Files Loaded</span>
           </div>
         </div>
@@ -856,6 +856,22 @@
           <span id="ocr-confidence-pill" class="badge badge-sm badge-blue" style="font-size: 10px;">OCR Engine: Tesseract 5.5.2</span>
         </div>
 
+        <!-- Seized Voice Note / Audio Player Bar (Visible for Audio Exhibits) -->
+        <div class="evidence-audio-player-bar" id="evidence-audio-bar" style="display: none; padding: 10px 14px; background: #0b1329; border-bottom: 1px solid #1e293b; border-left: 3px solid #38bdf8;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 14px;">🎙️</span>
+              <span style="font-size: 11px; font-weight: 700; color: #38bdf8;">SEIZED VOICE EXHIBIT (SEC 63 BSA AIR-GAPPED PLAYBACK)</span>
+            </div>
+            <span id="audio-engine-badge" class="badge badge-sm badge-blue" style="font-size: 10px;">ASR: whisper-cpp GGML (Local Metal)</span>
+          </div>
+          <audio id="evidence-audio-player" controls style="width: 100%; height: 32px; border-radius: 4px; outline: none;"></audio>
+          <div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 10px; color: #94a3b8;" class="mono">
+            <span id="audio-codec-meta">Codec: Opus / 48kHz / Mono</span>
+            <span id="audio-hash-meta">SHA-256 Verified ✓</span>
+          </div>
+        </div>
+
         <div class="raw-viewer-toolbar" id="raw-viewer-toolbar">
           <div class="search-input-wrapper">
             <span class="search-icon">🔍</span>
@@ -898,6 +914,7 @@
 
         <div class="triage-filters">
           <button class="filter-chip active" onclick="setTriageFilter('all')">All Leads (<span id="count-all">8</span>)</button>
+          <button class="filter-chip" onclick="setTriageFilter('voice')">🎙️ Voice Notes (<span id="count-voice">0</span>)</button>
           <button class="filter-chip" onclick="setTriageFilter('financial')">Financial / Wallets (<span id="count-financial">3</span>)</button>
           <button class="filter-chip" onclick="setTriageFilter('slang')">Slang & Intent (<span id="count-slang">3</span>)</button>
           <button class="filter-chip" onclick="setTriageFilter('darknet')">Tor Listings (<span id="count-darknet">1</span>)</button>

@@ -7,3 +7,6 @@ data/raw/drug_listings.csv
 data/raw/drug_listings.tar.gz
 logs/*.log
 data/evidence_images/
+data/evidence_audio/
+models/whisper/*.bin
+models/whisper/*.gguf

@@ -204,6 +204,89 @@ class ForensicHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
                 return
 
+        # API: Seized Evidence Audio / Voice Note Serving
+        if path == '/api/evidence_audio':
+            file_id = params.get('file_id', [''])[0]
+            audio_path = storage.get_evidence_audio_path(file_id)
+            if not audio_path or not os.path.isfile(audio_path):
+                self._set_json_headers(404)
+                self.wfile.write(b'{"status": "error", "message": "Evidence audio not found"}')
+                return
+            
+            ext = os.path.splitext(audio_path)[1].lower()
+            mime_type = "audio/ogg"
+            if ext == ".wav":
+                mime_type = "audio/wav"
+            elif ext == ".mp3":
+                mime_type = "audio/mpeg"
+            elif ext in [".m4a", ".mp4", ".aac"]:
+                mime_type = "audio/mp4"
+            elif ext == ".opus":
+                mime_type = "audio/opus"
+
+            try:
+                file_size = os.path.getsize(audio_path)
+                range_header = self.headers.get('Range')
+
+                if range_header and range_header.startswith('bytes='):
+                    ranges = range_header[6:].split('-')
+                    start = int(ranges[0]) if ranges[0] else 0
+                    end = int(ranges[1]) if ranges[1] else file_size - 1
+                    end = min(end, file_size - 1)
+                    length = end - start + 1
+
+                    with open(audio_path, "rb") as f:
+                        f.seek(start)
+                        chunk = f.read(length)
+
+                    self.send_response(206)
+                    self.send_header('Content-Type', mime_type)
+                    self.send_header('Content-Range', f'bytes {start}-{end}/{file_size}')
+                    self.send_header('Content-Length', str(length))
+                    self.send_header('Accept-Ranges', 'bytes')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(chunk)
+                    return
+                else:
+                    with open(audio_path, "rb") as f:
+                        data = f.read()
+                    self.send_response(200)
+                    self.send_header('Content-Type', mime_type)
+                    self.send_header('Content-Length', str(len(data)))
+                    self.send_header('Accept-Ranges', 'bytes')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.send_header('Cache-Control', 'public, max-age=3600')
+                    self.end_headers()
+                    self.wfile.write(data)
+                    return
+            except Exception as e:
+                self._set_json_headers(500)
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+                return
+
+        # API: Local Air-Gapped Audio Engine Status Check (whisper-cpp + ffmpeg)
+        if path == '/api/audio_status':
+            import audio_worker
+            w_bin = audio_worker.get_whisper_binary()
+            w_mod = audio_worker.get_whisper_model()
+            ff_bin = audio_worker.get_ffmpeg_binary()
+            fp_bin = audio_worker.get_ffprobe_binary()
+            available = bool(w_bin and w_mod and ff_bin)
+
+            self._set_json_headers(200)
+            self.wfile.write(json.dumps({
+                "status": "available" if available else "fallback",
+                "whisper_bin": w_bin,
+                "whisper_model": os.path.basename(w_mod) if w_mod else None,
+                "whisper_model_path": w_mod,
+                "ffmpeg_bin": ff_bin,
+                "ffprobe_bin": fp_bin,
+                "supported_formats": ["ogg", "opus", "wav", "mp3", "m4a", "aac", "flac"],
+                "compliance": "Section 63(4) Bharatiya Sakshya Adhiniyam, 2023 Forensic Standard"
+            }).encode('utf-8'))
+            return
+
         # API: Local Air-Gapped OCR Status Check (dots.ocr + Tesseract)
         if path == '/api/ocr_status':
             import ocr_worker

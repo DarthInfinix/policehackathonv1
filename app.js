@@ -1206,6 +1206,7 @@ async function handleRealFilesSelected(fileList) {
   for (let i = 0; i < fileList.length; i++) {
     const file = fileList[i];
     const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp|bmp|tiff)$/i.test(file.name);
+    const isAudio = file.type.startsWith('audio/') || /\.(ogg|opus|wav|mp3|m4a|aac|flac)$/i.test(file.name);
     const stagedId = "staged_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7);
 
     let previewUrl = null;
@@ -1215,6 +1216,10 @@ async function handleRealFilesSelected(fileList) {
     if (isImage) {
       previewUrl = URL.createObjectURL(file);
       typeBadge = "📸 IMAGE EXHIBIT";
+    } else if (isAudio) {
+      previewUrl = URL.createObjectURL(file);
+      typeBadge = "🎙️ AUDIO / VOICE NOTE";
+      textPreview = `[Seized Audio Exhibit: ${file.name} | Offline ASR Auto-Transcribe]`;
     } else {
       if (file.name.endsWith('.csv')) typeBadge = "📊 SPREADSHEET / CSV";
       else if (file.name.endsWith('.json')) typeBadge = "💬 CHAT / JSON DUMP";
@@ -1236,10 +1241,11 @@ async function handleRealFilesSelected(fileList) {
       name: file.name,
       size: file.size,
       isImage: isImage,
+      isAudio: isAudio,
       previewUrl: previewUrl,
       textPreview: textPreview,
       typeBadge: typeBadge,
-      runOcr: true
+      runOcr: isImage
     });
   }
 
@@ -1248,7 +1254,7 @@ async function handleRealFilesSelected(fileList) {
   if (rInput) rInput.value = '';
 
   renderStagedCards();
-  showToast(`📋 Staged ${fileList.length} exhibit(s) for review. Configure OCR below!`, "info");
+  showToast(`📋 Staged ${fileList.length} exhibit(s) for review. Configure processing below!`, "info");
 }
 
 function renderStagedCards() {
@@ -1296,6 +1302,25 @@ function renderStagedCards() {
               </div>
             </div>
           </div>
+        </div>
+      `;
+    } else if (item.isAudio) {
+      return `
+        <div class="staged-file-card" id="card-${item.id}">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div style="font-weight: 600; font-size: 11px; color: #f8fafc; max-width: 210px; word-break: break-all;">
+              ${escapeHtml(item.name)}
+            </div>
+            <button type="button" class="btn btn-sm btn-gov-secondary" onclick="removeStagedFile('${item.id}')" style="padding: 1px 6px; font-size: 10px; color: #ef4444;" title="Remove this file">✖</button>
+          </div>
+          <div style="margin-top: 4px; display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8;">
+            <span class="badge badge-sm badge-blue">${item.typeBadge}</span>
+            <span class="mono">${(item.size / 1024).toFixed(1)} KB</span>
+          </div>
+          <div style="margin-top: 6px;">
+            <audio controls src="${item.previewUrl}" style="width: 100%; height: 26px; border-radius: 4px;"></audio>
+          </div>
+          <div style="margin-top: 4px; font-size: 9.5px; color: #38bdf8;">⚡ Auto-ASR via On-Device Whisper</div>
         </div>
       `;
     } else {
@@ -1403,21 +1428,23 @@ async function handlePanelFilesSelected(fileList) {
   for (let i = 0; i < fileList.length; i++) {
     const file = fileList[i];
     const isImg = file.type.startsWith('image/') || /\.(png|jpe?g|webp|bmp)$/i.test(file.name);
+    const isAud = file.type.startsWith('audio/') || /\.(ogg|opus|wav|mp3|m4a|aac|flac)$/i.test(file.name);
     const item = {
       id: `panel-file-${Date.now()}-${i}`,
       file: file,
       name: file.name,
       size: file.size,
       isImage: isImg,
-      typeBadge: isImg ? 'IMAGE EXHIBIT' : file.name.endsWith('.csv') ? 'CSV SPREADSHEET' : file.name.endsWith('.json') ? 'JSON DATASET' : 'TEXT DUMP',
-      previewUrl: isImg ? URL.createObjectURL(file) : null,
+      isAudio: isAud,
+      typeBadge: isImg ? 'IMAGE EXHIBIT' : isAud ? '🎙️ VOICE EXHIBIT' : file.name.endsWith('.csv') ? 'CSV SPREADSHEET' : file.name.endsWith('.json') ? 'JSON DATASET' : 'TEXT DUMP',
+      previewUrl: (isImg || isAud) ? URL.createObjectURL(file) : null,
       textPreview: '',
       ocrChoice: isImg ? defaultEngine : 'skip',
       quickOcrText: null,
       quickOcrLoading: false
     };
 
-    if (!isImg) {
+    if (!isImg && !isAud) {
       try {
         const textSlice = await file.slice(0, 2048).text();
         const previewLines = textSlice.split('\n').slice(0, 10).join('\n');
@@ -1425,6 +1452,8 @@ async function handlePanelFilesSelected(fileList) {
       } catch (e) {
         item.textPreview = '[Preview unavailable]';
       }
+    } else if (isAud) {
+      item.textPreview = `[Audio Exhibit: ${file.name} | Automatic ASR Transcription via Local Whisper Engine]`;
     }
 
     PANEL_INGEST_QUEUE.push(item);
@@ -1498,6 +1527,27 @@ function renderPanelIngestModal() {
                 </div>
               ` : ''}
             </div>
+          </div>
+        </div>
+      `;
+    } else if (item.isAudio) {
+      return `
+        <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid #334155; border-radius: 8px; padding: 14px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              <span style="font-weight: 700; font-size: 13px; color: #f8fafc; word-break: break-all;">${escapeHtml(item.name)}</span>
+              <div style="margin-top: 3px; display: flex; gap: 8px; align-items: center;">
+                <span class="badge badge-sm badge-blue">${item.typeBadge}</span>
+                <span class="mono" style="font-size: 11px; color: #94a3b8;">${(item.size / 1024).toFixed(1)} KB</span>
+              </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-gov-secondary" onclick="removePanelIngestItem('${item.id}')" style="padding: 2px 7px; color: #ef4444;" title="Remove this exhibit">✖</button>
+          </div>
+          <div style="margin-top: 8px;">
+            <audio controls src="${item.previewUrl}" style="width: 100%; height: 28px; border-radius: 4px;"></audio>
+          </div>
+          <div style="margin-top: 6px; font-size: 10.5px; color: #38bdf8;">
+            ⚡ Will transcribe via On-Device Whisper Model (Apple M4 Metal acceleration)
           </div>
         </div>
       `;
@@ -2453,13 +2503,18 @@ function updateEvidenceViewerMode() {
   const dlLink = document.getElementById("image-download-link");
   const metaSubtext = document.getElementById("image-meta-subtext");
   const pill = document.getElementById("ocr-confidence-pill");
+  const audioBar = document.getElementById("evidence-audio-bar");
+  const audioPlayer = document.getElementById("evidence-audio-player");
+  const audioCodec = document.getElementById("audio-codec-meta");
 
   if (!linesContainer || !imgContainer) return;
 
   const file = REAL_FILES.find(f => f.file_id === currentSelectedFileId);
   const isImage = file && ((file.file_type || "").includes("IMAGE_OCR") || /\.(png|jpe?g|webp|bmp|tiff)$/i.test(file.filename));
+  const isAudio = file && ((file.file_type || "").includes("VOICE") || /\.(ogg|opus|wav|mp3|m4a|aac|flac)$/i.test(file.filename));
 
   if (isImage) {
+    if (audioBar) audioBar.style.display = "none";
     if (toggleBar) toggleBar.style.display = "flex";
     if (pill) {
       pill.textContent = `📸 OCR Exhibit: ${file.record_count} lines parsed`;
@@ -2480,9 +2535,30 @@ function updateEvidenceViewerMode() {
       if (toolbar) toolbar.style.display = "flex";
       imgContainer.style.display = "none";
     }
-  } else {
-    // Non-image file (CSV, JSON, Plaintext)
+  } else if (isAudio) {
     if (toggleBar) toggleBar.style.display = "none";
+    if (imgContainer) imgContainer.style.display = "none";
+    if (audioBar) {
+      audioBar.style.display = "block";
+      if (audioPlayer) {
+        const audioSrc = `http://localhost:8000/api/evidence_audio?file_id=${encodeURIComponent(file.file_id)}`;
+        if (audioPlayer.src !== audioSrc) {
+          audioPlayer.src = audioSrc;
+        }
+      }
+      if (audioCodec) {
+        audioCodec.textContent = `Exhibit: ${file.filename} | ${file.record_count} Transcribed Lines`;
+      }
+    }
+    linesContainer.style.display = "block";
+    if (toolbar) toolbar.style.display = "flex";
+  } else {
+    // Non-image, non-audio file (CSV, JSON, Plaintext)
+    if (toggleBar) toggleBar.style.display = "none";
+    if (audioBar) {
+      audioBar.style.display = "none";
+      if (audioPlayer) audioPlayer.pause();
+    }
     linesContainer.style.display = "block";
     if (toolbar) toolbar.style.display = "flex";
     imgContainer.style.display = "none";
@@ -2503,11 +2579,12 @@ function renderFileTabs() {
 
   container.innerHTML = REAL_FILES.map(file => {
     const isImage = (file.file_type || "").includes("IMAGE_OCR") || /\.(png|jpe?g|webp|bmp|tiff)$/i.test(file.filename);
-    const tag = isImage ? "[IMG]" : file.file_type.includes("DARKNET") ? "[TOR]" : file.file_type.includes("BANK") ? "[FIN]" : file.file_type.includes("TELEGRAM") ? "[CHAT]" : "[DOC]";
+    const isAudio = (file.file_type || "").includes("VOICE") || /\.(ogg|opus|wav|mp3|m4a|aac|flac)$/i.test(file.filename);
+    const tag = isAudio ? "[VOICE]" : isImage ? "[IMG]" : file.file_type.includes("DARKNET") ? "[TOR]" : file.file_type.includes("BANK") ? "[FIN]" : file.file_type.includes("TELEGRAM") ? "[CHAT]" : "[DOC]";
     return `
       <button class="file-tab-btn ${file.file_id === currentSelectedFileId ? 'active' : ''}" 
               onclick="selectFile('${file.file_id}')">
-        <span class="mono text-xs font-bold" style="color: #38bdf8;">${tag}</span>
+        <span class="mono text-xs font-bold" style="color: ${isAudio ? '#10b981' : '#38bdf8'};">${tag}</span>
         <span>${escapeHtml(file.filename)}</span>
       </button>
     `;
@@ -4308,6 +4385,7 @@ function updateDossierMetrics() {
 function updateCounts() {
   const total = REAL_TRIAGE_LEADS.length;
   const verified = REAL_TRIAGE_LEADS.filter(l => l.status === "verified").length;
+  const voice = REAL_TRIAGE_LEADS.filter(l => l.category === "voice").length;
   const financial = REAL_TRIAGE_LEADS.filter(l => l.category === "financial").length;
   const slang = REAL_TRIAGE_LEADS.filter(l => l.category === "slang").length;
   const darknet = REAL_TRIAGE_LEADS.filter(l => l.category === "darknet").length;
@@ -4316,6 +4394,8 @@ function updateCounts() {
   document.getElementById("verified-count").textContent = verified;
   document.getElementById("total-leads-count").textContent = total;
   document.getElementById("count-all").textContent = total;
+  const cntVoice = document.getElementById("count-voice");
+  if (cntVoice) cntVoice.textContent = voice;
   document.getElementById("count-financial").textContent = financial;
   document.getElementById("count-slang").textContent = slang;
   document.getElementById("count-darknet").textContent = darknet;

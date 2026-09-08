@@ -98,7 +98,17 @@ else
     echo "    (To enable dual-server dots.ocr VLM, launch with: ./start.sh --with-dots)"
 fi
 
-# 3. Check & Start Forensic Web Application (Port 8000)
+# 3. Check Whisper ASR Engine & Model
+WHISPER_CLI_BIN="$(which whisper-cli 2>/dev/null || which whisper-cpp 2>/dev/null || echo "")"
+WHISPER_MODEL_PATH="$DIR/models/whisper/ggml-base.bin"
+
+if [ -n "$WHISPER_CLI_BIN" ] && [ -f "$WHISPER_MODEL_PATH" ]; then
+    echo "✓ On-Device Whisper ASR: Ready (whisper-cpp Metal + ggml-base.bin)"
+else
+    echo "ℹ️  On-Device Whisper ASR: Fallback mode active (ffmpeg forensic normalizer)"
+fi
+
+# 4. Check & Start Forensic Web Application (Port 8000)
 if lsof -i :"$WEB_PORT" >/dev/null 2>&1; then
     echo "✓ Forensic Web App is already active on http://localhost:$WEB_PORT"
 else
@@ -133,6 +143,7 @@ echo "🟢 CHANDIGARH POLICE INVESTIGATION PLATFORM RUNNING"
 echo "   - Web UI:           http://localhost:$WEB_PORT"
 echo "   - LiquidAI (SLM):   http://localhost:$LIQUID_PORT"
 echo "   - dots.ocr (VLM):   http://localhost:$DOTS_PORT (or native CLI)"
+echo "   - Whisper (ASR):    $([ -n "$WHISPER_CLI_BIN" ] && [ -f "$WHISPER_MODEL_PATH" ] && echo "[ONLINE - Metal M4]" || echo "[STANDBY - Fallback]")"
 echo "   - Logs:             tail -f logs/*.log"
 echo "================================================================="
 echo "Press Ctrl+C to safely terminate all platform processes."

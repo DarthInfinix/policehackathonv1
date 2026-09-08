@@ -450,6 +450,38 @@ def parse_and_ingest_file(case_id: str, filename: str, content_bytes: bytes, db_
             except Exception as ocr_err:
                 print(f"[OCR ERROR] {ocr_err}")
 
+    # 0b. Seized Audio & Voice Note Intercept Detection (.ogg, .opus, .wav, .mp3, .m4a)
+    import audio_worker
+    if not records_to_insert and audio_worker.is_audio_data(filename, content_bytes[:32]):
+        audio_dir = os.path.join(os.path.dirname(db_path), "evidence_audio")
+        os.makedirs(audio_dir, exist_ok=True)
+        audio_save_path = os.path.join(audio_dir, f"{file_id}_{os.path.basename(filename)}")
+        with open(audio_save_path, "wb") as f_aud:
+            f_aud.write(content_bytes)
+
+        try:
+            aud_res = audio_worker.transcribe_audio_payload(content_bytes, filename, case_id)
+            codec_tag = (aud_res.get("metadata", {}).get("codec_name") or "AUDIO").upper()
+            file_type = f"VOICE_INTERCEPT_{codec_tag}"
+            for r in aud_res.get("records", []):
+                records_to_insert.append({
+                    "source_type": "VOICE_NOTE",
+                    "sender_id": r.get("sender_id", "SEIZED_VOICE"),
+                    "timestamp": r.get("timestamp", now_str),
+                    "raw_text": r.get("raw_text", ""),
+                    "line_number": r.get("line_number", 1)
+                })
+        except Exception as aud_err:
+            print(f"[AUDIO TRANSCRIBE ERROR] {aud_err}")
+            file_type = "VOICE_INTERCEPT_RAW"
+            records_to_insert.append({
+                "source_type": "VOICE_NOTE",
+                "sender_id": "SEIZED_VOICE",
+                "timestamp": now_str,
+                "raw_text": f"[VOICE EXHIBIT ARCHIVED: {os.path.basename(filename)}]",
+                "line_number": 1
+            })
+
     # 1. Telegram & Darknet JSON Detect
     if not records_to_insert and (filename.endswith(".json") or '"messages"' in text_content[:500]):
         try:
@@ -1262,6 +1294,18 @@ def get_evidence_image_path(file_id: str, db_path: str = DB_PATH) -> Optional[st
                 return full_p
     return None
 
+def get_evidence_audio_path(file_id: str, db_path: str = DB_PATH) -> Optional[str]:
+    """Finds the local file path for an ingested seized voice note / audio exhibit."""
+    audio_dir = os.path.join(os.path.dirname(db_path), "evidence_audio")
+    if not os.path.isdir(audio_dir):
+        return None
+    for fname in os.listdir(audio_dir):
+        if fname.startswith(f"{file_id}_") or fname.startswith(file_id):
+            full_p = os.path.join(audio_dir, fname)
+            if os.path.isfile(full_p):
+                return full_p
+    return None
+
 def get_dynamic_triage_leads(case_id: Optional[str] = None, db_path: str = DB_PATH) -> List[Dict[str, Any]]:
     """Dynamically generates triage leads from extracted entities and flagged records with cross-case matching."""
     con = get_db(db_path)
@@ -1271,7 +1315,8 @@ def get_dynamic_triage_leads(case_id: Optional[str] = None, db_path: str = DB_PA
     if case_id:
         cur.execute("""
         SELECT e.entity_id, e.entity_type, e.raw_value, e.risk_score, e.mention_count,
-               er.record_id, er.file_id, er.line_number, er.raw_text, ef.filename, er.case_id
+               er.record_id, er.file_id, er.line_number, er.raw_text, ef.filename, er.case_id,
+               ef.file_type, er.source_type
         FROM entities e
         JOIN entity_mentions em ON e.entity_id = em.entity_id
         JOIN evidence_records er ON em.record_id = er.record_id
@@ -1284,7 +1329,8 @@ def get_dynamic_triage_leads(case_id: Optional[str] = None, db_path: str = DB_PA
     else:
         cur.execute("""
         SELECT e.entity_id, e.entity_type, e.raw_value, e.risk_score, e.mention_count,
-               er.record_id, er.file_id, er.line_number, er.raw_text, ef.filename, er.case_id
+               er.record_id, er.file_id, er.line_number, er.raw_text, ef.filename, er.case_id,
+               ef.file_type, er.source_type
         FROM entities e
         JOIN entity_mentions em ON e.entity_id = em.entity_id
         JOIN evidence_records er ON em.record_id = er.record_id
@@ -1303,8 +1349,9 @@ def get_dynamic_triage_leads(case_id: Optional[str] = None, db_path: str = DB_PA
         seen_values.add(val.lower())
         
         ent_type = row["entity_type"]
-        cat = "financial" if ent_type in ["UPI_ID", "CRYPTO_WALLET", "TRANSACTION_REF"] else "darknet" if ent_type == "DARKNET" else "slang" if ent_type == "SLANG" else "financial"
-        type_label = "UPI IDENTIFIER" if ent_type == "UPI_ID" else "CRYPTO WALLET" if ent_type == "CRYPTO_WALLET" else "PHONE IDENTIFIER" if ent_type == "PHONE" else "TRANSACTION REF" if ent_type == "TRANSACTION_REF" else "GEOGRAPHIC LANDMARK" if ent_type == "LOCATION" else "NARCOTICS CODEWORD"
+        is_voice = (row["source_type"] == "VOICE_NOTE") or ("VOICE" in (row["file_type"] or ""))
+        cat = "voice" if is_voice else ("financial" if ent_type in ["UPI_ID", "CRYPTO_WALLET", "TRANSACTION_REF"] else "darknet" if ent_type == "DARKNET" else "slang" if ent_type == "SLANG" else "financial")
+        type_label = ("SPOKEN " + ("UPI HANDLE" if ent_type == "UPI_ID" else "PHONE NUMBER" if ent_type == "PHONE" else "LOCATION / LANDMARK" if ent_type == "LOCATION" else "NARCOTICS SLANG")) if is_voice else ("UPI IDENTIFIER" if ent_type == "UPI_ID" else "CRYPTO WALLET" if ent_type == "CRYPTO_WALLET" else "PHONE IDENTIFIER" if ent_type == "PHONE" else "TRANSACTION REF" if ent_type == "TRANSACTION_REF" else "GEOGRAPHIC LANDMARK" if ent_type == "LOCATION" else "NARCOTICS CODEWORD")
         
         # Check cross-case link in SQLite
         cross_case_hit = None
@@ -1489,7 +1536,8 @@ def load_default_demo_datasets(case_id: str = "FIR_104_2026", base_dir: Optional
             os.path.join(base_dir, "data", "raw", "sample_telegram_export.json"),
             os.path.join(base_dir, "data", "processed", "bank_statement_baseline.csv"),
             os.path.join(base_dir, "data", "raw", "seized_paytm_mule_receipt.png"),
-            os.path.join(base_dir, "data", "raw", "seized_telegram_chat_drop.png")
+            os.path.join(base_dir, "data", "raw", "seized_telegram_chat_drop.png"),
+            os.path.join(base_dir, "data", "raw", "seized_voice_note_deal.ogg")
         ]
 
     ingested = []
@@ -1708,13 +1756,22 @@ def delete_evidence_file(file_id: str, case_id: Optional[str] = None, performed_
     cid = f_row["case_id"] or case_id
     fname = f_row["filename"]
 
-    # 1. Remove physical image if stored on disk
+    # 1. Remove physical image or audio if stored on disk
     images_dir = os.path.join(os.path.dirname(db_path), "evidence_images")
     if os.path.isdir(images_dir):
         for img_fn in os.listdir(images_dir):
             if img_fn.startswith(f"{file_id}_") or img_fn.startswith(file_id):
                 try:
                     os.remove(os.path.join(images_dir, img_fn))
+                except Exception:
+                    pass
+
+    audio_dir = os.path.join(os.path.dirname(db_path), "evidence_audio")
+    if os.path.isdir(audio_dir):
+        for aud_fn in os.listdir(audio_dir):
+            if aud_fn.startswith(f"{file_id}_") or aud_fn.startswith(file_id):
+                try:
+                    os.remove(os.path.join(audio_dir, aud_fn))
                 except Exception:
                     pass
 
@@ -1794,6 +1851,16 @@ def delete_case(case_id: str, performed_by: str = "Insp. Vikramjit Singh", force
                 if img_fn.startswith(f"{fid}_") or img_fn.startswith(fid):
                     try:
                         os.remove(os.path.join(images_dir, img_fn))
+                    except Exception:
+                        pass
+
+    audio_dir = os.path.join(os.path.dirname(db_path), "evidence_audio")
+    if os.path.isdir(audio_dir) and file_ids:
+        for aud_fn in os.listdir(audio_dir):
+            for fid in file_ids:
+                if aud_fn.startswith(f"{fid}_") or aud_fn.startswith(fid):
+                    try:
+                        os.remove(os.path.join(audio_dir, aud_fn))
                     except Exception:
                         pass
 
