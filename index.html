@@ -199,6 +199,9 @@
           <button class="header-nav-link" id="nav-btn-workbench" onclick="goToWorkbench()">
             ⚡ Workbench
           </button>
+          <button class="header-nav-link" id="nav-btn-graph" onclick="goToNetworkGraphView()">
+            🕸️ Syndicate Graph
+          </button>
         </div>
 
         <!-- Active Case Dropdown Pill (Clean & Single-Line) -->
@@ -1164,6 +1167,122 @@
       </section>
 
     </main>
+
+    <!-- ===================================================================== -->
+    <!-- DEDICATED FULL-VIEW: SYNDICATE NETWORK & FINANCIAL FLOW GRAPH -->
+    <!-- ===================================================================== -->
+    <section class="wizard-screen" id="screen-graph-view" style="display: none; padding: 18px 24px; height: calc(100vh - 58px); overflow: hidden; background: #0b1120;">
+      <div style="display: flex; flex-direction: column; height: 100%; max-width: 1500px; margin: 0 auto; gap: 12px;">
+        
+        <!-- Graph View Header Banner -->
+        <div style="display: flex; justify-content: space-between; align-items: center; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px 18px; flex-shrink: 0;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 26px;">🕸️</span>
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <h2 style="font-size: 15px; font-weight: 700; color: #f8fafc; margin: 0; letter-spacing: 0.04em;">PRECINCT SYNDICATE & FINANCIAL FLOW GRAPH</h2>
+                <span class="badge badge-sm badge-blue" id="full-graph-linkage-badge">Corroborated Network</span>
+              </div>
+              <p style="font-size: 11px; color: #94a3b8; margin: 3px 0 0 0;">
+                Full-canvas visual correlation between Tor Darknet sellers, mule accounts, phone numbers, and physical meeting drop points. Click any node to instantly jump to its source evidence line.
+              </p>
+            </div>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div id="full-graph-node-inspect-box" style="display: none; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 6px; padding: 6px 12px; font-size: 11px;">
+              <span style="color: #94a3b8;">Selected Node:</span>
+              <strong id="full-graph-inspect-label" class="mono" style="color: #38bdf8; margin: 0 6px;">--</strong>
+              <button class="btn btn-sm btn-gov-primary" id="btn-inspect-jump-source" style="padding: 2px 8px; font-size: 10.5px;">
+                Jump to Source Line ➔
+              </button>
+            </div>
+
+            <button class="btn btn-gov-secondary btn-sm" onclick="renderNetworkGraph()" title="Re-simulate node layout">
+              🔄 Re-center Force Layout
+            </button>
+            <button class="btn btn-gov-primary btn-sm" onclick="goToWorkbench()">
+              ⚡ Open 3-Panel Workbench ➔
+            </button>
+          </div>
+        </div>
+
+        <!-- Main Big Interactive Graph Canvas -->
+        <div style="flex: 1; min-height: 0; display: flex; gap: 14px;">
+          
+          <!-- Graph Interactive Viewport -->
+          <div style="flex: 1; height: 100%; background: #070d19; border: 1px solid #1e293b; border-radius: 8px; position: relative; overflow: hidden;" id="full-network-graph-canvas-container">
+            <!-- Rendered by JS -->
+          </div>
+
+          <!-- Right Sidebar: Interactive Node & Source Inspector Drawer -->
+          <div style="width: 320px; height: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 14px; display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0;">
+            <div style="font-size: 12px; font-weight: 700; color: #f8fafc; border-bottom: 1px solid #334155; padding-bottom: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+              <span>TARGET NODE INSPECTOR</span>
+              <span class="badge badge-sm badge-blue">Section 63 BSA</span>
+            </div>
+
+            <div id="graph-sidebar-empty" style="color: #64748b; font-size: 11.5px; line-height: 1.5; text-align: center; margin-top: 40px;">
+              <div style="font-size: 32px; margin-bottom: 8px;">🎯</div>
+              Click any node in the syndicate graph to view its source exhibit, corroborated mentions, and raw text context.
+            </div>
+
+            <div id="graph-sidebar-details" style="display: none; flex-direction: column; gap: 12px;">
+              <div>
+                <span class="text-xs text-muted">TARGET ENTITY</span>
+                <div id="sidebar-node-label" class="mono font-bold" style="font-size: 14px; color: #38bdf8; word-break: break-all; margin-top: 2px;">--</div>
+              </div>
+
+              <div>
+                <span class="text-xs text-muted">ENTITY MODALITY</span>
+                <div id="sidebar-node-type" style="margin-top: 2px;"><span class="badge badge-sm badge-purple">--</span></div>
+              </div>
+
+              <div>
+                <span class="text-xs text-muted">CORROBORATED MENTIONS</span>
+                <div id="sidebar-node-mentions" class="mono font-bold" style="font-size: 12px; color: #f8fafc; margin-top: 2px;">0 Records</div>
+              </div>
+
+              <div>
+                <span class="text-xs text-muted">SEIZED EVIDENCE SOURCE</span>
+                <div id="sidebar-node-source" style="font-size: 11.5px; color: #cbd5e1; margin-top: 2px;">--</div>
+              </div>
+
+              <div>
+                <span class="text-xs text-muted">PRIMARY EVIDENCE CONTEXT</span>
+                <div id="sidebar-node-context" class="mono text-xs" style="background: #070d19; border: 1px solid #1e293b; border-radius: 4px; padding: 8px; color: #94a3b8; max-height: 120px; overflow-y: auto; line-height: 1.4; margin-top: 4px;">
+                  --
+                </div>
+              </div>
+
+              <div style="margin-top: 10px;">
+                <button class="btn btn-gov-primary btn-sm btn-full" id="btn-sidebar-jump" onclick="">
+                  📍 Jump to Raw Evidence Line ➔
+                </button>
+              </div>
+            </div>
+
+            <!-- Legend strip -->
+            <div style="margin-top: auto; border-top: 1px solid #334155; padding-top: 12px;">
+              <div style="font-size: 10.5px; font-weight: 700; color: #94a3b8; margin-bottom: 6px;">GRAPH LEGEND</div>
+              <div style="display: flex; flex-direction: column; gap: 6px; font-size: 10.5px; color: #cbd5e1;">
+                <div style="display: flex; align-items: center; gap: 6px;"><span class="legend-dot dot-purple"></span> Tor Marketplace Vendor</div>
+                <div style="display: flex; align-items: center; gap: 6px;"><span class="legend-dot dot-blue"></span> Suspect / Messenger Persona</div>
+                <div style="display: flex; align-items: center; gap: 6px;"><span class="legend-dot dot-amber"></span> Financial (UPI / Bank Account)</div>
+                <div style="display: flex; align-items: center; gap: 6px;"><span class="legend-dot dot-green"></span> Physical Drop Location</div>
+              </div>
+              <div style="margin-top: 10px; font-size: 10px; color: #64748b; line-height: 1.4;">
+                <span style="color: #38bdf8;">──▶ Cyan Link:</span> Bank Transaction Flow<br>
+                <span style="color: #94a3b8;">──▶ Grey Link:</span> Conversational Co-mention
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+    </section>
 
     <!-- ================================================================= -->
     <!-- MODAL: GLOBAL PRECINCT INTEL SEARCH (Requirement #7) -->

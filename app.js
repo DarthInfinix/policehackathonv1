@@ -715,8 +715,10 @@ function goToCaseDocket() {
   // Update Nav links
   const navDocket = document.getElementById('nav-btn-docket');
   const navWb = document.getElementById('nav-btn-workbench');
+  const navGraph = document.getElementById('nav-btn-graph');
   if (navDocket) navDocket.classList.add('active');
   if (navWb) navWb.classList.remove('active');
+  if (navGraph) navGraph.classList.remove('active');
 
   renderCaseDocket();
 }
@@ -725,8 +727,42 @@ function goToWorkbench() {
   goToStep(5);
   const navDocket = document.getElementById('nav-btn-docket');
   const navWb = document.getElementById('nav-btn-workbench');
+  const navGraph = document.getElementById('nav-btn-graph');
   if (navDocket) navDocket.classList.remove('active');
   if (navWb) navWb.classList.add('active');
+  if (navGraph) navGraph.classList.remove('active');
+}
+
+function goToNetworkGraphView() {
+  document.querySelectorAll('.wizard-screen').forEach(s => s.style.display = 'none');
+  const dash = document.getElementById('screen-dashboard');
+  if (dash) dash.style.display = 'none';
+  const stepper = document.getElementById('wizard-stepper');
+  if (stepper) stepper.style.display = 'none';
+  const resetBtn = document.getElementById('btn-reset-workflow');
+  if (resetBtn) resetBtn.style.display = 'none';
+  const casesScreen = document.getElementById('screen-cases');
+  if (casesScreen) casesScreen.style.display = 'none';
+
+  // Keep case pill and model badge visible so user can see active FIR
+  const casePill = document.getElementById('header-active-case-pill');
+  if (casePill) casePill.style.display = 'inline-flex';
+  const modelBadge = document.getElementById('header-model-badge');
+  if (modelBadge) modelBadge.style.display = 'inline-flex';
+
+  const graphScreen = document.getElementById('screen-graph-view');
+  if (graphScreen) graphScreen.style.display = 'block';
+
+  // Update Nav links
+  const navDocket = document.getElementById('nav-btn-docket');
+  const navWb = document.getElementById('nav-btn-workbench');
+  const navGraph = document.getElementById('nav-btn-graph');
+  if (navDocket) navDocket.classList.remove('active');
+  if (navWb) navWb.classList.remove('active');
+  if (navGraph) navGraph.classList.add('active');
+
+  // Trigger render with isFullView = true
+  renderNetworkGraph(true);
 }
 
 async function renderCaseDocket() {
@@ -950,11 +986,13 @@ function goToStep(stepNum) {
 
   const navDocket = document.getElementById('nav-btn-docket');
   const navWb = document.getElementById('nav-btn-workbench');
+  const navGraph = document.getElementById('nav-btn-graph');
 
   if (stepNum === 1) {
     document.getElementById('screen-intake').style.display = 'flex';
     if (navDocket) navDocket.classList.remove('active');
     if (navWb) navWb.classList.remove('active');
+    if (navGraph) navGraph.classList.remove('active');
 
     const ioInput = document.getElementById('intake-io');
     const beltInput = document.getElementById('intake-belt');
@@ -986,6 +1024,7 @@ function goToStep(stepNum) {
     if (resetBtn) resetBtn.style.display = 'none';
     if (navDocket) navDocket.classList.remove('active');
     if (navWb) navWb.classList.add('active');
+    if (navGraph) navGraph.classList.remove('active');
     renderDashboard();
   }
 }
@@ -2780,11 +2819,32 @@ function saveEditedLead() {
   closeEditLeadModal();
 }
 
-async function jumpToSourceFromNode(nodeLabel, nodeType) {
+async function jumpToSourceFromNode(nodeLabel, nodeType, directFileId = null, directLineNum = null) {
   if (!nodeLabel) return;
   const cleanLabel = nodeLabel.trim().toLowerCase();
-  
-  // 1. Try finding matching lead in REAL_TRIAGE_LEADS
+
+  // If currently in Syndicate Graph dedicated screen, transition to Workbench first
+  const graphScreen = document.getElementById('screen-graph-view');
+  if (graphScreen && graphScreen.style.display !== 'none') {
+    goToWorkbench();
+  }
+
+  // 1. Direct file_id and line_number provided from database
+  if (directFileId && directLineNum) {
+    await traceToSource(directFileId, directLineNum);
+    showToast(`📍 Traced [${nodeType}]: "${nodeLabel}" to line #${directLineNum}`, 'success');
+    return;
+  }
+
+  // 2. Try finding matching node in GRAPH_SIM_STATE.nodes
+  const graphNode = GRAPH_SIM_STATE.nodes.find(n => (n.label || '').toLowerCase() === cleanLabel);
+  if (graphNode && graphNode.file_id && graphNode.line_number) {
+    await traceToSource(graphNode.file_id, graphNode.line_number);
+    showToast(`📍 Traced [${nodeType}]: "${nodeLabel}" to line #${graphNode.line_number}`, 'success');
+    return;
+  }
+
+  // 3. Try finding matching lead in REAL_TRIAGE_LEADS
   const matchingLead = REAL_TRIAGE_LEADS.find(l => {
     const val = (l.value || l.raw_value || '').toLowerCase();
     return val === cleanLabel || val.includes(cleanLabel) || cleanLabel.includes(val);
@@ -2796,7 +2856,7 @@ async function jumpToSourceFromNode(nodeLabel, nodeType) {
     return;
   }
 
-  // 2. Check if partial alphanumeric matches
+  // 4. Check if partial alphanumeric matches
   const secondaryLead = REAL_TRIAGE_LEADS.find(l => {
     const val = (l.value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     const cleanNoPunct = cleanLabel.replace(/[^a-z0-9]/g, '');
@@ -2809,7 +2869,7 @@ async function jumpToSourceFromNode(nodeLabel, nodeType) {
     return;
   }
 
-  // 3. Fallback: filter raw evidence in Panel 1
+  // 5. Fallback: filter raw evidence in Panel 1
   const searchInput = document.getElementById("raw-search-input");
   if (searchInput) {
     searchInput.value = nodeLabel;
@@ -2829,13 +2889,26 @@ let GRAPH_SIM_STATE = {
   animId: null,
   draggingNode: null,
   hoveredNode: null,
+  selectedNode: null,
+  dragStartPos: null,
+  isFullView: false,
   width: 400,
   height: 290
 };
 
-async function renderNetworkGraph() {
-  const container = document.getElementById("network-graph-canvas-container");
-  const badge = document.getElementById("graph-linkage-badge");
+async function renderNetworkGraph(isFullView = null) {
+  if (isFullView === null) {
+    const fullScreen = document.getElementById("screen-graph-view");
+    isFullView = fullScreen && fullScreen.style.display !== "none";
+  }
+  GRAPH_SIM_STATE.isFullView = isFullView;
+
+  const container = isFullView 
+    ? document.getElementById("full-network-graph-canvas-container")
+    : document.getElementById("network-graph-canvas-container");
+  const badge = isFullView
+    ? document.getElementById("full-graph-linkage-badge")
+    : document.getElementById("graph-linkage-badge");
   const legendBox = document.getElementById("graph-legend-box");
   if (!container) return;
 
@@ -2881,31 +2954,34 @@ async function renderNetworkGraph() {
 
       if (badge) {
         badge.className = "badge badge-sm badge-blue";
-        badge.textContent = `${rawNodes.length} Nodes &bull; ${edges.length} Corroborated Links`;
+        badge.textContent = `${rawNodes.length} Nodes • ${edges.length} Corroborated Links`;
       }
       if (legendBox) legendBox.style.opacity = "1";
 
-      const width = container.clientWidth || 390;
-      const height = container.clientHeight || 280;
+      const width = container.clientWidth || (isFullView ? 1000 : 390);
+      const height = container.clientHeight || (isFullView ? 620 : 280);
       GRAPH_SIM_STATE.width = width;
       GRAPH_SIM_STATE.height = height;
 
-      // Group nodes: arrange clusters (Darknet at top-left, financial at center, locations at bottom-right)
+      // Group nodes: arrange clusters
       const nodeMap = {};
-      const displayNodes = rawNodes.slice(0, 16).map((n, i) => {
-        let initialX = width / 2 + (Math.random() - 0.5) * 120;
-        let initialY = height / 2 + (Math.random() - 0.5) * 100;
+      const maxDisplayCount = isFullView ? 28 : 16;
+      const baseRadius = isFullView ? 22 : 14;
+
+      const displayNodes = rawNodes.slice(0, maxDisplayCount).map((n, i) => {
+        let initialX = width / 2 + (Math.random() - 0.5) * (width * 0.4);
+        let initialY = height / 2 + (Math.random() - 0.5) * (height * 0.4);
         
         // Initial biased clustering based on entity modality
         if (n.type === "DARKNET_VENDOR") {
-          initialX = width * 0.25 + (Math.random() - 0.5) * 40;
-          initialY = height * 0.28 + (Math.random() - 0.5) * 40;
+          initialX = width * 0.22 + (Math.random() - 0.5) * (width * 0.15);
+          initialY = height * 0.28 + (Math.random() - 0.5) * (height * 0.15);
         } else if (n.type in ["UPI_ID", "CRYPTO_WALLET", "TRANSACTION_REF"]) {
-          initialX = width * 0.52 + (Math.random() - 0.5) * 60;
-          initialY = height * 0.50 + (Math.random() - 0.5) * 50;
+          initialX = width * 0.50 + (Math.random() - 0.5) * (width * 0.18);
+          initialY = height * 0.50 + (Math.random() - 0.5) * (height * 0.18);
         } else if (n.type === "LOCATION") {
-          initialX = width * 0.75 + (Math.random() - 0.5) * 40;
-          initialY = height * 0.72 + (Math.random() - 0.5) * 40;
+          initialX = width * 0.78 + (Math.random() - 0.5) * (width * 0.15);
+          initialY = height * 0.72 + (Math.random() - 0.5) * (height * 0.15);
         }
 
         const color = n.type === "DARKNET_VENDOR" ? "#8b5cf6" : 
@@ -2913,13 +2989,20 @@ async function renderNetworkGraph() {
                       n.type === "CRYPTO_WALLET" ? "#ec4899" : 
                       n.type === "LOCATION" ? "#10b981" : "#3b82f6";
 
+        const radius = n.type === "DARKNET_VENDOR" ? baseRadius + 4 : (n.type === "UPI_ID" ? baseRadius + 2 : baseRadius);
+
         const nodeObj = {
           id: n.id,
           label: n.label,
           type: n.type,
           risk: n.risk,
+          mentions: n.mentions || 1,
+          file_id: n.file_id || null,
+          line_number: n.line_number || null,
+          filename: n.filename || null,
+          raw_context: n.raw_context || null,
           color: color,
-          radius: n.type === "DARKNET_VENDOR" ? 17 : (n.type === "UPI_ID" ? 16 : 14),
+          radius: radius,
           x: initialX,
           y: initialY,
           vx: 0,
@@ -2935,30 +3018,39 @@ async function renderNetworkGraph() {
       GRAPH_SIM_STATE.nodeMap = nodeMap;
       GRAPH_SIM_STATE.edges = edges;
 
+      const svgId = isFullView ? "full-force-network-svg" : "force-network-svg";
+
       // Create SVG with defs for directional markers
       container.innerHTML = `
-        <svg id="force-network-svg" width="100%" height="100%" viewBox="0 0 ${width} ${height}" style="background: #0b1120; border-radius: 6px; user-select: none; width: 100%; height: 100%;">
+        <svg id="${svgId}" width="100%" height="100%" viewBox="0 0 ${width} ${height}" style="background: #0b1120; border-radius: 6px; user-select: none; width: 100%; height: 100%;">
           <defs>
-            <marker id="arrow-corrob" viewBox="0 0 10 10" refX="22" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <marker id="arrow-corrob" viewBox="0 0 10 10" refX="24" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
               <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#38bdf8"/>
             </marker>
-            <marker id="arrow-default" viewBox="0 0 10 10" refX="20" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <marker id="arrow-default" viewBox="0 0 10 10" refX="22" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
               <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#64748b"/>
             </marker>
           </defs>
           <g id="svg-edges-group"></g>
           <g id="svg-nodes-group"></g>
-          <text id="svg-tooltip" x="10" y="20" fill="#94a3b8" font-size="9.5" font-family="monospace" style="pointer-events: none; opacity: 0.85;">💡 Drag nodes to isolate • Click node to trace source</text>
+          <text id="svg-tooltip" x="14" y="24" fill="#94a3b8" font-size="${isFullView ? 12 : 9.5}" font-family="monospace" style="pointer-events: none; opacity: 0.9;">💡 Drag nodes to isolate • Click any node to inspect evidence source</text>
         </svg>
       `;
 
       // Set up Dragging & Interaction on the SVG
-      const svgEl = document.getElementById("force-network-svg");
+      const svgEl = document.getElementById(svgId);
       setupForceGraphInteractivity(svgEl);
+
+      // Select first node by default for inspector in full view
+      if (isFullView && displayNodes.length > 0 && !GRAPH_SIM_STATE.selectedNode) {
+        inspectGraphNode(displayNodes[0].id);
+      }
 
       // Run Force Simulation (Spring Embedder + Coulomb Repulsion)
       let iterations = 0;
-      const maxIterations = 200;
+      const maxIterations = isFullView ? 240 : 180;
+      const repulseDist = isFullView ? 240 : 180;
+      const targetDist = isFullView ? 120 : 85;
 
       function stepSimulation() {
         const nodes = GRAPH_SIM_STATE.nodes;
@@ -2973,10 +3065,9 @@ async function renderNetworkGraph() {
             let dx = nb.x - na.x;
             let dy = nb.y - na.y;
             let dist = Math.sqrt(dx * dx + dy * dy) || 1;
-            const minDist = (na.radius + nb.radius) * 2.8;
-            if (dist < 180) {
-              const force = (180 - dist) / 180;
-              const repulse = force * 2.2;
+            if (dist < repulseDist) {
+              const force = (repulseDist - dist) / repulseDist;
+              const repulse = force * 2.5;
               const fx = (dx / dist) * repulse;
               const fy = (dy / dist) * repulse;
               if (na.fx === null) { na.vx -= fx; na.vy -= fy; }
@@ -2993,7 +3084,6 @@ async function renderNetworkGraph() {
             let dx = dst.x - src.x;
             let dy = dst.y - src.y;
             let dist = Math.sqrt(dx * dx + dy * dy) || 1;
-            const targetDist = 85;
             const delta = dist - targetDist;
             const springForce = delta * 0.035;
             const fx = (dx / dist) * springForce;
@@ -3016,8 +3106,8 @@ async function renderNetworkGraph() {
             n.y += n.vy;
 
             // Clamping inside canvas margins
-            n.x = Math.max(n.radius + 10, Math.min(width - n.radius - 10, n.x));
-            n.y = Math.max(n.radius + 15, Math.min(height - n.radius - 15, n.y));
+            n.x = Math.max(n.radius + 15, Math.min(width - n.radius - 15, n.x));
+            n.y = Math.max(n.radius + 20, Math.min(height - n.radius - 20, n.y));
           } else {
             n.x = n.fx;
             n.y = n.fy;
@@ -3050,6 +3140,7 @@ function updateGraphSvgElements() {
   const nodeMap = GRAPH_SIM_STATE.nodeMap;
   const edges = GRAPH_SIM_STATE.edges;
   const nodes = GRAPH_SIM_STATE.nodes;
+  const isFull = GRAPH_SIM_STATE.isFullView;
 
   // Render Edges
   let edgesHtml = "";
@@ -3059,7 +3150,7 @@ function updateGraphSvgElements() {
     if (src && dst) {
       const isCorrob = (e.label || "").toLowerCase().includes("bank") || (e.label || "").toLowerCase().includes("corroborat");
       const strokeColor = isCorrob ? "#38bdf8" : "#475569";
-      const strokeWidth = isCorrob ? 2.0 : 1.3;
+      const strokeWidth = isCorrob ? (isFull ? 2.5 : 2.0) : (isFull ? 1.6 : 1.3);
       const markerId = isCorrob ? "arrow-corrob" : "arrow-default";
       const midX = (src.x + dst.x) / 2;
       const midY = (src.y + dst.y) / 2;
@@ -3073,9 +3164,11 @@ function updateGraphSvgElements() {
 
       // Edge label (compact)
       if (e.label) {
-        const shortLabel = e.label.length > 18 ? e.label.substring(0, 16) + '..' : e.label;
+        const maxLen = isFull ? 26 : 18;
+        const shortLabel = e.label.length > maxLen ? e.label.substring(0, maxLen - 2) + '..' : e.label;
+        const fontSize = isFull ? 8.5 : 7;
         edgesHtml += `
-          <text x="${midX}" y="${midY - 3}" font-size="7" fill="${isCorrob ? '#7dd3fc' : '#94a3b8'}" 
+          <text x="${midX}" y="${midY - 4}" font-size="${fontSize}" fill="${isCorrob ? '#7dd3fc' : '#94a3b8'}" 
                 text-anchor="middle" font-family="monospace" opacity="0.85">${escapeHtml(shortLabel)}</text>
         `;
       }
@@ -3086,20 +3179,24 @@ function updateGraphSvgElements() {
   // Render Nodes
   let nodesHtml = "";
   nodes.forEach(n => {
-    const shortLabel = n.label.length > 12 ? n.label.substring(0, 10) + '..' : n.label;
+    const maxChars = isFull ? 16 : 12;
+    const shortLabel = n.label.length > maxChars ? n.label.substring(0, maxChars - 2) + '..' : n.label;
     const isHovered = GRAPH_SIM_STATE.hoveredNode === n.id;
-    const strokeWidth = isHovered ? 3.5 : 2;
-    const r = isHovered ? n.radius + 3 : n.radius;
+    const isSelected = GRAPH_SIM_STATE.selectedNode === n.id;
+    const strokeWidth = (isHovered || isSelected) ? 4.0 : 2.0;
+    const r = (isHovered || isSelected) ? n.radius + 4 : n.radius;
+    const strokeColor = isSelected ? "#38bdf8" : n.color;
+    const fontSize = isFull ? 9 : 7.5;
 
     nodesHtml += `
-      <g class="svg-node" data-node-id="${n.id}" style="cursor: grab;" 
+      <g class="svg-node" data-node-id="${n.id}" style="cursor: pointer;" 
          onmousedown="startNodeDrag(event, '${n.id}')"
          onmouseenter="highlightNode('${n.id}')"
          onmouseleave="unhighlightNode('${n.id}')"
-         onclick="jumpToSourceFromNode('${escapeHtml(n.label)}', '${escapeHtml(n.type)}')">
-        <circle cx="${n.x}" cy="${n.y}" r="${r}" fill="#0f172a" stroke="${n.color}" stroke-width="${strokeWidth}" />
-        <circle cx="${n.x}" cy="${n.y}" r="${r - 3}" fill="${n.color}" opacity="0.22" />
-        <text x="${n.x}" y="${n.y + 3.5}" font-size="7.5" text-anchor="middle" fill="#f8fafc" font-family="monospace" font-weight="600" style="pointer-events: none;">
+         onclick="handleNodeClick(event, '${n.id}')">
+        <circle cx="${n.x}" cy="${n.y}" r="${r}" fill="#0f172a" stroke="${strokeColor}" stroke-width="${strokeWidth}" />
+        <circle cx="${n.x}" cy="${n.y}" r="${r - 3}" fill="${n.color}" opacity="0.25" />
+        <text x="${n.x}" y="${n.y + (fontSize / 2)}" font-size="${fontSize}" text-anchor="middle" fill="#f8fafc" font-family="monospace" font-weight="600" style="pointer-events: none;">
           ${escapeHtml(shortLabel)}
         </text>
       </g>
@@ -3108,12 +3205,81 @@ function updateGraphSvgElements() {
   nodesGroup.innerHTML = nodesHtml;
 }
 
+function handleNodeClick(event, nodeId) {
+  event.stopPropagation();
+  const node = GRAPH_SIM_STATE.nodeMap[nodeId];
+  if (!node) return;
+
+  // Update Inspector Drawer
+  inspectGraphNode(nodeId);
+
+  // If in Mini View (Panel 3), jump straight to source line
+  if (!GRAPH_SIM_STATE.isFullView) {
+    jumpToSourceFromNode(node.label, node.type, node.file_id, node.line_number);
+  }
+}
+
+function inspectGraphNode(nodeId) {
+  GRAPH_SIM_STATE.selectedNode = nodeId;
+  const node = GRAPH_SIM_STATE.nodeMap[nodeId];
+  if (!node) return;
+
+  // Update full graph header inspect box
+  const inspectBox = document.getElementById("full-graph-node-inspect-box");
+  const inspectLabel = document.getElementById("full-graph-inspect-label");
+  const inspectJumpBtn = document.getElementById("btn-inspect-jump-source");
+  if (inspectBox && inspectLabel && inspectJumpBtn) {
+    inspectBox.style.display = "inline-flex";
+    inspectLabel.textContent = node.label;
+    inspectJumpBtn.onclick = () => {
+      jumpToSourceFromNode(node.label, node.type, node.file_id, node.line_number);
+    };
+  }
+
+  // Update Sidebar details
+  const emptySide = document.getElementById("graph-sidebar-empty");
+  const detailsSide = document.getElementById("graph-sidebar-details");
+  if (emptySide) emptySide.style.display = "none";
+  if (detailsSide) detailsSide.style.display = "flex";
+
+  const lbl = document.getElementById("sidebar-node-label");
+  const typ = document.getElementById("sidebar-node-type");
+  const mentions = document.getElementById("sidebar-node-mentions");
+  const src = document.getElementById("sidebar-node-source");
+  const ctx = document.getElementById("sidebar-node-context");
+  const btnJump = document.getElementById("btn-sidebar-jump");
+
+  if (lbl) lbl.textContent = node.label;
+  if (typ) {
+    const badgeColor = node.type === "DARKNET_VENDOR" ? "badge-purple" : 
+                       (node.type === "UPI_ID" || node.type === "TRANSACTION_REF") ? "badge-amber" : 
+                       node.type === "LOCATION" ? "badge-green" : "badge-blue";
+    typ.innerHTML = `<span class="badge badge-sm ${badgeColor}">${escapeHtml(node.type)}</span>`;
+  }
+  if (mentions) {
+    mentions.textContent = `${node.mentions} Corroborated Record(s)`;
+  }
+  if (src) {
+    src.textContent = node.filename ? `${node.filename} (Line #${node.line_number || 'N/A'})` : "Primary Case Evidence Files";
+  }
+  if (ctx) {
+    ctx.textContent = node.raw_context || `Corroborated cross-link detected in seized case exhibits for ${node.label}.`;
+  }
+  if (btnJump) {
+    btnJump.onclick = () => {
+      jumpToSourceFromNode(node.label, node.type, node.file_id, node.line_number);
+    };
+  }
+
+  updateGraphSvgElements();
+}
+
 function highlightNode(nodeId) {
   GRAPH_SIM_STATE.hoveredNode = nodeId;
   const node = GRAPH_SIM_STATE.nodeMap[nodeId];
   const tipEl = document.getElementById("svg-tooltip");
   if (node && tipEl) {
-    tipEl.textContent = `🎯 ${node.type}: "${node.label}" (Click to view source)`;
+    tipEl.textContent = `🎯 ${node.type}: "${node.label}" (Click to inspect source)`;
     tipEl.setAttribute("fill", node.color);
   }
 }
@@ -3123,7 +3289,7 @@ function unhighlightNode(nodeId) {
     GRAPH_SIM_STATE.hoveredNode = null;
     const tipEl = document.getElementById("svg-tooltip");
     if (tipEl) {
-      tipEl.textContent = `💡 Drag nodes to isolate • Click node to trace source`;
+      tipEl.textContent = `💡 Drag nodes to isolate • Click any node to inspect evidence source`;
       tipEl.setAttribute("fill", "#94a3b8");
     }
   }
@@ -3151,11 +3317,21 @@ function setupForceGraphInteractivity(svgEl) {
     }
   });
 
-  const stopDrag = () => {
+  const stopDrag = (e) => {
     if (GRAPH_SIM_STATE.draggingNode) {
+      // Check drag distance; if small, handle as click
+      if (GRAPH_SIM_STATE.dragStartPos) {
+        const dx = e.clientX - GRAPH_SIM_STATE.dragStartPos.x;
+        const dy = e.clientY - GRAPH_SIM_STATE.dragStartPos.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 6) {
+          handleNodeClick(e, GRAPH_SIM_STATE.draggingNode.id);
+        }
+      }
       GRAPH_SIM_STATE.draggingNode.fx = null;
       GRAPH_SIM_STATE.draggingNode.fy = null;
       GRAPH_SIM_STATE.draggingNode = null;
+      GRAPH_SIM_STATE.dragStartPos = null;
     }
   };
 
@@ -3168,6 +3344,7 @@ function startNodeDrag(event, nodeId) {
   const node = GRAPH_SIM_STATE.nodeMap[nodeId];
   if (node) {
     GRAPH_SIM_STATE.draggingNode = node;
+    GRAPH_SIM_STATE.dragStartPos = { x: event.clientX, y: event.clientY };
     node.fx = node.x;
     node.fy = node.y;
     if (!GRAPH_SIM_STATE.animId) {
@@ -3517,7 +3694,7 @@ function switchRightPanelTab(tabName) {
   }
 
   if (tabName === "graph") {
-    renderNetworkGraph();
+    renderNetworkGraph(false);
   } else if (tabName === "induction") {
     updateInductionFileSelect();
   }

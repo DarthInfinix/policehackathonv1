@@ -819,16 +819,20 @@ def get_case_graph_data(case_id: str, db_path: str = DB_PATH) -> Dict[str, Any]:
     con = get_db(db_path)
     cur = con.cursor()
 
-    # 1. Get non-narcotics entities (Actors, Financial Rails, Wallets, Locations)
+    # 1. Get non-narcotics entities (Actors, Financial Rails, Wallets, Locations) with source citation
     cur.execute("""
-    SELECT DISTINCT e.entity_id, e.entity_type, e.raw_value, e.risk_score, COUNT(em.record_id) as mentions
+    SELECT 
+        e.entity_id, e.entity_type, e.raw_value, e.risk_score, COUNT(em.record_id) as mentions,
+        MIN(er.file_id) as file_id, MIN(er.line_number) as line_number, MIN(ef.filename) as filename,
+        MIN(er.raw_text) as raw_context
     FROM entities e
     JOIN entity_mentions em ON e.entity_id = em.entity_id
     JOIN evidence_records er ON em.record_id = er.record_id
+    LEFT JOIN evidence_files ef ON er.file_id = ef.file_id
     WHERE er.case_id = ? AND e.entity_type NOT IN ('NARCOTICS_KEYWORD', 'SLANG')
     GROUP BY e.entity_id
     ORDER BY mentions DESC
-    LIMIT 50
+    LIMIT 60
     """, (case_id,))
     
     nodes_map = {}
@@ -841,6 +845,10 @@ def get_case_graph_data(case_id: str, db_path: str = DB_PATH) -> Dict[str, Any]:
             "type": ent_type,
             "risk": row["risk_score"],
             "mentions": row["mentions"],
+            "file_id": row["file_id"],
+            "line_number": row["line_number"],
+            "filename": row["filename"],
+            "raw_context": row["raw_context"],
             "color": color
         }
 
