@@ -21,19 +21,42 @@ PORT = 8000
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 LLAMA_PORTS = [8012, 8080]
+SLM_HOST = os.environ.get("SLM_HOST", "localhost")
+SLM_PORT = os.environ.get("SLM_PORT", "8012")
+SLM_URL = os.environ.get("SLM_URL", "")
 
 # Async Background Job Tracking for Heavy Operations (OCR, Large Dumps)
 OCR_JOBS = {} # job_id -> {status, filename, started_at, elapsed_sec, result, error}
 
-def get_active_llama_port():
+def get_active_llama_endpoint():
+    """Finds active llama-server endpoint (either local or remote over Tailscale/LAN)."""
+    candidates = []
+    if SLM_URL:
+        candidates.append(SLM_URL.rstrip('/'))
+    if SLM_HOST and SLM_HOST != "localhost":
+        for p in [SLM_PORT, 8012, 8080]:
+            candidates.append(f"http://{SLM_HOST}:{p}")
     for p in LLAMA_PORTS:
+        candidates.append(f"http://localhost:{p}")
+
+    for endpoint in candidates:
         try:
-            req = urllib.request.Request(f"http://localhost:{p}/v1/models")
+            req = urllib.request.Request(f"{endpoint}/v1/models")
             with urllib.request.urlopen(req, timeout=0.8) as resp:
                 if resp.status == 200:
-                    return p
+                    return endpoint
         except Exception:
             pass
+    return None
+
+def get_active_llama_port():
+    ep = get_active_llama_endpoint()
+    if ep:
+        try:
+            parsed = urllib.parse.urlparse(ep)
+            return parsed.port or (443 if parsed.scheme == 'https' else 80)
+        except Exception:
+            return 8012
     return None
 
 class ForensicHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -218,23 +241,26 @@ class ForensicHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         # API: SLM Status Check
         if path == '/api/slm_status':
-            port = get_active_llama_port()
-            if port:
+            endpoint = get_active_llama_endpoint()
+            if endpoint:
                 try:
-                    req = urllib.request.Request(f"http://localhost:{port}/v1/models")
+                    req = urllib.request.Request(f"{endpoint}/v1/models")
                     with urllib.request.urlopen(req, timeout=1.0) as resp:
                         m_data = json.loads(resp.read().decode())
                         model_name = "LFM2.5-8B-A1B-Q4_0"
                         if "data" in m_data and len(m_data["data"]) > 0:
                             model_name = m_data["data"][0].get("id", model_name)
+                        port = get_active_llama_port() or 8012
                         self._set_json_headers(200)
-                        self.wfile.write(json.dumps({"status": "online", "model": model_name, "port": port, "endpoint": f"http://localhost:{port}"}).encode('utf-8'))
+                        self.wfile.write(json.dumps({"status": "online", "model": model_name, "port": port, "endpoint": endpoint}).encode('utf-8'))
                         return
                 except Exception:
                     pass
             self._set_json_headers(200)
             self.wfile.write(b'{"status": "offline", "model": "Offline Fallback Regex Engine"}')
             return
+
+
 
         # API: SillyTavern-style Local Model Discovery
         if path == '/api/llm/models':
@@ -331,9 +357,9 @@ class ForensicHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     completion_endpoint = f"{custom_url}/completion"
                     endpoint_label = custom_url
                 else:
-                    port = get_active_llama_port() or 8080
-                    completion_endpoint = f"http://localhost:{port}/completion"
-                    endpoint_label = f"localhost:{port}"
+                    active_ep = get_active_llama_endpoint() or "http://localhost:8012"
+                    completion_endpoint = f"{active_ep}/completion"
+                    endpoint_label = active_ep.replace("http://", "").replace("https://", "")
 
                 context_str = ""
                 if context_history:
@@ -572,7 +598,7 @@ Evasion Code Word:"""
                 req_data = json.loads(body.decode('utf-8'))
                 text_to_triage = req_data.get("text", "")
 
-                port = get_active_llama_port() or 8080
+                active_ep = get_active_llama_endpoint() or "http://localhost:8012"
                 llama_payload = json.dumps({
                     "messages": [
                         {"role": "system", "content": "You are a cyber narcotics triage copilot. Given a text snippet, return a JSON object with: intent (string), detected_slang (array of strings), estimated_risk (integer 0-100). Do not include conversational markdown."},
@@ -582,7 +608,7 @@ Evasion Code Word:"""
                     "max_tokens": 250
                 }).encode('utf-8')
 
-                req = urllib.request.Request(f"http://localhost:{port}/v1/chat/completions", data=llama_payload, headers={"Content-Type": "application/json"})
+                req = urllib.request.Request(f"{active_ep}/v1/chat/completions", data=llama_payload, headers={"Content-Type": "application/json"})
                 with urllib.request.urlopen(req, timeout=8.0) as resp:
                     resp_data = json.loads(resp.read().decode())
                     choice = resp_data.get("choices", [{}])[0]

@@ -1240,14 +1240,26 @@ def mine_unstructured_entities_chunked(case_id: str, file_id: Optional[str] = No
             "snippet": snippet
         })
 
-    # Call local LLM or fallback semantic extractor
-    port = None
-    for p in [8012, 8015, 8080, 8081]:
+    # Call local or remote LLM (via Tailscale/LAN), or fallback semantic extractor
+    slm_url = os.environ.get("SLM_URL")
+    slm_host = os.environ.get("SLM_HOST", "localhost")
+    slm_port = os.environ.get("SLM_PORT", "8012")
+    candidates = []
+    if slm_url:
+        candidates.append(slm_url.rstrip('/'))
+    if slm_host and slm_host != "localhost":
+        for p in [slm_port, 8012, 8080]:
+            candidates.append(f"http://{slm_host}:{p}")
+    for p in [8012, 8080, 8015, 8081]:
+        candidates.append(f"http://localhost:{p}")
+
+    active_endpoint = None
+    for cand in candidates:
         try:
-            req = urllib.request.Request(f"http://localhost:{p}/v1/models")
-            with urllib.request.urlopen(req, timeout=0.5) as resp:
+            req = urllib.request.Request(f"{cand}/v1/models")
+            with urllib.request.urlopen(req, timeout=0.6) as resp:
                 if resp.status == 200:
-                    port = p
+                    active_endpoint = cand
                     break
         except Exception:
             pass
@@ -1256,7 +1268,7 @@ def mine_unstructured_entities_chunked(case_id: str, file_id: Optional[str] = No
     discovered_slang = []
 
     for c in chunks:
-        if port:
+        if active_endpoint:
             try:
                 system_prompt = (
                     "You are an expert Indian Cyber Narcotics intelligence copilot for Chandigarh Police. "
@@ -1275,7 +1287,7 @@ def mine_unstructured_entities_chunked(case_id: str, file_id: Optional[str] = No
                     "max_tokens": 250
                 }).encode('utf-8')
 
-                req = urllib.request.Request(f"http://localhost:{port}/v1/chat/completions", data=payload, headers={"Content-Type": "application/json"})
+                req = urllib.request.Request(f"{active_endpoint}/v1/chat/completions", data=payload, headers={"Content-Type": "application/json"})
                 with urllib.request.urlopen(req, timeout=12.0) as resp:
                     data = json.loads(resp.read().decode('utf-8'))
                     raw_ans = data.get("choices", [{}])[0].get("message", {}).get("content", "")

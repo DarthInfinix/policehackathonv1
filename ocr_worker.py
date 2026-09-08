@@ -10,9 +10,12 @@ Integrates with system Tesseract binary with zero cloud or proprietary dependenc
 import os
 import re
 import sys
+import json
+import base64
 import shutil
 import tempfile
 import subprocess
+import urllib.request
 from typing import Dict, List, Any, Optional, Tuple
 
 TESSERACT_CANDIDATE_PATHS = [
@@ -48,7 +51,31 @@ def get_tesseract_binary() -> Optional[str]:
     return None
 
 def get_dots_ocr_config() -> Optional[Dict[str, str]]:
-    """Checks if dots.ocr binary and GGUF model files are available."""
+    """Checks if dots.ocr HTTP endpoint (e.g. GPU laptop via Tailscale) or local binary/GGUF files are available."""
+    # 1. Check HTTP remote VLM endpoint (e.g. from Tailscale or local server)
+    ocr_url = os.environ.get("OCR_SERVER_URL") or os.environ.get("DOTS_OCR_URL")
+    candidates = []
+    if ocr_url:
+        candidates.append(ocr_url.rstrip('/'))
+    ocr_host = os.environ.get("OCR_HOST", os.environ.get("SLM_HOST", "localhost"))
+    candidates.append(f"http://{ocr_host}:8015")
+    if ocr_host != "localhost":
+        candidates.append("http://localhost:8015")
+
+    for url in candidates:
+        try:
+            req = urllib.request.Request(f"{url}/v1/models")
+            with urllib.request.urlopen(req, timeout=0.8) as resp:
+                if resp.status == 200:
+                    return {
+                        "type": "http",
+                        "url": url,
+                        "model": f"dots.ocr (Remote GPU VLM Server @ {url})"
+                    }
+        except Exception:
+            pass
+
+    # 2. Local CLI & GGUF fallback
     cli_bin = None
     for p in LLAMA_MTMD_CLI_PATHS:
         if os.path.isfile(p) and os.access(p, os.X_OK):
@@ -73,6 +100,7 @@ def get_dots_ocr_config() -> Optional[Dict[str, str]]:
 
     if cli_bin and model_path and mmproj_path:
         return {
+            "type": "cli",
             "cli": cli_bin,
             "model": model_path,
             "mmproj": mmproj_path
@@ -229,42 +257,83 @@ def classify_screenshot_content(lines: List[Dict[str, Any]]) -> Tuple[str, str]:
 
 def run_dots_ocr(image_path: str, dots_cfg: Dict[str, str], timeout_sec: int = 45) -> Tuple[List[Dict[str, Any]], float]:
     """
-    Executes dots.ocr (Qwen2-1.7B ViT) via llama-mtmd-cli.
+    Executes dots.ocr (Qwen2-1.7B ViT) via HTTP API (GPU server) or local llama-mtmd-cli.
     Provides human-grade handwriting and mobile UI transcription.
     """
-    cmd = [
-        dots_cfg["cli"],
-        "-m", dots_cfg["model"],
-        "--mmproj", dots_cfg["mmproj"],
-        "--image", image_path,
-        "-p", "OCR",
-        "-ngl", "99",
-        "-n", "1024",
-        "--temp", "0"
-    ]
-    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout_sec)
-    raw_output = res.stdout
+    if dots_cfg.get("type") == "http":
+        with open(image_path, "rb") as f:
+            b64_img = base64.b64encode(f.read()).decode("utf-8")
 
-    # Find where model response starts (after mtmd batch encoding done)
-    if "mtmd batch encoding done" in raw_output:
-        text_part = raw_output.split("mtmd batch encoding done", 1)[1]
-        if "\n\n" in text_part:
-            text_part = text_part.split("\n\n", 1)[1]
+        ext = os.path.splitext(image_path)[1].lower().replace('.', '')
+        mime = f"image/{ext}" if ext in ["png", "jpeg", "jpg", "webp"] else "image/jpeg"
+        data_uri = f"data:{mime};base64,{b64_img}"
+
+        payload = json.dumps({
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Extract all text."},
+                        {"type": "image_url", "image_url": {"url": data_uri}}
+                    ]
+                }
+            ],
+            "temperature": 0.0,
+            "max_tokens": 150,
+            "repeat_penalty": 1.35,
+            "logit_bias": {151673: -100, 151643: -100}
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            f"{dots_cfg['url']}/v1/chat/completions",
+            data=payload,
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            text_part = data.get("choices", [{}])[0].get("message", {}).get("content", "")
     else:
-        text_part = raw_output
+        cmd = [
+            dots_cfg["cli"],
+            "-m", dots_cfg["model"],
+            "--mmproj", dots_cfg["mmproj"],
+            "--image", image_path,
+            "-p", "OCR",
+            "-ngl", "99",
+            "-n", "1024",
+            "--temp", "0"
+        ]
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout_sec)
+        raw_output = res.stdout
+
+        # Find where model response starts (after mtmd batch encoding done)
+        if "mtmd batch encoding done" in raw_output:
+            text_part = raw_output.split("mtmd batch encoding done", 1)[1]
+            if "\n\n" in text_part:
+                text_part = text_part.split("\n\n", 1)[1]
+        else:
+            text_part = raw_output
 
     # Clean up trailing assistant tokens and whitespace
     text_part = re.sub(r'<\|[^>]+\|>', '', text_part).strip()
 
-    raw_lines = [l.strip() for l in text_part.splitlines() if l.strip()]
+    raw_candidates = [l.strip() for l in text_part.splitlines() if l.strip()]
     structured = []
-    for idx, l in enumerate(raw_lines):
-        structured.append({
-            "line_number": idx + 1,
-            "raw_text": l,
-            "confidence": 96.5,
-            "bbox": None
-        })
+    seen = set()
+    for l in raw_candidates:
+        l_clean = re.sub(r"^[#\*\_>\-]+\s*", "", l).strip()
+        if not l_clean or l_clean.startswith("<table") or l_clean.startswith("</") or l_clean.startswith("<td") or l_clean.startswith("<tr") or l_clean.startswith("<tbody"):
+            continue
+        if any(ign in l_clean.lower() for ign in ["i am sorry", "cannot recognize", "does not contain", "unable to detect"]):
+            continue
+        if l_clean.lower() not in seen:
+            seen.add(l_clean.lower())
+            structured.append({
+                "line_number": len(structured) + 1,
+                "raw_text": l_clean,
+                "confidence": 96.5,
+                "bbox": None
+            })
 
     return structured, 96.5
 
@@ -285,8 +354,8 @@ def process_image_bytes(image_bytes: bytes, filename: str, case_id: str = "FIR_1
     active_engine: str = "Unknown"
 
     try:
-        # 1. If explicitly requested 'dots' or 'accuracy', run dots.ocr Neural VLM
-        if (engine_preference in ["dots", "accuracy"]) and dots_cfg:
+        # 1. Prefer dots.ocr Neural VLM when available (GPU or server online, or accuracy/auto requested)
+        if dots_cfg and engine_preference in ["dots", "accuracy", "auto"]:
             try:
                 lines, avg_conf = run_dots_ocr(tmp_path, dots_cfg, timeout_sec=45)
                 if lines and len(lines) > 0:
@@ -294,7 +363,7 @@ def process_image_bytes(image_bytes: bytes, filename: str, case_id: str = "FIR_1
             except Exception as dots_err:
                 print(f"[WARN] dots.ocr failed ({dots_err}), falling back to Tesseract...")
 
-        # 2. Fast Air-Gapped Tesseract (Default for auto/light: instant 0.1s, preserves M4 RAM)
+        # 2. Local Air-Gapped Tesseract (Fallback or when light mode explicitly selected)
         if not lines and tesseract_bin:
             cmd = [tesseract_bin, tmp_path, "stdout", "-l", "eng", "--psm", "6", "tsv"]
             res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15)
@@ -307,14 +376,14 @@ def process_image_bytes(image_bytes: bytes, filename: str, case_id: str = "FIR_1
             if lines and len(lines) > 0:
                 active_engine = "Tesseract 5.5 (Instant Air-Gapped)"
 
-        # 3. If Tesseract found nothing and dots is available, try dots as second-pass
-        if not lines and dots_cfg and engine_preference in ["auto", "dots", "accuracy"]:
+        # 3. If Tesseract was tried first (e.g. light mode) and found nothing, check dots.ocr
+        if not lines and dots_cfg:
             try:
                 lines, avg_conf = run_dots_ocr(tmp_path, dots_cfg, timeout_sec=45)
                 if lines and len(lines) > 0:
                     active_engine = "dots.ocr (Qwen2-1.7B ViT Neural VLM)"
             except Exception as dots_err:
-                print(f"[WARN] dots.ocr second-pass failed: {dots_err}")
+                print(f"[WARN] dots.ocr fallback failed: {dots_err}")
 
         if not lines:
             if not tesseract_bin and not dots_cfg:

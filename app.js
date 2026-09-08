@@ -630,6 +630,27 @@ async function updateStagedEvidenceTable() {
   const tbody = document.getElementById('staged-evidence-tbody');
   await loadCaseFiles();
   
+  // Dynamically update Step 2 OCR Engine badge based on backend detection
+  try {
+    const ocrResp = await fetch('http://localhost:8000/api/ocr_status');
+    if (ocrResp.ok) {
+      const ocrData = await ocrResp.json();
+      const badge = document.getElementById('active-ocr-engine-badge');
+      if (badge) {
+        if (ocrData.dots_ocr) {
+          badge.className = "badge badge-sm badge-blue";
+          badge.textContent = "OCR Engine: dots.ocr (1.7B ViT Neural VLM Active)";
+          CURRENT_ENGINE_PRESET = "accuracy";
+        } else if (ocrData.tesseract) {
+          badge.className = "badge badge-sm badge-green";
+          badge.textContent = "OCR Engine: Tesseract 5.5 (Fast Air-Gapped)";
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("Could not check OCR status in Step 2:", e);
+  }
+  
   const countBadge = document.getElementById('staged-files-badge');
   if (countBadge) countBadge.textContent = `${REAL_FILES.length} Files Staged`;
   
@@ -642,7 +663,11 @@ async function updateStagedEvidenceTable() {
       </tr>
     `;
     document.getElementById('evidence-queue-section').style.display = 'block';
-    document.getElementById('btn-to-config').disabled = true;
+    if (STAGED_FILES_QUEUE.length === 0) {
+      document.getElementById('btn-to-config').disabled = true;
+    } else {
+      document.getElementById('btn-to-config').disabled = false;
+    }
     return;
   }
 
