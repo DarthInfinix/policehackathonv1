@@ -17,11 +17,12 @@ The entire platform runs without `npm`, Node dependencies, Docker, or external c
 
 ### Launching the Platform
 
-#### Option A: macOS/Linux 1-Click Startup Script
-Automatically checks and launches `llama-server` instances for LiquidAI (port 8012) and dots.ocr (port 8015), starts `server.py` on port 8000, and opens the browser:
+#### Option A: macOS/Linux 1-Click Startup Script (M4 Safe)
+Automatically boots LiquidAI (port 8012) and backend server on port 8000. Uses fast local Tesseract OCR (instant 0.1s, 0 GPU memory) to protect M4 unified memory:
 ```bash
 ./start.sh
 ```
+*(To run dual-server dots.ocr Neural ViT in parallel, launch with `./start.sh --with-dots`).*
 
 #### Option B: Windows PowerShell 1-Click Startup Script
 Checks dependencies (Python 3.9+, SQLite3, Tesseract OCR), probes neural model servers on ports 8012 & 8015, starts the backend, and opens the browser:
@@ -41,18 +42,25 @@ python3 server.py
 ```
 Open your browser to: `http://localhost:8000/`
 
-### Instant 4-Step Verification
-1. **Step 1 (Case Intake)**: Review prefilled Chandigarh Police case details (FIR 104/2026/CYBER, Sec 21/22 NDPS & Sec 66D IT Act), click **"Proceed to Evidence Media Intake ➔"**.
-2. **Step 2 (Media Intake & Previews)**:
-   - Browse or drag & drop seized evidence (images, CSVs, JSON, text dumps) or click **"⚡ Load Pre-Staged Datasets & OCR"**.
-   - Review live staged cards: see image thumbnails with an explicit **`[✓] Run Neural OCR`** checkbox (allowing operator to run or skip OCR per image), and monospace preview boxes showing the first lines of CSV/text files.
-   - Click **"Proceed to Engine Configuration ➔"**.
-3. **Step 3 (Engine Presets)**:
-   - **⚡ Light Mode (Default)**: Pure deterministic regex & financial NER + fast Tesseract OCR (0 GPU overhead).
-   - **🧠 Accuracy Mode**: Deep contextual reasoning via LiquidAI (LFM2.5 on port 8012) + dots.ocr Neural ViT.
-   - Click **"⚡ Start Forensic Pipeline & Triage ➔"**.
-4. **Step 4 (Genuine Loading Screen)**:
-   - Watches authentic live execution across exhibits: hashes files with SHA-256, streams neural OCR status and elapsed time, runs financial NER, queries correlations, and seals forensic records under Section 63(4) BSA before loading the Workbench.
+### Instant Operational Workflow
+1. **Screen 0 (Case Docket Landing Repository)**:
+   - Browse the institutional repository of registered Chandigarh Police FIRs in a comprehensive table.
+   - Filter by FIR Number, Station, IO, or Offense category.
+   - Click **"Open Workbench ➔"** on any case row to immediately load that case into the Live Triage Workbench, or click **"＋ Register New Case / FIR"** to begin a new investigation intake.
+   - Quick load shortcuts: **"Open Baseline FIR-104 Demo"** or **"Open Adversarial Stress Test"**.
+2. **Step 1 (Intake & Registration)**:
+   - Register FIR details, Police Station, IO Belt number, and statutory offenses under the NDPS Act & Bharatiya Sakshya Adhiniyam.
+3. **Step 2 (Media Intake & Previews)**:
+   - Browse or drag & drop seized evidence (images, CSVs, JSON, text dumps) or click **"Load Baseline Dataset (FIR-104)"** / **"Load Adversarial Stress Corpus"**.
+   - Review live staged cards with image previews, OCR toggles, and CSV/text first-line manifests.
+4. **Step 3 (Engine Presets)**:
+   - **Light Mode (Default)**: Pure deterministic regex & financial NER + fast Tesseract OCR (0 GPU overhead, M4 memory safe).
+   - **Accuracy Mode**: Deep contextual reasoning via LiquidAI (LFM2.5 on port 8012) + dots.ocr Neural ViT.
+5. **Step 4 (Genuine Loading Screen & Live Triage Dashboard)**:
+   - Complete live forensic analysis: hashes files with SHA-256, extracts financial and syndicate leads, cross-corroborates across historical cases, and renders interactive evidence cards.
+6. **Codeword Copilot & Interactive Induction**:
+   - Test any raw text message with local SLM few-shot learning (strictly outputs `NONE` on innocent chatter, eliminates hallucinations).
+   - Induct confirmed contraband codewords directly into the Section 63 BSA precinct dictionary.
 
 ---
 

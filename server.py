@@ -340,7 +340,9 @@ class ForensicHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     context_lines = "\n".join([f"  {c}" for c in context_history[-3:]])
                     context_str = f"Prior Chat Context:\n{context_lines}\n"
 
-                few_shot_prompt = f"""Rule: Extract only the disguised contraband noun (e.g. ice tea, white shoes, cold coffee, stamp papers). Payment rails (USDT, UPI, GPay, Paytm, Cash) and locations are NOT code words.
+                few_shot_prompt = f"""Rule: Extract only the disguised contraband noun (e.g. ice tea, white shoes, cold coffee, stamp papers).
+Payment rails (USDT, UPI, GPay, Paytm, Cash), ordinary food/beverages in legitimate contexts, and normal conversational phrases are NOT code words.
+If the message is routine conversation, legitimate payment, or contains NO illicit narcotics code word, output strictly: NONE.
 
 Example 1:
 Prior Chat Context:
@@ -349,21 +351,42 @@ Message: "Bhai urgent 3 piece cold coffee ready rakhna Aroma hotel ke peeche, US
 Payment Rail: USDT
 Evasion Code Word: cold coffee
 
-Example 2:
+Example 2 (Routine College/Work Chat):
+Prior Chat Context:
+  Rohan: Kal subah 9 baje class hai kya?
+Message: "Ha bhai lecture attend karna padega attendance short ho jayegi"
+Payment Rail: None
+Evasion Code Word: NONE
+
+Example 3:
 Prior Chat Context:
   Buyer: Rate batao for 2 parcels
 Message: "Bhai 2 parcel ice tea deliver kar dena sector 35 me, 3k gpay on raj@upi kar diya"
 Payment Rail: raj@upi
 Evasion Code Word: ice tea
 
-Example 3:
+Example 4 (Legitimate Food / Expense):
+Prior Chat Context:
+  Amit: Lunch kya mangwana hai?
+Message: "Swiggy se 2 burger mangwa lo, 400 gpay on rahul@upi send kar diye"
+Payment Rail: rahul@upi
+Evasion Code Word: NONE
+
+Example 5:
 Prior Chat Context:
   Viper: Last time late tha
 Message: "Send 2k on mule44@ybl for 5 boxes of stamp papers, drop at sec 17"
 Payment Rail: mule44@ybl
 Evasion Code Word: stamp papers
 
-Example 4:
+Example 6 (Routine Meeting / Travel):
+Prior Chat Context:
+  Pooja: Where are you guys?
+Message: "Sector 17 plaza pe baithe hai CCD ke bahar, jaldi aao"
+Payment Rail: None
+Evasion Code Word: NONE
+
+Example 7:
 {context_str}Message: "{message}"
 Evasion Code Word:"""
 
@@ -381,9 +404,10 @@ Evasion Code Word:"""
                         extracted = resp_data.get("content", "").strip().lower()
                         extracted = re.sub(r'[^a-zA-Z0-9\s\-]', '', extracted).strip()
                         
-                        # Blacklist guardrail: Ignore payment rails mistakenly returned
-                        PAYMENT_BLACKLIST = {"usdt", "upi", "gpay", "paytm", "cash", "crypto", "btc", "tron", "inr", "rs", "rupees", "dollar"}
-                        if extracted in PAYMENT_BLACKLIST or len(extracted) < 3:
+                        # Blacklist guardrail: Ignore payment rails mistakenly returned & negative tokens
+                        PAYMENT_BLACKLIST = {"usdt", "upi", "gpay", "paytm", "cash", "crypto", "btc", "tron", "inr", "rs", "rupees", "dollar", "phonepe", "netbanking"}
+                        NONE_KEYWORDS = {"none", "no", "null", "na", "n/a", "no code word", "none detected", "not detected", "clean", "normal", "nothing"}
+                        if extracted in NONE_KEYWORDS or extracted in PAYMENT_BLACKLIST or len(extracted) < 3:
                             extracted = None
 
                         timings = resp_data.get("timings", {})
@@ -408,13 +432,15 @@ Evasion Code Word:"""
                         }).encode('utf-8'))
                         return
                 except Exception as inner_e:
-                    # Deterministic fallback extraction
+                    # Deterministic fallback extraction with contextual check
                     extracted = None
                     m_lower = message.lower()
                     for term in ["ice tea", "stamp paper", "stamp papers", "cold coffee", "green apple", "green apples", "cough syrup", "white shoes", "chitta", "4-mmc"]:
                         if term in m_lower:
-                            extracted = term
-                            break
+                            has_commercial = bool(re.search(r'(?:parcel|packet|rate|box|piece|drop|delivery|deliver|stock|advance|usdt|gpay|paytm|₹|rs\.?)', m_lower))
+                            if has_commercial or term in ["chitta", "4-mmc", "white shoes"]:
+                                extracted = term
+                                break
                     self._set_json_headers(200)
                     self.wfile.write(json.dumps({
                         "status": "fallback",

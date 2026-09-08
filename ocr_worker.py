@@ -285,8 +285,8 @@ def process_image_bytes(image_bytes: bytes, filename: str, case_id: str = "FIR_1
     active_engine: str = "Unknown"
 
     try:
-        # 1. Try dots.ocr Neural VLM
-        if (engine_preference in ["auto", "dots"]) and dots_cfg:
+        # 1. If explicitly requested 'dots' or 'accuracy', run dots.ocr Neural VLM
+        if (engine_preference in ["dots", "accuracy"]) and dots_cfg:
             try:
                 lines, avg_conf = run_dots_ocr(tmp_path, dots_cfg, timeout_sec=45)
                 if lines and len(lines) > 0:
@@ -294,7 +294,7 @@ def process_image_bytes(image_bytes: bytes, filename: str, case_id: str = "FIR_1
             except Exception as dots_err:
                 print(f"[WARN] dots.ocr failed ({dots_err}), falling back to Tesseract...")
 
-        # 2. Fallback to Tesseract
+        # 2. Fast Air-Gapped Tesseract (Default for auto/light: instant 0.1s, preserves M4 RAM)
         if not lines and tesseract_bin:
             cmd = [tesseract_bin, tmp_path, "stdout", "-l", "eng", "--psm", "6", "tsv"]
             res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15)
@@ -304,7 +304,17 @@ def process_image_bytes(image_bytes: bytes, filename: str, case_id: str = "FIR_1
                 res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15)
                 tsv_data = res.stdout
             lines, avg_conf = parse_tesseract_tsv(tsv_data)
-            active_engine = "Tesseract 5.5.2 (Local Air-Gapped)"
+            if lines and len(lines) > 0:
+                active_engine = "Tesseract 5.5 (Instant Air-Gapped)"
+
+        # 3. If Tesseract found nothing and dots is available, try dots as second-pass
+        if not lines and dots_cfg and engine_preference in ["auto", "dots", "accuracy"]:
+            try:
+                lines, avg_conf = run_dots_ocr(tmp_path, dots_cfg, timeout_sec=45)
+                if lines and len(lines) > 0:
+                    active_engine = "dots.ocr (Qwen2-1.7B ViT Neural VLM)"
+            except Exception as dots_err:
+                print(f"[WARN] dots.ocr second-pass failed: {dots_err}")
 
         if not lines:
             if not tesseract_bin and not dots_cfg:

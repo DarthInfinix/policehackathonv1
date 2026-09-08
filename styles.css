@@ -126,31 +126,61 @@ body {
   font-size: 20px;
 }
 
+.gov-title-group {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
 .gov-dept-name {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
   color: #FEF3C7;
+  line-height: 1.2;
 }
 
-.gov-case-info {
-  display: flex;
+.gov-sub-dept {
+  color: #94A3B8;
+  font-weight: 500;
+}
+
+.gov-compliance-tag {
+  font-size: 10px;
+  color: #64748B;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  margin-top: 2px;
+}
+
+/* Compact Active Case Dropdown Pill */
+.header-case-pill {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: 11.5px;
-  color: #E2E8F0;
-  margin-top: 1px;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid #334155;
+  border-radius: 4px;
+  padding: 3px 8px;
+  margin-left: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
-.case-tag {
-  background: var(--gov-navy-light);
-  border: 1px solid #38BDF8;
-  color: #BAE6FD;
-  padding: 1px 6px;
-  border-radius: 3px;
+.header-case-select {
+  background: transparent;
+  border: none;
+  color: #38bdf8;
   font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: 10.5px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  max-width: 250px;
+}
+
+.header-case-select option {
+  background: #0f172a;
+  color: #f1f5f9;
 }
 
 .header-center {
@@ -214,29 +244,50 @@ body {
   font-size: 10px;
 }
 
-.role-badge {
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #FEF3C7;
-  padding: 3px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  display: flex;
+/* Header Action Buttons */
+.btn-header-action {
+  display: inline-flex;
   align-items: center;
   gap: 5px;
-}
-
-.model-badge {
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #E2E8F0;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
   padding: 4px 10px;
   border-radius: 4px;
-  font-size: 11px;
-  display: flex;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #f1f5f9;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-header-action:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+}
+
+.header-model-pill {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #6ee7b7;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.model-pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
 }
 
 .header-right {
@@ -296,6 +347,16 @@ body {
 .btn-gov-secondary:hover {
   background: #F1F5F9;
   border-color: #94A3B8;
+}
+
+.gov-header .btn-gov-secondary {
+  background: rgba(255, 255, 255, 0.12);
+  color: #F8FAFC;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+.gov-header .btn-gov-secondary:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
 .btn-autofill {
@@ -490,22 +551,24 @@ body {
 
 /* Large Drop Zone */
 .drop-zone-large {
-  border: 2px dashed var(--border-dark);
-  border-radius: 6px;
-  padding: 26px 20px;
+  border: 2px dashed #334155;
+  border-radius: 8px;
+  padding: 28px 22px;
   text-align: center;
-  background: #F8FAFC;
+  background: #0b1322;
+  color: #f8fafc;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.2s ease;
 }
 .drop-zone-large:hover {
-  border-color: var(--accent-blue);
-  background: var(--accent-blue-bg);
+  border-color: #38bdf8;
+  background: #0f1c34;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.15);
 }
 
-.drop-zone-icon { font-size: 32px; margin-bottom: 6px; }
-.drop-zone-title { font-size: 13px; color: var(--text-primary); }
-.drop-zone-desc { font-size: 11px; margin-top: 2px; }
+.drop-zone-icon { font-size: 28px; margin-bottom: 8px; color: #38bdf8; }
+.drop-zone-title { font-size: 13.5px; font-weight: 700; color: #f8fafc; }
+.drop-zone-desc { font-size: 11px; margin-top: 4px; color: #94a3b8; }
 
 /* Pipeline Loading Logs */
 .pipeline-progress-bar-wrapper {
@@ -1612,6 +1675,9 @@ body {
 
 .toast.toast-success { border-left: 4px solid #22C55E; }
 .toast.toast-alert { border-left: 4px solid #F59E0B; }
+.toast.toast-warning { border-left: 4px solid #F59E0B; }
+.toast.toast-info { border-left: 4px solid #38BDF8; }
+.toast.toast-danger { border-left: 4px solid #EF4444; }
 
 @keyframes toastIn {
   from { transform: translateY(10px); opacity: 0; }
@@ -1841,6 +1907,254 @@ body {
 }
 .staged-file-card:hover {
   border-color: #475569;
+}
+
+/* ==========================================================================
+   CASE REPOSITORY & FIR DOCKET LANDING PAGE
+   Institutional Police Forensics Aesthetic
+   ========================================================================== */
+.cases-page-container {
+  max-width: 1240px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  max-height: calc(100vh - 58px);
+}
+
+.case-docket-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #0b1322;
+  border: 1px solid #1e293b;
+  border-left: 4px solid #1d4ed8;
+  border-radius: 8px;
+  padding: 18px 22px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.case-docket-title-area {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.docket-crest-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  background: #1e3a8a;
+  color: #93c5fd;
+  border: 1px solid #3b82f6;
+  border-radius: 4px;
+  padding: 6px 10px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.case-docket-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #f8fafc;
+  letter-spacing: 0.02em;
+  margin-bottom: 3px;
+}
+
+.case-docket-subtitle {
+  font-size: 11.5px;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+.case-docket-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Docket Stats Ribbon */
+.docket-stats-ribbon {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.docket-stat-card {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.docket-stat-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.docket-stat-val {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  color: #f8fafc;
+  line-height: 1.2;
+}
+
+.docket-stat-sub {
+  font-size: 10.5px;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+/* Docket Toolbar */
+.docket-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 10px 14px;
+}
+
+.docket-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  max-width: 460px;
+}
+
+.docket-search-icon {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.docket-filters {
+  display: flex;
+  gap: 6px;
+}
+
+.docket-filter-btn {
+  background: #1e293b;
+  color: #94a3b8;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.docket-filter-btn:hover {
+  background: #334155;
+  color: #f8fafc;
+}
+
+.docket-filter-btn.active {
+  background: #1d4ed8;
+  color: #ffffff;
+  border-color: #3b82f6;
+}
+
+/* Docket Table Card */
+.docket-table-card {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.docket-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+  color: #e2e8f0;
+}
+
+.docket-table th {
+  background: #0b1322;
+  color: #94a3b8;
+  font-weight: 700;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 10px 14px;
+  border-bottom: 1px solid #334155;
+  text-align: left;
+}
+
+.docket-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #1e293b;
+  vertical-align: middle;
+}
+
+.docket-table tr:hover td {
+  background: rgba(30, 41, 59, 0.6);
+}
+
+.docket-table tr:last-child td {
+  border-bottom: none;
+}
+
+.btn-danger-subtle {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid #ef4444;
+  color: #f87171;
+  font-weight: 600;
+}
+.btn-danger-subtle:hover {
+  background: rgba(239, 68, 68, 0.25);
+  color: #ffffff;
+}
+
+/* Header Navigation Tabs */
+.header-nav-group {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-left: 14px;
+}
+
+.header-nav-link {
+  background: transparent;
+  color: #cbd5e1;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.header-nav-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.header-nav-link.active {
+  background: #1d4ed8;
+  color: #ffffff;
+  border-color: #3b82f6;
 }
 
 

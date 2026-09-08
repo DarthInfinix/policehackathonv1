@@ -73,26 +73,29 @@ else
     fi
 fi
 
-# 2. Check & Start dots.ocr Multimodal VLM Server (Port 8015)
-if lsof -i :"$DOTS_PORT" >/dev/null 2>&1; then
-    echo "✓ dots.ocr VLM is already running on port $DOTS_PORT."
-else
-    if [ -f "$DOTS_MODEL" ] && [ -f "$DOTS_MMPROJ" ] && [ -x "$LLAMA_SERVER" ]; then
-        echo "🚀 Starting dots.ocr (Qwen2-1.7B ViT) on port $DOTS_PORT..."
-        "$LLAMA_SERVER" \
-            -m "$DOTS_MODEL" \
-            --mmproj "$DOTS_MMPROJ" \
-            --port "$DOTS_PORT" \
-            -ngl 99 \
-            -c 2048 \
-            --host 127.0.0.1 \
-            > logs/dots_server.log 2>&1 &
-        DOTS_PID=$!
-        SPAWNED_PIDS+=("$DOTS_PID")
-        echo "✓ dots.ocr server started (PID: $DOTS_PID) -> logs/dots_server.log"
+# 2. Check & Start dots.ocr Multimodal VLM Server (Optional, via --with-dots)
+if [[ "$*" == *"--with-dots"* ]]; then
+    if lsof -i :"$DOTS_PORT" >/dev/null 2>&1; then
+        echo "✓ dots.ocr VLM is already running on port $DOTS_PORT."
     else
-        echo "ℹ️  dots.ocr server not launched; ocr_worker will use native llama-mtmd-cli / Tesseract."
+        if [ -f "$DOTS_MODEL" ] && [ -f "$DOTS_MMPROJ" ] && [ -x "$LLAMA_SERVER" ]; then
+            echo "🚀 Starting dots.ocr (Qwen2-1.7B ViT) on port $DOTS_PORT..."
+            "$LLAMA_SERVER" \
+                -m "$DOTS_MODEL" \
+                --mmproj "$DOTS_MMPROJ" \
+                --port "$DOTS_PORT" \
+                -ngl 99 \
+                -c 2048 \
+                --host 127.0.0.1 \
+                > logs/dots_server.log 2>&1 &
+            DOTS_PID=$!
+            SPAWNED_PIDS+=("$DOTS_PID")
+            echo "✓ dots.ocr server started (PID: $DOTS_PID) -> logs/dots_server.log"
+        fi
     fi
+else
+    echo "ℹ️  M4 Memory Protection: Running single-SLM mode (LiquidAI on :$LIQUID_PORT + Tesseract OCR)."
+    echo "    (To enable dual-server dots.ocr VLM, launch with: ./start.sh --with-dots)"
 fi
 
 # 3. Check & Start Forensic Web Application (Port 8000)

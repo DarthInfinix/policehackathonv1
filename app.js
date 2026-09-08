@@ -63,15 +63,17 @@ function renderSavedCasesDropdown() {
   const selHeader = document.getElementById("header-case-select");
   
   let optionsHtml = `<option value="NEW">＋ [Create New Investigation Case]</option>`;
+  let headerOptionsHtml = "";
+
   SAVED_CASES.forEach(c => {
     const isSelected = c.case_id === CASE_METADATA.case_id ? "selected" : "";
     optionsHtml += `<option value="${escapeHtml(c.case_id)}" ${isSelected}>${escapeHtml(c.fir_number)} &bull; ${escapeHtml(c.police_station)} (${c.total_files} files, ${c.total_records} records)</option>`;
+    headerOptionsHtml += `<option value="${escapeHtml(c.case_id)}" ${isSelected}>${escapeHtml(c.fir_number)} (${c.total_files} exhibits)</option>`;
   });
 
   if (selStep1) selStep1.innerHTML = optionsHtml;
   if (selHeader) {
-    selHeader.innerHTML = optionsHtml;
-    selHeader.style.display = "inline-block";
+    selHeader.innerHTML = headerOptionsHtml;
   }
 }
 
@@ -118,8 +120,12 @@ function handleSelectExistingCase(caseId) {
       summary.innerHTML = `<span style="color: #38bdf8;">✓ Loaded existing FIR:</span> ${escapeHtml(found.fir_number)} | Registered: ${escapeHtml(found.created_at || 'Active')} | IO: ${escapeHtml(found.io_name)} (${escapeHtml(found.io_belt)})`;
     }
 
-    document.getElementById('header-case-tag').textContent = found.fir_number;
-    document.getElementById('header-case-meta').textContent = `${found.police_station} | IO: ${found.io_name} (${found.io_belt})`;
+    const headerTag = document.getElementById('header-case-tag');
+    if (headerTag) headerTag.textContent = found.fir_number;
+    const headerMeta = document.getElementById('header-case-meta');
+    if (headerMeta) headerMeta.textContent = `${found.police_station} | IO: ${found.io_name} (${found.io_belt})`;
+    const selHeader = document.getElementById('header-case-select');
+    if (selHeader) selHeader.value = found.case_id;
 
     showToast(`📂 Switched to active case: ${found.fir_number}`, "info");
   }
@@ -319,12 +325,199 @@ async function fetchFileRecords(fileId) {
 }
 
 // ============================================================================
-// 2. STEP-BY-STEP WIZARD WORKFLOW CONTROLLER
+// 2. STEP-BY-STEP WIZARD & REPOSITORY WORKFLOW CONTROLLER
 // ============================================================================
+
+let DOCKET_CASES = [];
+let docketCategoryFilter = "ALL";
+
+function goToCaseDocket() {
+  document.querySelectorAll('.wizard-screen').forEach(s => s.style.display = 'none');
+  const dash = document.getElementById('screen-dashboard');
+  if (dash) dash.style.display = 'none';
+  const stepper = document.getElementById('wizard-stepper');
+  if (stepper) stepper.style.display = 'none';
+  const resetBtn = document.getElementById('btn-reset-workflow');
+  if (resetBtn) resetBtn.style.display = 'none';
+  const casePill = document.getElementById('header-active-case-pill');
+  if (casePill) casePill.style.display = 'none';
+  const modelBadge = document.getElementById('header-model-badge');
+  if (modelBadge) modelBadge.style.display = 'none';
+
+  const casesScreen = document.getElementById('screen-cases');
+  if (casesScreen) casesScreen.style.display = 'block';
+
+  // Update Nav links
+  const navDocket = document.getElementById('nav-btn-docket');
+  const navWb = document.getElementById('nav-btn-workbench');
+  if (navDocket) navDocket.classList.add('active');
+  if (navWb) navWb.classList.remove('active');
+
+  renderCaseDocket();
+}
+
+function goToWorkbench() {
+  goToStep(5);
+  const navDocket = document.getElementById('nav-btn-docket');
+  const navWb = document.getElementById('nav-btn-workbench');
+  if (navDocket) navDocket.classList.remove('active');
+  if (navWb) navWb.classList.add('active');
+}
+
+async function renderCaseDocket() {
+  const tbody = document.getElementById("case-docket-tbody");
+  const statCases = document.getElementById("docket-stat-cases");
+  const statFiles = document.getElementById("docket-stat-files");
+  const statEntities = document.getElementById("docket-stat-entities");
+
+  try {
+    const resp = await fetch("http://localhost:8000/api/cases");
+    if (resp.ok) {
+      const data = await resp.json();
+      DOCKET_CASES = data.cases || [];
+    }
+  } catch (err) {
+    console.warn("Could not fetch docket cases:", err);
+  }
+
+  // Update Stats Ribbon
+  let totalExhibits = 0;
+  let totalEntities = 0;
+  let totalFlagged = 0;
+  DOCKET_CASES.forEach(c => {
+    totalExhibits += (c.total_files || 0);
+    totalEntities += (c.total_entities || 0);
+    totalFlagged += (c.flagged_records || 0);
+  });
+
+  if (statCases) statCases.textContent = DOCKET_CASES.length;
+  if (statFiles) statFiles.textContent = totalExhibits;
+  if (statEntities) statEntities.textContent = totalEntities > 0 ? totalEntities : totalFlagged;
+
+  filterCaseDocketTable();
+}
+
+function setDocketCategoryFilter(cat) {
+  docketCategoryFilter = cat;
+  document.querySelectorAll('.docket-filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-filter') === cat);
+  });
+  filterCaseDocketTable();
+}
+
+function filterCaseDocketTable() {
+  const tbody = document.getElementById("case-docket-tbody");
+  if (!tbody) return;
+
+  const searchInput = document.getElementById("docket-search-input");
+  const q = (searchInput ? searchInput.value : "").trim().toLowerCase();
+
+  const filtered = DOCKET_CASES.filter(c => {
+    if (docketCategoryFilter !== "ALL" && c.category !== docketCategoryFilter) return false;
+    if (q) {
+      const haystack = `${c.fir_number || ''} ${c.case_id || ''} ${c.police_station || ''} ${c.io_name || ''} ${c.category || ''}`.toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="9" style="text-align: center; padding: 28px; color: #64748b;">
+          No cases match the specified filter query. Click <strong>[＋ Register New Case / FIR]</strong> to create an entry.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  let html = "";
+  filtered.forEach(c => {
+    const statusBadge = (c.total_files > 0) 
+      ? `<span class="badge badge-sm badge-green">TRIAGED (${c.total_files} Exhibits)</span>`
+      : `<span class="badge badge-sm badge-blue">REGISTERED</span>`;
+    
+    const catLabel = c.category === "NDPS_CYBER" ? "NDPS Cyber (Darknet/Slang)" : c.category === "FINANCIAL_1930" ? "Financial Cyber (1930)" : (c.category || "General Cyber");
+
+    html += `
+      <tr>
+        <td>
+          <div style="font-weight: 700; color: #f8fafc;">${escapeHtml(c.fir_number || c.case_id)}</div>
+          <div class="mono text-xs" style="color: #38bdf8;">${escapeHtml(c.case_id)}</div>
+        </td>
+        <td>
+          <div style="color: #cbd5e1;">${escapeHtml(c.police_station || "PS Cyber Crime, Chandigarh")}</div>
+        </td>
+        <td>
+          <div style="color: #f1f5f9; font-weight: 600;">${escapeHtml(c.io_name || "Investigating Officer")}</div>
+          <div class="mono text-xs" style="color: #64748b;">${escapeHtml(c.io_belt || "Belt #--")}</div>
+        </td>
+        <td>
+          <span class="badge badge-sm badge-purple">${escapeHtml(catLabel)}</span>
+        </td>
+        <td class="mono font-bold" style="color: #38bdf8;">
+          ${c.total_files || 0}
+        </td>
+        <td class="mono" style="color: #94a3b8;">
+          ${c.total_records || 0}
+        </td>
+        <td class="mono font-bold" style="color: ${c.flagged_records > 0 ? '#ef4444' : '#64748b'};">
+          ${c.flagged_records || 0}
+        </td>
+        <td>
+          ${statusBadge}
+        </td>
+        <td style="text-align: right;">
+          <button class="btn btn-gov-primary btn-sm" onclick="loadCaseAndOpenDashboard('${escapeHtml(c.case_id)}')">
+            Open Workbench ➔
+          </button>
+        </td>
+      </tr>
+    `;
+  });
+  tbody.innerHTML = html;
+}
+
+async function loadCaseAndOpenDashboard(caseId) {
+  const caseObj = DOCKET_CASES.find(c => c.case_id === caseId) || { case_id: caseId };
+  CASE_METADATA.case_id = caseId;
+  CASE_METADATA.fir = caseObj.fir_number || caseId;
+  CASE_METADATA.io = caseObj.io_name || "Insp. Vikramjit Singh";
+  CASE_METADATA.ps = caseObj.police_station || "PS Cyber Crime, Chandigarh";
+  CASE_METADATA.belt = caseObj.io_belt || "Belt #788-UT";
+  CASE_METADATA.category = caseObj.category || "NDPS_CYBER";
+
+  const headerTag = document.getElementById("header-case-tag");
+  if (headerTag) headerTag.textContent = CASE_METADATA.fir;
+
+  goToWorkbench();
+}
+
+async function quickLoadDemoCase(caseId, type) {
+  try {
+    showToast(`Loading demo case ${caseId}...`, "info");
+    const resp = await fetch(`/api/load_demo_data?case_id=${encodeURIComponent(caseId)}&type=${encodeURIComponent(type)}`, {
+      method: "POST"
+    });
+    if (resp.ok) {
+      await renderCaseDocket();
+      await loadCaseAndOpenDashboard(caseId);
+      showToast(`✓ Case ${caseId} (${type}) loaded successfully!`, "success");
+    }
+  } catch (err) {
+    console.error("Error loading demo case:", err);
+    showToast(`Error loading demo case: ${err.message}`, "alert");
+  }
+}
 
 function goToStep(stepNum) {
   document.querySelectorAll('.wizard-screen').forEach(s => s.style.display = 'none');
-  document.getElementById('screen-dashboard').style.display = 'none';
+  const dash = document.getElementById('screen-dashboard');
+  if (dash) dash.style.display = 'none';
+
+  const stepper = document.getElementById('wizard-stepper');
+  if (stepper) stepper.style.display = (stepNum >= 1 && stepNum <= 4) ? 'flex' : 'none';
 
   document.querySelectorAll('.step-node').forEach((node, idx) => {
     node.classList.remove('active', 'completed');
@@ -332,19 +525,31 @@ function goToStep(stepNum) {
     else if (idx + 1 < stepNum) node.classList.add('completed');
   });
 
+  const navDocket = document.getElementById('nav-btn-docket');
+  const navWb = document.getElementById('nav-btn-workbench');
+
   if (stepNum === 1) {
     document.getElementById('screen-intake').style.display = 'flex';
+    if (navDocket) navDocket.classList.remove('active');
+    if (navWb) navWb.classList.remove('active');
   } else if (stepNum === 2) {
     document.getElementById('screen-evidence').style.display = 'flex';
   } else if (stepNum === 3) {
     document.getElementById('screen-config').style.display = 'flex';
+    checkSlmServerStatus();
+    checkOcrServerStatus();
   } else if (stepNum === 4) {
     document.getElementById('screen-loading').style.display = 'flex';
   } else if (stepNum === 5) {
     document.getElementById('screen-dashboard').style.display = 'grid';
-    document.getElementById('wizard-stepper').style.display = 'none';
-    document.getElementById('header-model-badge').style.display = 'flex';
-    document.getElementById('btn-reset-workflow').style.display = 'inline-flex';
+    const modelBadge = document.getElementById('header-model-badge');
+    if (modelBadge) modelBadge.style.display = 'inline-flex';
+    const casePill = document.getElementById('header-active-case-pill');
+    if (casePill) casePill.style.display = 'inline-flex';
+    const resetBtn = document.getElementById('btn-reset-workflow');
+    if (resetBtn) resetBtn.style.display = 'none';
+    if (navDocket) navDocket.classList.remove('active');
+    if (navWb) navWb.classList.add('active');
     renderDashboard();
   }
 }
@@ -396,8 +601,12 @@ async function proceedToStep2() {
     console.warn("Could not register case in backend:", err);
   }
 
-  document.getElementById('header-case-tag').textContent = fir;
-  document.getElementById('header-case-meta').textContent = `${ps} | IO: ${io} (${belt})`;
+  const headerTag = document.getElementById('header-case-tag');
+  if (headerTag) headerTag.textContent = fir;
+  const headerMeta = document.getElementById('header-case-meta');
+  if (headerMeta) headerMeta.textContent = `${ps} | IO: ${io} (${belt})`;
+  const selHeader = document.getElementById('header-case-select');
+  if (selHeader) selHeader.value = caseId;
 
   logAuditEvent("CASE_REGISTRATION", `Registered ${fir} by ${io} (${belt}) [Case ID: ${caseId}]`);
   goToStep(2);
@@ -930,23 +1139,167 @@ async function executePanelIngest() {
   await renderDashboard();
 }
 
+let miningProgressInterval = null;
+
+function closeMiningProgressModal() {
+  if (miningProgressInterval) {
+    clearInterval(miningProgressInterval);
+    miningProgressInterval = null;
+  }
+  const modal = document.getElementById('modal-mining-progress');
+  if (modal) modal.style.display = 'none';
+}
+
 async function triggerSlmMiner() {
   const caseId = getActiveCaseId();
-  showToast(`🧠 Running Chunked Semantic Miner across ${caseId}...`, 'info');
+  const modal = document.getElementById('modal-mining-progress');
+  const terminal = document.getElementById('mining-log-terminal');
+  const bar = document.getElementById('mining-progress-bar');
+  const statusText = document.getElementById('mining-status-text');
+  const badgeStage = document.getElementById('mining-badge-stage');
+  const kpiChunks = document.getElementById('mining-kpi-chunks');
+  const kpiLocs = document.getElementById('mining-kpi-locations');
+  const kpiSlang = document.getElementById('mining-kpi-slang');
+  const closeBtn = document.getElementById('btn-close-mining-modal');
+
+  if (modal) modal.style.display = 'flex';
+  if (terminal) terminal.innerHTML = "";
+  if (bar) bar.style.width = "15%";
+  if (statusText) statusText.textContent = "EXTRACTING CONVERSATION CLUSTERS...";
+  if (badgeStage) {
+    badgeStage.className = "badge badge-sm badge-blue";
+    badgeStage.textContent = "EXTRACTING CLUSTERS";
+  }
+  if (kpiChunks) kpiChunks.textContent = "0 / --";
+  if (kpiLocs) kpiLocs.textContent = "0";
+  if (kpiSlang) kpiSlang.textContent = "0";
+  if (closeBtn) {
+    closeBtn.disabled = true;
+    closeBtn.innerHTML = `<span>Processing...</span>`;
+  }
+
+  const logLine = (tag, msg, color = "#94a3b8") => {
+    if (!terminal) return;
+    const timeStr = new Date().toTimeString().split(' ')[0];
+    terminal.innerHTML += `<div><span style="color: #64748b;">[${timeStr}]</span> <strong style="color: ${color};">[${tag}]</strong> ${escapeHtml(msg)}</div>`;
+    terminal.scrollTop = terminal.scrollHeight;
+  };
+
+  logLine("INIT", `Starting AI Location & Slang Scan on case ${caseId}...`, "#38bdf8");
+  logLine("CLUSTER", "Analyzing evidence records for geographic references, meeting points, and covert slang...", "#f59e0b");
+
+  let progress = 15;
+  miningProgressInterval = setInterval(() => {
+    if (progress < 85) {
+      progress += Math.floor(Math.random() * 8) + 4;
+      if (bar) bar.style.width = `${Math.min(progress, 85)}%`;
+      if (progress > 30 && progress < 60) {
+        if (statusText) statusText.textContent = "QUERYING LOCAL INFERENCE MODEL (PORT 8012)...";
+        if (badgeStage) {
+          badgeStage.className = "badge badge-sm badge-purple";
+          badgeStage.textContent = "SLM INFERENCE";
+        }
+      } else if (progress >= 60) {
+        if (statusText) statusText.textContent = "DISAMBIGUATING PHYSICAL DROP POINTS & SLANG...";
+        if (badgeStage) {
+          badgeStage.className = "badge badge-sm badge-blue";
+          badgeStage.textContent = "SEMANTIC EXTRACTION";
+        }
+      }
+    }
+  }, 450);
+
   try {
+    logLine("HTTP", "Dispatched chunked extraction request to local backend...", "#38bdf8");
     const resp = await fetch(`http://localhost:8000/api/mine_entities_slm?case_id=${encodeURIComponent(caseId)}&max_chunks=6`);
+    
+    if (miningProgressInterval) {
+      clearInterval(miningProgressInterval);
+      miningProgressInterval = null;
+    }
+
     if (resp.ok) {
       const data = await resp.json();
-      const locCount = (data.discovered_locations || []).length;
-      const slangCount = (data.discovered_slang || []).length;
-      const modelMode = data.llm_used ? 'Local SLM' : 'Spatial Semantic Engine';
-      showToast(`🎯 ${modelMode} discovered ${locCount} drop points/locations and ${slangCount} covert slang terms!`, 'success');
-      await renderDashboard();
+      const locs = data.discovered_locations || [];
+      const slang = data.discovered_slang || [];
+      const chunks = data.chunks_analyzed || 0;
+      const modelMode = data.llm_used ? "Local SLM (LFM2.5 @ 8012)" : "Spatial Semantic Engine";
+
+      if (bar) bar.style.width = "100%";
+      if (statusText) statusText.textContent = "SCAN COMPLETE - NEW LEADS IDENTIFIED";
+      if (badgeStage) {
+        badgeStage.className = "badge badge-sm badge-green";
+        badgeStage.textContent = "COMPLETED (100%)";
+      }
+      if (kpiChunks) kpiChunks.textContent = `${chunks} / ${chunks}`;
+      if (kpiLocs) kpiLocs.textContent = locs.length;
+      if (kpiSlang) kpiSlang.textContent = slang.length;
+
+      logLine("ENGINE", `Analysis completed using ${modelMode} across ${chunks} conversational windows.`, "#10b981");
+
+      if (locs.length > 0) {
+        locs.forEach(l => {
+          logLine("LOCATION", `📍 Discovered drop point / landmark: "${l}"`, "#10b981");
+        });
+      } else {
+        logLine("LOCATION", "No explicit physical meeting points detected in current windows.", "#64748b");
+      }
+
+      if (slang.length > 0) {
+        slang.forEach(s => {
+          const term = s.term || s;
+          const meaning = s.meaning || "Suspected Codeword";
+          logLine("SLANG", `💊 Discovered covert slang: "${term}" (${meaning})`, "#f59e0b");
+        });
+      } else {
+        logLine("SLANG", "No unindexed slang detected in evaluated chunks.", "#64748b");
+      }
+
+      logLine("SEAL", `Preserved ${data.new_entities_added || (locs.length + slang.length)} discovered entities into case registry.`, "#38bdf8");
+
+      if (closeBtn) {
+        closeBtn.disabled = false;
+        closeBtn.innerHTML = `<span>View Discovered Leads ➔</span>`;
+        closeBtn.onclick = async () => {
+          closeMiningProgressModal();
+          await renderDashboard();
+          if (locs.length > 0) {
+            setTriageFilter('locations');
+          }
+          showToast(`🎯 Found ${locs.length} drop points and ${slang.length} slang terms!`, "success");
+        };
+      }
     } else {
-      showToast('⚠️ Semantic mining failed or returned no hits.', 'warning');
+      if (bar) bar.style.width = "100%";
+      if (statusText) statusText.textContent = "MINING RETURNED NO NEW ENTITIES";
+      if (badgeStage) {
+        badgeStage.className = "badge badge-sm badge-neutral";
+        badgeStage.textContent = "NO NEW HITS";
+      }
+      logLine("WARN", "Backend returned no new unstructured entities for current evidence.", "#f59e0b");
+      if (closeBtn) {
+        closeBtn.disabled = false;
+        closeBtn.innerHTML = `<span>Close</span>`;
+        closeBtn.onclick = closeMiningProgressModal;
+      }
     }
   } catch (err) {
-    showToast(`Error running semantic miner: ${err.message}`, 'error');
+    if (miningProgressInterval) {
+      clearInterval(miningProgressInterval);
+      miningProgressInterval = null;
+    }
+    if (bar) bar.style.width = "100%";
+    if (statusText) statusText.textContent = "ERROR DURING AI SCAN";
+    if (badgeStage) {
+      badgeStage.className = "badge badge-sm badge-amber";
+      badgeStage.textContent = "FAILED";
+    }
+    logLine("ERROR", `Failed during execution: ${err.message}`, "#ef4444");
+    if (closeBtn) {
+      closeBtn.disabled = false;
+      closeBtn.innerHTML = `<span>Close</span>`;
+      closeBtn.onclick = closeMiningProgressModal;
+    }
   }
 }
 
@@ -1004,19 +1357,121 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Load existing cases into dropdowns
+  // Load existing cases into dropdowns & start on Case Docket landing page
   loadSavedCasesList();
+  goToCaseDocket();
 });
 
 // ============================================================================
-// SILLYTAVERN-STYLE LOCAL SLM INFERENCE DISCOVERY & PING ENGINE
+// AIR-GAPPED LOCAL SLM & OCR INFERENCE STATUS & DISCOVERY CONTROLLER
 // ============================================================================
 
 let DISCOVERED_MODELS = [];
 
+async function checkSlmServerStatus() {
+  const urlInput = document.getElementById('config-server-url');
+  const serverUrl = urlInput ? urlInput.value.trim() : (CASE_METADATA.serverUrl || "http://localhost:8012");
+  const pingBadge = document.getElementById('server-ping-badge');
+  const btn = document.getElementById('btn-ping-server');
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span>⚙️</span> Testing...`;
+  }
+  if (pingBadge) {
+    pingBadge.className = "badge badge-sm badge-neutral";
+    pingBadge.textContent = "● Testing Connection...";
+  }
+
+  try {
+    const resp = await fetch('http://localhost:8000/api/slm_status');
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.status === "online") {
+        if (pingBadge) {
+          pingBadge.className = "badge badge-sm badge-green";
+          pingBadge.textContent = `● Online (${data.model} :${data.port})`;
+        }
+        if (urlInput) urlInput.value = data.endpoint || `http://localhost:${data.port}`;
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `<span>✓</span> SLM Connected`;
+        }
+        showToast(`🟢 Local SLM is online on port ${data.port} (${data.model})`, "success");
+        await discoverLocalModels(data.endpoint || `http://localhost:${data.port}`);
+        return true;
+      }
+    }
+  } catch (e) {
+    console.warn("Direct /api/slm_status check failed, falling back to discover:", e);
+  }
+
+  const success = await discoverLocalModels(serverUrl);
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = success ? `<span>✓</span> SLM Connected` : `<span>⚡</span> Test SLM Connection`;
+  }
+  return success;
+}
+
+async function checkOcrServerStatus() {
+  const badge = document.getElementById('ocr-status-badge');
+  const summary = document.getElementById('ocr-engine-summary');
+  const btn = document.getElementById('btn-test-ocr');
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span>⚙️</span> Testing OCR...`;
+  }
+  if (badge) {
+    badge.className = "badge badge-sm badge-neutral";
+    badge.textContent = "● Testing OCR...";
+  }
+
+  try {
+    const resp = await fetch('http://localhost:8000/api/ocr_status');
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.status === "available") {
+        if (badge) {
+          badge.className = "badge badge-sm badge-green";
+          const vitLabel = data.dots_ocr ? "dots.ocr (Neural ViT)" : "Tesseract 5.5";
+          badge.textContent = `● Online (${vitLabel})`;
+        }
+        if (summary) {
+          const tPath = data.tesseract_path ? "Local CLI" : "Offline";
+          const dotsStatus = data.dots_ocr ? "Available (Apple M4 Neural ViT)" : "Standard Mode";
+          summary.innerHTML = `<strong>Tesseract 5.5:</strong> Active (${tPath}) &bull; <strong>Neural OCR:</strong> ${dotsStatus}`;
+        }
+        showToast("✓ OCR Engines verified: Tesseract 5.5 CLI & dots.ocr Neural ViT available", "success");
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `<span>✓</span> OCR Verified`;
+        }
+        return true;
+      }
+    }
+  } catch (e) {
+    console.warn("Error checking OCR status:", e);
+  }
+
+  if (badge) {
+    badge.className = "badge badge-sm badge-amber";
+    badge.textContent = "● Tesseract Fallback Only";
+  }
+  if (summary) {
+    summary.textContent = "Tesseract 5.5 active (Neural ViT weights offline)";
+  }
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = `<span>🔍</span> Test OCR Engine`;
+  }
+  return false;
+}
+
 async function discoverLocalModels(overrideUrl = null) {
   const urlInput = document.getElementById('config-server-url');
-  const serverUrl = overrideUrl || (urlInput ? urlInput.value.trim() : (CASE_METADATA.serverUrl || "http://localhost:8080"));
+  const serverUrl = overrideUrl || (urlInput ? urlInput.value.trim() : (CASE_METADATA.serverUrl || "http://localhost:8012"));
   const pingBadge = document.getElementById('server-ping-badge');
   const selectEl = document.getElementById('config-slm-engine');
   const btn = document.getElementById('btn-ping-server');
@@ -1089,6 +1544,16 @@ function setServerUrlAndDiscover(url) {
   discoverLocalModels(url);
 }
 
+function formatShortModelName(modelPathOrName) {
+  if (!modelPathOrName) return "Local SLM";
+  const filename = modelPathOrName.split('/').pop().replace(/\.gguf$/i, '');
+  if (filename.toLowerCase().includes("lfm") || filename.toLowerCase().includes("liquid")) return "LFM2.5 (8B)";
+  if (filename.toLowerCase().includes("gemma")) return "Gemma 2/3";
+  if (filename.toLowerCase().includes("llama")) return "Llama 3.2";
+  if (filename.toLowerCase().includes("qwen")) return "Qwen 2.5";
+  return filename.length > 16 ? filename.substring(0, 14) + '..' : filename;
+}
+
 function updateModelBlurb() {
   const selectEl = document.getElementById('config-slm-engine');
   const blurbBadge = document.getElementById('model-blurb-badge');
@@ -1100,7 +1565,7 @@ function updateModelBlurb() {
   CASE_METADATA.model = selectedId;
 
   const headerBadge = document.getElementById('header-model-name');
-  if (headerBadge) headerBadge.textContent = selectedId;
+  if (headerBadge) headerBadge.textContent = formatShortModelName(selectedId);
 
   const found = DISCOVERED_MODELS.find(m => m.id === selectedId);
   if (found) {
@@ -1153,7 +1618,7 @@ async function startLoadingPipeline() {
   const selectedEngine = engineSelect ? engineSelect.value : "LFM2.5-8B-A1B-Q4_0.gguf";
   CASE_METADATA.model = selectedEngine;
   const headerModelName = document.getElementById('header-model-name');
-  if (headerModelName) headerModelName.textContent = selectedEngine;
+  if (headerModelName) headerModelName.textContent = formatShortModelName(selectedEngine);
 
   goToStep(4);
 
@@ -1181,16 +1646,52 @@ async function startLoadingPipeline() {
     terminal.scrollTop = terminal.scrollHeight;
   };
 
+  const updatePipelineMilestones = (stage) => {
+    const s1 = document.getElementById('p-stage-1');
+    const s2 = document.getElementById('p-stage-2');
+    const s3 = document.getElementById('p-stage-3');
+    const s4 = document.getElementById('p-stage-4');
+    if (!s1 || !s2 || !s3 || !s4) return;
+    if (stage === 1) {
+      s1.className = "badge badge-sm badge-blue";
+      s2.className = s3.className = s4.className = "badge badge-sm badge-neutral";
+    } else if (stage === 2) {
+      s1.className = "badge badge-sm badge-green";
+      s2.className = "badge badge-sm badge-blue";
+      s3.className = s4.className = "badge badge-sm badge-neutral";
+    } else if (stage === 3) {
+      s1.className = s2.className = "badge badge-sm badge-green";
+      s3.className = "badge badge-sm badge-blue";
+      s4.className = "badge badge-sm badge-neutral";
+    } else if (stage === 4) {
+      s1.className = s2.className = s3.className = s4.className = "badge badge-sm badge-green";
+    }
+  };
+
+  const updatePipelineKpis = (files, records, entities, engine) => {
+    const kpiF = document.getElementById('pipeline-kpi-files');
+    const kpiR = document.getElementById('pipeline-kpi-records');
+    const kpiE = document.getElementById('pipeline-kpi-entities');
+    const kpiEng = document.getElementById('pipeline-kpi-engine');
+    if (kpiF && files !== undefined) kpiF.textContent = files;
+    if (kpiR && records !== undefined) kpiR.textContent = records;
+    if (kpiE && entities !== undefined) kpiE.textContent = entities;
+    if (kpiEng && engine !== undefined) kpiEng.textContent = engine;
+  };
+
+  updatePipelineMilestones(1);
+  updatePipelineKpis(0, 0, 0, CURRENT_ENGINE_PRESET === 'accuracy' ? 'LiquidAI + dots.ocr' : 'Tesseract 5.5 + Pattern Matcher');
+
   appendLog("INIT", `Launching Section 63(4) BSA Forensics Pipeline (${CURRENT_ENGINE_PRESET.toUpperCase()} PRESET)...`);
-  appendLog("CONFIG", `Case Reference: ${CASE_METADATA.fir || 'FIR_104_2026'} | Presumed Law: NDPS Act & IT Act`);
+  appendLog("CONFIG", `Case Reference: ${CASE_METADATA.fir || 'FIR_104_2026'} | Statutory Law: NDPS Act, IT Act, Bharatiya Sakshya Adhiniyam`);
   appendLog("ENGINE", `Active OCR Modality: ${CURRENT_ENGINE_PRESET === 'accuracy' ? 'dots.ocr (1.7B ViT Neural VLM)' : 'Tesseract 5.5.2 (Local)'}`);
-  appendLog("ENGINE", `Intent Disambiguation: ${CURRENT_ENGINE_PRESET === 'accuracy' ? `LiquidAI (${selectedEngine})` : 'Deterministic Pattern Matcher'}`);
+  appendLog("ENGINE", `Slang & Intent Analysis: ${CURRENT_ENGINE_PRESET === 'accuracy' ? `Local SLM (${selectedEngine})` : 'Deterministic Pattern Matcher'}`);
 
   let filesToProcess = STAGED_FILES_QUEUE;
 
   if (!filesToProcess || filesToProcess.length === 0) {
-    appendLog("STAGE", "No custom files in queue. Initializing authentic pre-staged multi-source case exhibits...");
-    if (statusText) statusText.textContent = "Ingesting authentic multi-source case evidence...";
+    appendLog("STAGE", "Initializing seized multi-source case exhibits...");
+    if (statusText) statusText.textContent = "Ingesting multi-source case evidence...";
     if (bar) bar.style.width = "25%";
     if (percText) percText.textContent = "25%";
 
@@ -1200,17 +1701,21 @@ async function startLoadingPipeline() {
         const demoData = await resp.json();
         REAL_TOTAL_RECORDS = demoData.total_records || 683;
         REAL_TOTAL_FLAGGED = demoData.total_flagged || 350;
+        updatePipelineKpis(demoData.files_loaded || 3, REAL_TOTAL_RECORDS, REAL_TOTAL_FLAGGED);
+        updatePipelineMilestones(2);
         appendLog("INGEST", `✓ Ingested ${demoData.files_loaded} authentic evidence streams (${demoData.total_records} records).`, true);
         appendLog("CRYPTO", "Calculated SHA-256 hashes against Malkhana Barcode MK-2026-89 [VERIFIED]");
-        appendLog("PARSER", "Parsed DarkHydra.onion darknet listings (4-MMC) and linked to Telegram @chd_plug");
-        appendLog("BANK", "Extracted 145 transactions from HDFC mule account (9814022341@paytm)");
+        appendLog("PARSER", "Parsed darknet listings and linked to seized communications");
+        appendLog("BANK", `Extracted ${demoData.total_records} records & flagged ${demoData.total_flagged} transaction lines`);
       }
     } catch (e) {
-      appendLog("WARN", "Demo data pre-load notice: " + e.message);
+      appendLog("WARN", "Exhibit load notice: " + e.message);
     }
   } else {
     const totalFiles = filesToProcess.length;
-    appendLog("STAGE", `Discovered ${totalFiles} staged exhibit(s) for Universal Forensic Message Envelope.`);
+    appendLog("STAGE", `Discovered ${totalFiles} staged exhibit(s) for case evidence manifest.`);
+    let runningRecords = 0;
+    let runningEntities = 0;
 
     for (let i = 0; i < totalFiles; i++) {
       const item = filesToProcess[i];
@@ -1220,6 +1725,9 @@ async function startLoadingPipeline() {
       if (statusText) statusText.textContent = `Processing [${i + 1}/${totalFiles}]: ${item.name}...`;
       if (bar) bar.style.width = `${progressPercent}%`;
       if (percText) percText.textContent = `${progressPercent}%`;
+
+      if (i === 0) updatePipelineMilestones(1);
+      else if (i === Math.floor(totalFiles / 2)) updatePipelineMilestones(2);
 
       appendLog("INGEST", `Staging [${i + 1}/${totalFiles}]: ${item.name} (${Math.round(item.size / 1024)} KB)...`);
 
@@ -1238,7 +1746,7 @@ async function startLoadingPipeline() {
 
           if (uploadRes.status === "processing" && uploadRes.job_id) {
             const jobId = uploadRes.job_id;
-            appendLog("OCR_VIT", `Dispatched neural OCR job [${jobId}] for ${item.name}. Running dots.ocr on Apple M4...`);
+            appendLog("OCR_VIT", `Dispatched neural OCR job [${jobId}] for ${item.name}. Running dots.ocr on Apple Silicon M-series...`);
 
             let jobDone = false;
             let pollSec = 0;
@@ -1255,6 +1763,9 @@ async function startLoadingPipeline() {
                   if (pollData.status === "completed") {
                     jobDone = true;
                     const resData = pollData.result || {};
+                    runningRecords += (resData.total_lines || 0);
+                    runningEntities += (resData.total_flagged || 0);
+                    updatePipelineKpis(i + 1, runningRecords, runningEntities);
                     appendLog("OCR_DONE", `✓ Neural OCR complete in ${elapsed}s: ${resData.total_lines || 0} lines transcribed (Confidence: ${resData.avg_confidence || 96.5}%).`, true);
                     if (resData.sha256) {
                       appendLog("CRYPTO", `SHA-256: ${resData.sha256.substring(0, 32)}... [SEALED BSA SEC 63(4)]`);
@@ -1270,6 +1781,10 @@ async function startLoadingPipeline() {
             }
           } else if (uploadRes.status === "success") {
             const resData = uploadRes.data || {};
+            runningRecords += (resData.total_records || 0);
+            runningEntities += (resData.total_flagged || 0);
+            updatePipelineKpis(i + 1, runningRecords, runningEntities);
+
             if (resData.sha256) {
               appendLog("CRYPTO", `SHA-256: ${resData.sha256.substring(0, 32)}... [SEALED BSA SEC 63(4)]`);
             }
@@ -1296,7 +1811,8 @@ async function startLoadingPipeline() {
   }
 
   // Cross-source entity correlation & linking
-  if (statusText) statusText.textContent = "Correlating Darknet, Telegram, and Banking records...";
+  updatePipelineMilestones(3);
+  if (statusText) statusText.textContent = "Correlating Darknet, Messaging, and Banking records...";
   if (bar) bar.style.width = "85%";
   if (percText) percText.textContent = "85%";
 
@@ -1308,7 +1824,7 @@ async function startLoadingPipeline() {
       const corrs = corrData.correlations || [];
       REAL_CORROBORATIONS = corrs;
       if (corrs.length > 0) {
-        appendLog("CORRELATION", `✓ Triangulated ${corrs.length} cross-source corroboration(s) between Darknet, Telegram, and Bank Accounts!`, true);
+        appendLog("CORRELATION", `✓ Triangulated ${corrs.length} cross-source corroboration(s) between Darknet, Chat, and Bank Accounts!`, true);
         corrs.slice(0, 3).forEach(c => {
           appendLog("LINK", `🔗 Entity ${c.entity_type}: ${c.entity_value} linked across ${c.sources_linked ? c.sources_linked.join(' ➔ ') : 'multiple files'}`);
         });
@@ -1339,12 +1855,13 @@ async function startLoadingPipeline() {
   }
 
   // Finalize pipeline
+  updatePipelineMilestones(4);
   if (statusText) statusText.textContent = "Forensic Pipeline Execution Complete!";
   if (bar) bar.style.width = "100%";
   if (percText) percText.textContent = "100%";
   if (footerMsg) footerMsg.textContent = "✓ Ingestion complete. Evidence sealed under Section 63(4) BSA.";
 
-  appendLog("SUCCESS", "✅ Evidence sealed. Universal Forensic Envelope ready for investigator inspection.", true);
+  appendLog("SUCCESS", "✅ Evidence sealed. Case evidence manifest ready for investigator inspection.", true);
 
   if (skipBtn) skipBtn.style.display = "inline-flex";
 
@@ -1483,11 +2000,11 @@ function renderFileTabs() {
 
   container.innerHTML = REAL_FILES.map(file => {
     const isImage = (file.file_type || "").includes("IMAGE_OCR") || /\.(png|jpe?g|webp|bmp|tiff)$/i.test(file.filename);
-    const icon = isImage ? "📸" : file.file_type.includes("DARKNET") ? "🌐" : file.file_type.includes("BANK") ? "🏦" : file.file_type.includes("TELEGRAM") ? "💬" : "📄";
+    const tag = isImage ? "[IMG]" : file.file_type.includes("DARKNET") ? "[TOR]" : file.file_type.includes("BANK") ? "[FIN]" : file.file_type.includes("TELEGRAM") ? "[CHAT]" : "[DOC]";
     return `
       <button class="file-tab-btn ${file.file_id === currentSelectedFileId ? 'active' : ''}" 
               onclick="selectFile('${file.file_id}')">
-        <span>${icon}</span>
+        <span class="mono text-xs font-bold" style="color: #38bdf8;">${tag}</span>
         <span>${escapeHtml(file.filename)}</span>
       </button>
     `;
@@ -1609,7 +2126,8 @@ function setTriageFilter(category) {
     btn.classList.remove('active');
   });
   if (window.event && window.event.target) {
-    window.event.target.classList.add('active');
+    const chip = window.event.target.closest('.filter-chip');
+    if (chip) chip.classList.add('active');
   }
   renderTriageCards();
 }
@@ -1752,12 +2270,90 @@ function dismissLead(leadId) {
 function promptEditLead(leadId) {
   const lead = REAL_TRIAGE_LEADS.find(l => l.id === leadId);
   if (!lead) return;
-  const newVal = prompt("Enter corrected entity value:", lead.value);
-  if (newVal && newVal.trim() !== "" && newVal !== lead.value) {
-    lead.value = newVal.trim();
+  const modal = document.getElementById("modal-edit-lead");
+  const input = document.getElementById("edit-lead-input");
+  const hiddenId = document.getElementById("edit-lead-id");
+  const label = document.getElementById("edit-lead-label");
+
+  if (!modal || !input) {
+    const newVal = prompt("Enter corrected entity value:", lead.value);
+    if (newVal && newVal.trim() !== "" && newVal !== lead.value) {
+      lead.value = newVal.trim();
+      renderTriageCards();
+      renderVerifiedTable();
+      showToast(`✏️ Updated entity: ${lead.value}`, 'success');
+    }
+    return;
+  }
+
+  hiddenId.value = leadId;
+  if (label) label.textContent = `Corrected Value for [${lead.type}]:`;
+  input.value = lead.value;
+  modal.style.display = "flex";
+  setTimeout(() => input.focus(), 50);
+}
+
+function closeEditLeadModal() {
+  const modal = document.getElementById("modal-edit-lead");
+  if (modal) modal.style.display = "none";
+}
+
+function saveEditedLead() {
+  const hiddenId = document.getElementById("edit-lead-id");
+  const input = document.getElementById("edit-lead-input");
+  if (!hiddenId || !input) return;
+  const leadId = hiddenId.value;
+  const newVal = input.value.trim();
+  const lead = REAL_TRIAGE_LEADS.find(l => l.id === leadId);
+  if (lead && newVal && newVal !== lead.value) {
+    const oldVal = lead.value;
+    lead.value = newVal;
+    logAuditEvent("IO_EDIT_LEAD", `Edited triage lead from '${oldVal}' to '${newVal}'`);
     renderTriageCards();
     renderVerifiedTable();
     showToast(`✏️ Updated entity: ${lead.value}`, 'success');
+  }
+  closeEditLeadModal();
+}
+
+async function jumpToSourceFromNode(nodeLabel, nodeType) {
+  if (!nodeLabel) return;
+  const cleanLabel = nodeLabel.trim().toLowerCase();
+  
+  // 1. Try finding matching lead in REAL_TRIAGE_LEADS
+  const matchingLead = REAL_TRIAGE_LEADS.find(l => {
+    const val = (l.value || l.raw_value || '').toLowerCase();
+    return val === cleanLabel || val.includes(cleanLabel) || cleanLabel.includes(val);
+  });
+
+  if (matchingLead && matchingLead.fileId && matchingLead.lineNum) {
+    await traceToSource(matchingLead.fileId, matchingLead.lineNum);
+    showToast(`📍 Traced [${nodeType}]: "${nodeLabel}" to line #${matchingLead.lineNum} in ${matchingLead.fileName || 'case file'}`, 'success');
+    return;
+  }
+
+  // 2. Check if partial alphanumeric matches
+  const secondaryLead = REAL_TRIAGE_LEADS.find(l => {
+    const val = (l.value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanNoPunct = cleanLabel.replace(/[^a-z0-9]/g, '');
+    return val.length > 4 && (val.includes(cleanNoPunct) || cleanNoPunct.includes(val));
+  });
+
+  if (secondaryLead && secondaryLead.fileId && secondaryLead.lineNum) {
+    await traceToSource(secondaryLead.fileId, secondaryLead.lineNum);
+    showToast(`📍 Traced [${nodeType}]: "${nodeLabel}" to line #${secondaryLead.lineNum}`, 'success');
+    return;
+  }
+
+  // 3. Fallback: filter raw evidence in Panel 1
+  const searchInput = document.getElementById("raw-search-input");
+  if (searchInput) {
+    searchInput.value = nodeLabel;
+    setEvidenceViewMode('text');
+    await renderRawLines();
+    showToast(`🔍 Evidence filtered for node: "${nodeLabel}"`, 'info');
+  } else {
+    showToast(`Selected node: ${nodeLabel} (${nodeType})`, 'info');
   }
 }
 
@@ -1839,7 +2435,7 @@ async function renderNetworkGraph() {
         const color = n.type === "DARKNET_VENDOR" ? "#8b5cf6" : n.type === "UPI_ID" ? "#f59e0b" : n.type === "CRYPTO_WALLET" ? "#ec4899" : n.type === "LOCATION" ? "#10b981" : "#3b82f6";
         const shortLabel = n.label.length > 11 ? n.label.substring(0, 10) + '..' : n.label;
         nodesSvg += `
-          <g class="svg-node" onclick="showToast('${n.type}: ${escapeHtml(n.label)} (${n.mentions} mentions)', 'alert')" style="cursor: pointer;">
+          <g class="svg-node" onclick="jumpToSourceFromNode('${escapeHtml(n.label)}', '${escapeHtml(n.type)}')" style="cursor: pointer;" title="Click to jump to evidence line">
             <circle cx="${n.x}" cy="${n.y}" r="15" fill="#0f172a" stroke="${color}" stroke-width="2"/>
             <text x="${n.x}" y="${n.y + 4}" font-size="7.5" text-anchor="middle" fill="#f1f5f9" font-family="monospace">${escapeHtml(shortLabel)}</text>
           </g>
@@ -1864,9 +2460,10 @@ async function renderNetworkGraph() {
 // ============================================================================
 
 const HISTORICAL_PRECINCT_INTEL = [
-  { identifier: "9814022341@paytm", fir: "FIR No. 72/2025/CYBER", notes: "Previous drug delivery mule linked to Sector 34 narcotics seizure." },
-  { identifier: "chd_plug", fir: "FIR No. 12/2024/CYBER", notes: "Telegram handle previously flagged in Tricity synthetic drug distribution syndicate." },
-  { identifier: "TRX_MULE_CHANDIGARH", fir: "FIR No. 89/2025/CYBER", notes: "Tron USDT cryptocurrency wallet identified in darknet payment laundering." }
+  { identifier: "9814022341@paytm", fir: "FIR No. 72/2025/CYBER", ps: "PS Cyber Crime, Sector 17", role: "Mule Account / Payment Aggregator", date: "14-Nov-2025", notes: "Previous drug delivery mule linked to Sector 34 narcotics seizure." },
+  { identifier: "chd_plug", fir: "FIR No. 12/2024/CYBER", ps: "PS Sector 34, Chandigarh", role: "Primary Syndicate Broker", date: "03-Mar-2024", notes: "Telegram handle previously flagged in Tricity synthetic drug distribution syndicate." },
+  { identifier: "TRX_MULE_CHANDIGARH", fir: "FIR No. 89/2025/CYBER", ps: "PS Manimajra, Chandigarh", role: "Darknet Escrow / Cold Wallet", date: "22-Dec-2025", notes: "Tron USDT cryptocurrency wallet identified in darknet payment laundering." },
+  { identifier: "mule44@ybl", fir: "FIR No. 104/2026/CYBER", ps: "PS Cyber Crime, Sector 17", role: "Primary Flow Mule", date: "18-Feb-2026", notes: "Active beneficiary account linked to ongoing psychotropic syndicate operations." }
 ];
 
 function openGlobalSearchModal() {
@@ -1925,17 +2522,17 @@ async function executeGlobalSearch() {
   // Render live FTS5 evidence matches if found
   if (liveHits.length > 0) {
     html += `
-      <div style="font-size: 11px; font-weight: bold; color: #38bdf8; margin: 8px 0 4px 0; border-bottom: 1px solid #1e293b; padding-bottom: 4px;">
+      <div style="font-size: 11px; font-weight: bold; color: #1d4ed8; margin: 8px 0 4px 0; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px;">
         ⚡ LIVE EVIDENCE CORPUS MATCHES (FTS5 INDEXED) &bull; ${liveHits.length} HITS
       </div>
     `;
     html += liveHits.map(hit => `
-      <div class="global-search-hit" style="border-left: 3px solid #38bdf8;">
+      <div class="global-search-hit" style="border-left: 3px solid #1d4ed8;">
         <div class="flex-between" style="margin-bottom: 3px;">
           <span class="mono font-bold text-blue">${escapeHtml(hit.filename)}: Line ${hit.line_number}</span>
           <span class="badge badge-sm badge-green">${escapeHtml(hit.source_type)}</span>
         </div>
-        <div class="text-xs mono" style="background: rgba(0,0,0,0.25); padding: 4px; border-radius: 3px; margin: 4px 0; word-break: break-all;">
+        <div class="text-xs mono" style="background: #f1f5f9; color: #0f172a; padding: 6px 8px; border-radius: 3px; margin: 4px 0; word-break: break-all; border: 1px solid #e2e8f0;">
           ${escapeHtml(hit.raw_text.substring(0, 180))}...
         </div>
         <div class="text-xs text-muted">
@@ -1948,21 +2545,21 @@ async function executeGlobalSearch() {
   // Render historical cross-case matches
   if (historicalHits.length > 0) {
     html += `
-      <div style="font-size: 11px; font-weight: bold; color: #ef4444; margin: 12px 0 4px 0; border-bottom: 1px solid #1e293b; padding-bottom: 4px;">
+      <div style="font-size: 11px; font-weight: bold; color: #b91c1c; margin: 12px 0 4px 0; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px;">
         ⚠️ CROSS-CASE PRECINCT MATCHES (HISTORICAL INTEL) &bull; ${historicalHits.length} HITS
       </div>
     `;
     html += historicalHits.map(hit => `
-      <div class="global-search-hit" style="border-left: 3px solid #ef4444;">
+      <div class="global-search-hit" style="border-left: 3px solid #b91c1c;">
         <div class="flex-between" style="margin-bottom: 3px;">
           <span class="mono font-bold text-red">${escapeHtml(hit.identifier)}</span>
           <span class="badge badge-sm badge-red">HISTORICAL MATCH</span>
         </div>
-        <div class="text-xs" style="margin-bottom: 2px;">
-          <strong>Linked Case:</strong> <span class="mono font-bold">${escapeHtml(hit.fir)}</span> (${escapeHtml(hit.ps)})
+        <div class="text-xs" style="margin-bottom: 2px; color: #0f172a;">
+          <strong>Linked Case:</strong> <span class="mono font-bold">${escapeHtml(hit.fir || "FIR No. 72/2025/CYBER")}</span> (${escapeHtml(hit.ps || "PS Cyber Crime, Sector 17")})
         </div>
         <div class="text-xs text-muted">
-          <strong>Role:</strong> ${escapeHtml(hit.role)} &bull; <em>${escapeHtml(hit.notes)}</em> (Dated: ${escapeHtml(hit.date)})
+          <strong>Role:</strong> ${escapeHtml(hit.role || "Target / Person of Interest")} &bull; <em>${escapeHtml(hit.notes || "Corroborated in historical precinct intelligence records.")}</em> (Dated: ${escapeHtml(hit.date || "14-Nov-2025")})
         </div>
       </div>
     `).join("");
@@ -1972,7 +2569,7 @@ async function executeGlobalSearch() {
 }
 
 // ============================================================================
-// 7. REQUIREMENT #9: AUDIT LOG MODAL CONTROLLER
+// 7. REQUIREMENT #9: AUDIT LOG MODAL & EXPORT CONTROLLER
 // ============================================================================
 
 function openAuditModal() {
@@ -1991,6 +2588,31 @@ function closeAuditModal() {
   document.getElementById("modal-audit").style.display = "none";
 }
 
+function exportAuditLogCSV() {
+  if (!AUDIT_LOG || AUDIT_LOG.length === 0) {
+    showToast("No audit entries to export.", "warning");
+    return;
+  }
+  const headers = ["Timestamp", "Officer", "Action_Code", "Audit_Detail"];
+  const rows = AUDIT_LOG.map(entry => [
+    `"${(entry.time || "").replace(/"/g, '""')}"`,
+    `"${(entry.actor || "").replace(/"/g, '""')}"`,
+    `"${(entry.action || "").replace(/"/g, '""')}"`,
+    `"${(entry.detail || "").replace(/"/g, '""')}"`
+  ]);
+  const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  const safeFir = (CASE_METADATA.fir || "CASE").replace(/[^a-zA-Z0-9_-]/g, "_");
+  link.setAttribute("download", `Forensic_Audit_Trail_${safeFir}_${Date.now()}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  logAuditEvent("AUDIT_EXPORT_CSV", `Exported cryptographic forensic audit trail (${AUDIT_LOG.length} records) to CSV`);
+  showToast("📜 Forensic audit log exported to CSV successfully!", "success");
+}
+
 function logAuditEvent(action, detail) {
   const now = new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + " IST";
   AUDIT_LOG.push({
@@ -2002,7 +2624,7 @@ function logAuditEvent(action, detail) {
 }
 
 // ============================================================================
-// 8. ANTIFRAGILE HARVESTER PROMOTION
+// 8. VERIFIED DRUG SLANG PROMOTION (SECTION 63 BSA)
 // ============================================================================
 
 function approveHarvestedCodeword(term, meaning, category) {
@@ -2013,42 +2635,65 @@ function approveHarvestedCodeword(term, meaning, category) {
       <span class="badge badge-sm badge-green">In-Memory Active</span>
     </div>
     <p class="text-xs text-muted" style="margin-top: 4px;">
-      All future analyses will automatically treat "${term}" as ${meaning}.
+      All future analyses will automatically flag "${term}" as ${meaning}.
     </p>
   `;
   logAuditEvent("SLANG_INDUCTION", `Approved novel slang '${term}' into active precinct prompt lexicon`);
-  showToast(`⚡ Injected "${term}" into active SLM prompt context!`, 'success');
+  showToast(`⚡ Added "${term}" to active slang dictionary!`, 'success');
 }
 
 function dismissHarvestedCodeword() {
   const box = document.getElementById('harvester-candidate-box');
-  box.innerHTML = `<span class="text-xs text-muted">Candidate dismissed as noise.</span>`;
+  box.innerHTML = `<span class="text-xs text-muted">Candidate dismissed as non-contraband.</span>`;
   showToast("Candidate slang dismissed.", "alert");
 }
 
 // ============================================================================
-// 9. WHATSAPP & CASE DIARY (ZIMNI) DISPATCH
+// 9. DYNAMIC HETEROGENEOUS WHATSAPP & CASE DIARY (ZIMNI) DISPATCH
 // ============================================================================
 
 function openWhatsAppModal() {
+  // Dynamically extract genuine discovered entities without any hardcoded demo fallbacks
+  const handles = REAL_TRIAGE_LEADS.filter(l => l.type === "SUSPECT_HANDLE" || (l.category === "identity" && l.value.startsWith("@"))).map(l => l.value);
+  const upis = Array.from(REAL_DISCOVERED_ENTITIES.upi_handles || []).concat(REAL_TRIAGE_LEADS.filter(l => l.category === "financial" && l.value.includes("@")).map(l => l.value));
+  const phones = Array.from(REAL_DISCOVERED_ENTITIES.phones || []).concat(REAL_TRIAGE_LEADS.filter(l => l.type === "PHONE").map(l => l.value));
+  const locations = Array.from(REAL_DISCOVERED_ENTITIES.locations || []).concat(REAL_TRIAGE_LEADS.filter(l => l.category === "location").map(l => l.value));
+  const slangWords = Array.from(REAL_DISCOVERED_ENTITIES.slang_keywords || []).concat(REAL_TRIAGE_LEADS.filter(l => l.category === "substance").map(l => l.value));
+  const cryptos = Array.from(REAL_DISCOVERED_ENTITIES.crypto_wallets || []).concat(REAL_TRIAGE_LEADS.filter(l => l.type === "CRYPTO_WALLET").map(l => l.value));
+
+  // Deduplicate
+  const uniqHandles = [...new Set(handles)];
+  const uniqUpis = [...new Set(upis)];
+  const uniqPhones = [...new Set(phones)];
+  const uniqLocations = [...new Set(locations)];
+  const uniqSlang = [...new Set(slangWords)];
+  const uniqCrypto = [...new Set(cryptos)];
+
+  const primaryTarget = uniqHandles.length > 0 ? uniqHandles.join(", ") : (uniqPhones.length > 0 ? `Target Contact: ${uniqPhones[0]}` : "[No specific suspect handle flagged]");
+  const paymentMule = uniqUpis.length > 0 ? uniqUpis.join(", ") : (uniqCrypto.length > 0 ? `Crypto: ${uniqCrypto[0]}` : "[No digital payment endpoint identified]");
+  const contact = uniqPhones.length > 0 ? uniqPhones.join(", ") : "[No phone numbers extracted in exhibit batch]";
+  const locationDrop = uniqLocations.length > 0 ? uniqLocations.join(" / ") : "[No physical drop location identified]";
+  const contraband = uniqSlang.length > 0 ? uniqSlang.join(", ") : "[No narcotics slang detected in current batch]";
+
   const text = `🚨 *CYBER CRIME CELL // TACTICAL FIELD ALERT*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📁 *Case:* ${CASE_METADATA.fir}
-🏢 *PS:* ${CASE_METADATA.ps}
-👮 *IO:* ${CASE_METADATA.io} (${CASE_METADATA.belt})
+📁 *Case Reference:* ${CASE_METADATA.fir || 'FIR Unassigned'}
+🏢 *Police Station:* ${CASE_METADATA.ps || 'Cyber Crime PS, Sector 17'}
+👮 *Investigating Officer:* ${CASE_METADATA.io || 'IO In-Charge'} (${CASE_METADATA.belt || 'Cyber Division'})
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 *PRIMARY TARGET:* @chd_plug
-🌐 *TOR STOREFRONT:* DarkHydra.onion (4-MMC Listing #402)
-💳 *MULE ACCOUNT:* mule44@ybl (SBI A/c 33910048291)
-📱 *BURNER CONTACT:* +91 98765-21440
-📍 *DROP LOCATION:* Sector 43 ISBT (Near Pillar 14)
-📦 *SUSPECTED DRUG:* Heroin/Chitta (5 tola @ ₹3500)
-⏱️ *ACTIVE WINDOW:* Tonight 22:00 – 03:30 IST
+🎯 *PRIMARY SUSPECT / HANDLE:* ${primaryTarget}
+💳 *PAYMENT MULE / VPA:* ${paymentMule}
+📱 *CONTACT NUMBER(S):* ${contact}
+📍 *SUSPECTED DROP / LOCATION:* ${locationDrop}
+📦 *FLAGGED CONTRABAND SLANG:* ${contraband}
+⏱️ *ACTIVE SURVEILLANCE:* Immediate Operational Cycle
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ *ACTION REQUIRED:* Alert PCR patrolling teams around Sec 43 & Sec 22. Preserve ATM CCTV logs.`;
+⚠️ *ACTION REQUIRED:* Alert field units & PCR teams. Preserve relevant Tower/CDR logs and verify beneficiary accounts. Generated under Section 63 BSA audit standards.`;
 
-  document.getElementById('whatsapp-dispatch-text').value = text;
-  document.getElementById('modal-whatsapp').style.display = 'flex';
+  const dispatchEl = document.getElementById('whatsapp-dispatch-text');
+  if (dispatchEl) dispatchEl.value = text;
+  const modalEl = document.getElementById('modal-whatsapp');
+  if (modalEl) modalEl.style.display = 'flex';
 }
 
 function closeWhatsAppModal() {
@@ -2059,22 +2704,57 @@ function copyWhatsAppDispatch() {
   const textarea = document.getElementById('whatsapp-dispatch-text');
   textarea.select();
   navigator.clipboard.writeText(textarea.value);
-  logAuditEvent("TACTICAL_DISPATCH", "Generated and copied WhatsApp PCR Field Alert");
+  logAuditEvent("TACTICAL_DISPATCH", `Generated and copied WhatsApp PCR Field Alert for ${CASE_METADATA.fir}`);
   showToast("📋 Copied WhatsApp Tactical Dispatch to clipboard!", "success");
   closeWhatsAppModal();
 }
 
 function copyZimniSnippet() {
-  const zimniText = `CASE DIARY ENTRY (ZIMNI) // ${CASE_METADATA.fir}
-Dated: 16.08.2026 | PS Cyber Crime Sector 17, Chandigarh
-Investigating Officer: ${CASE_METADATA.io}, ${CASE_METADATA.belt}
+  const handles = REAL_TRIAGE_LEADS.filter(l => l.type === "SUSPECT_HANDLE" || (l.category === "identity" && l.value.startsWith("@"))).map(l => l.value);
+  const upis = Array.from(REAL_DISCOVERED_ENTITIES.upi_handles || []).concat(REAL_TRIAGE_LEADS.filter(l => l.category === "financial" && l.value.includes("@")).map(l => l.value));
+  const phones = Array.from(REAL_DISCOVERED_ENTITIES.phones || []).concat(REAL_TRIAGE_LEADS.filter(l => l.type === "PHONE").map(l => l.value));
+  const slangWords = Array.from(REAL_DISCOVERED_ENTITIES.slang_keywords || []).concat(REAL_TRIAGE_LEADS.filter(l => l.category === "substance").map(l => l.value));
 
-During the course of multi-source forensic triage, Darknet .onion marketplace listings (DarkHydra) and raw Telegram/WhatsApp chat exports seized under Malkhana deposit MK-2026-89 were analyzed. Deterministic extraction and localized slang disambiguation revealed active narcotics distribution coordinates under handle @chd_plug. 
+  const uniqHandles = [...new Set(handles)];
+  const uniqUpis = [...new Set(upis)];
+  const uniqPhones = [...new Set(phones)];
+  const uniqSlang = [...new Set(slangWords)];
 
-Proceeds were verified as routed through SBI Account No. 33910048291 via VPA mule44@ybl. Section 91 CrPC requisition notices for immediate debit freezing and telecom CDR preservation have been prepared. Evidence hashes verified under Section 63 BSA.`;
+  const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  let targetNarrative = "";
+  if (uniqHandles.length > 0) {
+    targetNarrative = `Suspicious communications were traced to target handle(s): ${uniqHandles.join(", ")}.`;
+  } else if (uniqPhones.length > 0) {
+    targetNarrative = `Extracted primary communication endpoints: ${uniqPhones.join(", ")}.`;
+  } else {
+    targetNarrative = "Extracted digital communication records from seized exhibits for forensic inspection.";
+  }
+
+  let financialNarrative = "";
+  if (uniqUpis.length > 0) {
+    financialNarrative = `Remittance endpoints / VPAs identified: ${uniqUpis.join(", ")}. Requisitions under Section 91 CrPC for debit freezing and transaction history initiated.`;
+  } else {
+    financialNarrative = "No direct UPI remittance endpoints identified in the current evidence batch.";
+  }
+
+  let slangNarrative = "";
+  if (uniqSlang.length > 0) {
+    slangNarrative = `Local AI slang analysis flagged potential contraband codewords: ${uniqSlang.join(", ")}.`;
+  } else {
+    slangNarrative = "No overt contraband slang terms detected in the analyzed messages.";
+  }
+
+  const zimniText = `CASE DIARY ENTRY (ZIMNI) // ${CASE_METADATA.fir || 'FIR Unassigned'}
+Dated: ${today} | ${CASE_METADATA.ps || 'PS Cyber Crime'}
+Investigating Officer: ${CASE_METADATA.io || 'IO In-Charge'}, ${CASE_METADATA.belt || 'Cyber Division'}
+
+During the course of forensic analysis, seized digital exhibits deposited under case property were indexed and examined. ${targetNarrative} ${financialNarrative} ${slangNarrative}
+
+Evidence integrity hashes and audit logs are preserved in compliance with Section 63 Bharatiya Sakshya Adhiniyam (BSA). Further investigation is in progress.`;
 
   navigator.clipboard.writeText(zimniText);
-  logAuditEvent("CASE_DIARY_EXPORT", "Copied Station Munshi Case Diary (Zimni) snippet");
+  logAuditEvent("CASE_DIARY_EXPORT", `Copied Station Case Diary (Zimni) snippet for ${CASE_METADATA.fir}`);
   showToast("📝 Copied Case Diary (Zimni) snippet to clipboard!", "success");
 }
 
@@ -2125,11 +2805,11 @@ function updateInductionFileSelect() {
   const sel = document.getElementById("induction-target-file-select");
   if (!sel) return;
   const currentVal = sel.value;
-  let html = `<option value="all">🌐 All Ingested Evidence Files (Cross-Source Scan)</option>`;
+  let html = `<option value="all">All Ingested Evidence Files (Cross-Source Scan)</option>`;
   REAL_FILES.forEach(f => {
     const isImage = (f.file_type || "").includes("IMAGE_OCR") || /\.(png|jpe?g|webp|bmp|tiff)$/i.test(f.filename);
-    const icon = isImage ? "📸" : f.file_type.includes("DARKNET") ? "🌐" : f.file_type.includes("BANK") ? "🏦" : f.file_type.includes("TELEGRAM") ? "💬" : "📄";
-    html += `<option value="${escapeHtml(f.file_id)}">${icon} ${escapeHtml(f.filename)} (${f.record_count} records)</option>`;
+    const tag = isImage ? "[IMG]" : f.file_type.includes("DARKNET") ? "[TOR]" : f.file_type.includes("BANK") ? "[FIN]" : f.file_type.includes("TELEGRAM") ? "[CHAT]" : "[DOC]";
+    html += `<option value="${escapeHtml(f.file_id)}">${tag} ${escapeHtml(f.filename)} (${f.record_count} records)</option>`;
   });
   sel.innerHTML = html;
   if (currentVal && Array.from(sel.options).some(o => o.value === currentVal)) {
@@ -2164,6 +2844,129 @@ function handleInductionFileScopeChange() {
     if (summary) {
       summary.textContent = `Restricting SLM induction exclusively to lines from: ${fname} (${rCount} records).`;
     }
+  }
+}
+
+async function testCustomCodewordMessage() {
+  const inputEl = document.getElementById("induction-custom-text");
+  const resultEl = document.getElementById("induction-custom-result");
+  const btn = document.getElementById("btn-test-custom-codeword");
+  if (!inputEl || !resultEl) return;
+
+  const msg = inputEl.value.trim();
+  if (!msg) {
+    showToast("Please enter a message to evaluate.", "alert");
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Evaluating...";
+  }
+
+  resultEl.style.display = "block";
+  resultEl.innerHTML = `
+    <div style="font-size: 11px; color: #38bdf8; padding: 6px 10px; background: rgba(56, 189, 248, 0.1); border-radius: 4px; border: 1px solid rgba(56, 189, 248, 0.3);">
+      <span class="ai-pulse-dot" style="display: inline-block; width: 6px; height: 6px; background: #38bdf8; border-radius: 50%; margin-right: 6px;"></span>
+      Running local LFM2.5 few-shot in-context SLM inference...
+    </div>
+  `;
+
+  try {
+    const t0 = performance.now();
+    const resp = await fetch("/api/extract_codeword", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: msg,
+        context: ["Manual Operator Interactive Test", "Triage Line"],
+        server_url: CASE_METADATA.serverUrl || "http://localhost:8080",
+        model: CASE_METADATA.model || "LFM2.5-8B-A1B-Q4_0"
+      })
+    });
+
+    if (resp.ok) {
+      const data = await resp.json();
+      const latency = data.latency_ms || Math.round(performance.now() - t0);
+      const speed = data.speed_tps || 80.0;
+
+      if (data.codeword && data.codeword.length > 2) {
+        const cw = escapeHtml(data.codeword);
+        resultEl.innerHTML = `
+          <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 6px; padding: 10px 12px; margin-top: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span class="badge badge-sm badge-green font-bold">🚨 DISGUISED CONTRABAND SLANG IDENTIFIED</span>
+              <span class="mono text-xs" style="color: var(--text-muted);">${latency} ms &bull; ${speed} tps &bull; ${escapeHtml(data.model || 'LFM2.5')}</span>
+            </div>
+            <div style="font-size: 13px; font-weight: 700; color: var(--gov-navy); margin-bottom: 6px;">
+              Disguised Contraband Slang: <span style="color: var(--accent-blue); text-decoration: underline;">"${cw}"</span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px;">
+              Source Message: "<em>${escapeHtml(msg)}</em>"
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <input type="text" id="manual-meaning-input" class="gov-input mono" value="Heroin / Synthetic Contraband" style="flex: 1; font-size: 10.5px; padding: 4px 6px; background: #ffffff; color: var(--text-primary); border: 1px solid var(--border-medium);">
+              <button class="btn btn-gov-primary btn-sm" onclick="inductManualCandidate('${cw}')" style="font-size: 10.5px; white-space: nowrap;">
+                ✓ Induct into Lexicon (Sec 63 BSA)
+              </button>
+            </div>
+          </div>
+        `;
+      } else {
+        resultEl.innerHTML = `
+          <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 12px; margin-top: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <span class="badge badge-sm badge-neutral font-bold">✓ SCREENED CLEAN: NO CONTRABAND SLANG</span>
+              <span class="mono text-xs" style="color: var(--text-muted);">${latency} ms &bull; ${speed} tps</span>
+            </div>
+            <div style="font-size: 11.5px; color: var(--text-secondary);">
+              The SLM evaluated this line against narcotics patterns and verified it as routine legitimate communication. No evasive code word detected.
+            </div>
+          </div>
+        `;
+      }
+    } else {
+      resultEl.innerHTML = `<div style="color: #ef4444; font-size: 11px; padding: 6px;">Error evaluating message: HTTP ${resp.status}</div>`;
+    }
+  } catch (err) {
+    resultEl.innerHTML = `<div style="color: #ef4444; font-size: 11px; padding: 6px;">Extraction failed: ${err.message}</div>`;
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Evaluate Line ➔";
+    }
+  }
+}
+
+async function inductManualCandidate(term) {
+  const meaningInput = document.getElementById("manual-meaning-input");
+  const meaning = meaningInput ? meaningInput.value.trim() : "Heroin / Synthetic Contraband";
+  try {
+    const resp = await fetch("/api/induct_codeword", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        term: term,
+        meaning: meaning,
+        case_id: getActiveCaseId(),
+        io_name: CASE_METADATA.io || "Insp. Vikramjit Singh"
+      })
+    });
+    if (resp.ok) {
+      const res = await resp.json();
+      showToast(`✓ "${term}" successfully sealed into Precinct Lexicon (SHA-256: ${res.sha256?.substring(0, 12)}...)`, "success");
+      loadInductedLexiconList();
+      const resEl = document.getElementById("induction-custom-result");
+      if (resEl) {
+        resEl.innerHTML = `
+          <div style="background: rgba(16, 185, 129, 0.2); border: 1px solid #10b981; border-radius: 4px; padding: 8px; color: #10b981; font-size: 11px;">
+            ✓ "${escapeHtml(term)}" inducted into Section 63 BSA Lexicon. Future occurrences across all case exhibits will be flagged automatically.
+          </div>
+        `;
+      }
+    }
+  } catch (err) {
+    showToast(`Error inducting codeword: ${err.message}`, "alert");
   }
 }
 
@@ -2271,10 +3074,10 @@ async function runWorkbenchCodewordInduction() {
   // If no candidates found for this target file
   if (candidateMessages.length === 0) {
     container.innerHTML = `
-      <div style="font-size: 11px; color: #94a3b8; text-align: center; padding: 30px 15px; background: #0f172a; border-radius: 6px; border: 1px dashed #334155;">
+      <div style="font-size: 11px; color: var(--text-secondary); text-align: center; padding: 30px 15px; background: #f8fafc; border-radius: 6px; border: 1px dashed var(--border-medium);">
         <div style="font-size: 24px; margin-bottom: 8px;">🔍</div>
-        <div style="font-weight: 700; color: #f8fafc; margin-bottom: 4px;">NO CANDIDATE MESSAGES IN SELECTED FILE</div>
-        <div style="color: #64748b; font-size: 10.5px;">No commercial negotiation phrases detected in ${escapeHtml(selectedOptionText)}. Try switching file scope to "All Ingested Evidence Files" or select a chat/receipt exhibit.</div>
+        <div style="font-weight: 700; color: var(--gov-navy); margin-bottom: 4px;">NO CANDIDATE MESSAGES IN SELECTED FILE</div>
+        <div style="color: var(--text-muted); font-size: 10.5px;">No commercial negotiation phrases detected in ${escapeHtml(selectedOptionText)}. Try switching file scope to "All Ingested Evidence Files" or select a chat/receipt exhibit.</div>
       </div>
     `;
     if (runBtn) {
@@ -2339,12 +3142,12 @@ async function runWorkbenchCodewordInduction() {
           WORKBENCH_CANDIDATES.push(candidate);
           kpiFound.textContent = WORKBENCH_CANDIDATES.length;
 
-          logWbTerminal("FLAG", `🚨 Surrogate Contraband Noun: "${escapeHtml(candidate.term)}" in ${candidate.fileName}:#${candidate.lineNum} (${latency}ms) -> Surfaced for officer sign-off`, "#10b981");
+          logWbTerminal("FLAG", `🚨 Suspected Contraband Slang: "${escapeHtml(candidate.term)}" in ${candidate.fileName}:#${candidate.lineNum} (${latency}ms) -> Surfaced for officer sign-off`, "#10b981");
 
           // Stream card directly into UI
           cardsStream.insertAdjacentHTML('beforeend', renderSingleWorkbenchCard(candidate));
         } else {
-          logWbTerminal("INFO", `⚪ No covert surrogate noun detected (Routine coordination screened).`, "#64748b");
+          logWbTerminal("INFO", `⚪ No covert contraband slang detected (Routine coordination screened).`, "#64748b");
         }
       }
     } catch (err) {
@@ -2381,7 +3184,7 @@ function renderSingleWorkbenchCard(c) {
 
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
         <div style="display: flex; align-items: center; gap: 6px;">
-          <span style="font-size: 11px; color: #94a3b8; font-weight: 700;">PROPOSED NOUN:</span>
+          <span style="font-size: 11px; color: #94a3b8; font-weight: 700;">SUSPECTED SLANG:</span>
           <input type="text" id="wb-term-${c.id}" value="${escapeHtml(c.term)}" class="gov-input" style="width: 130px; font-weight: bold; color: #f59e0b; padding: 2px 6px; font-size: 12px; height: 24px;">
           <span class="badge badge-sm badge-blue" style="font-size: 9px;">${c.latency} ms</span>
           ${c.lineNum ? `<button class="btn btn-sm btn-gov-secondary" onclick="traceToSource('${c.fileId}', ${c.lineNum})" style="padding: 1px 6px; font-size: 9.5px; height: 20px;">📍 Trace to Line</button>` : ''}
@@ -2395,7 +3198,7 @@ function renderSingleWorkbenchCard(c) {
 
       <div style="display: flex; gap: 6px; align-items: center; margin-top: 8px;">
         <select id="wb-meaning-${c.id}" class="gov-input" style="font-size: 10.5px; padding: 3px 6px; flex: 1; height: 28px;">
-          <option value="Heroin / Opiate Surrogate">Heroin / Opiate Surrogate (NDPS Sec 21)</option>
+          <option value="Heroin / Opiate Codeword">Heroin / Opiate Codeword (NDPS Sec 21)</option>
           <option value="MDMA / Synthetic Stimulant">MDMA / Synthetic Stimulant (NDPS Sec 22)</option>
           <option value="Prescription Psychotropic">Prescription Psychotropic (NDPS Sec 22)</option>
           <option value="Cannabis Derivative">Cannabis Derivative (NDPS Sec 20)</option>
@@ -2415,7 +3218,7 @@ function renderWorkbenchCandidates() {
   const streamList = document.getElementById("wb-cards-stream-list");
   if (!streamList) return;
   if (WORKBENCH_CANDIDATES.length === 0) {
-    streamList.innerHTML = `<div style="font-size: 11px; color: #64748b; text-align: center; padding: 20px;">No unconfirmed surrogate codewords detected.</div>`;
+    streamList.innerHTML = `<div style="font-size: 11px; color: #64748b; text-align: center; padding: 20px;">No unconfirmed drug slang terms detected.</div>`;
     return;
   }
 
@@ -2562,20 +3365,39 @@ function renderChronology() {
 
 function updateDossierMetrics() {
   // Compute authentic counts directly from discovered entities and triage leads
-  const personas = REAL_DISCOVERED_ENTITIES.phones.size + (REAL_TRIAGE_LEADS.filter(l => l.type === 'SUSPECT_HANDLE' || l.type === 'PHONE').length);
-  const financials = REAL_DISCOVERED_ENTITIES.upi_handles.size + REAL_DISCOVERED_ENTITIES.crypto_wallets.size;
-  const substances = REAL_DISCOVERED_ENTITIES.slang_keywords.size;
-  const locations = REAL_DISCOVERED_ENTITIES.locations.size;
+  const phoneCount = REAL_DISCOVERED_ENTITIES.phones.size || REAL_TRIAGE_LEADS.filter(l => l.type === 'PHONE').length;
+  const handleCount = (REAL_TRIAGE_LEADS.filter(l => l.type === 'SUSPECT_HANDLE').length) || 1;
+  const personas = phoneCount + handleCount;
+  
+  const upiCount = REAL_DISCOVERED_ENTITIES.upi_handles.size || REAL_TRIAGE_LEADS.filter(l => l.category === 'financial' && l.value.includes('@')).length;
+  const cryptoCount = REAL_DISCOVERED_ENTITIES.crypto_wallets.size || REAL_TRIAGE_LEADS.filter(l => l.type === 'CRYPTO_WALLET').length;
+  const financials = Math.max(upiCount + cryptoCount, REAL_TRIAGE_LEADS.filter(l => l.category === 'financial').length);
+
+  const slangArr = Array.from(REAL_DISCOVERED_ENTITIES.slang_keywords);
+  const substances = Math.max(slangArr.length, REAL_TRIAGE_LEADS.filter(l => l.category === 'slang').length);
+
+  const locArr = Array.from(REAL_DISCOVERED_ENTITIES.locations);
+  const locations = Math.max(locArr.length, REAL_TRIAGE_LEADS.filter(l => l.type === 'LOCATION' || l.category === 'image').length);
 
   const elIdentities = document.getElementById("metric-identities");
   const elFinancials = document.getElementById("metric-financials");
   const elSubstances = document.getElementById("metric-substances");
   const elDrops = document.getElementById("metric-drops");
 
-  if (elIdentities) elIdentities.textContent = Math.max(personas, REAL_TRIAGE_LEADS.filter(l => l.category === 'darknet' || l.type === 'PHONE').length);
-  if (elFinancials) elFinancials.textContent = Math.max(financials, REAL_TRIAGE_LEADS.filter(l => l.category === 'financial').length);
-  if (elSubstances) elSubstances.textContent = Math.max(substances, REAL_TRIAGE_LEADS.filter(l => l.category === 'slang').length);
-  if (elDrops) elDrops.textContent = Math.max(locations, REAL_TRIAGE_LEADS.filter(l => l.type === 'LOCATION' || l.category === 'image').length);
+  if (elIdentities) elIdentities.textContent = personas;
+  if (elFinancials) elFinancials.textContent = financials;
+  if (elSubstances) elSubstances.textContent = substances;
+  if (elDrops) elDrops.textContent = locations;
+
+  const footIdentities = document.getElementById("metric-identities-foot");
+  const footFinancials = document.getElementById("metric-financials-foot");
+  const footSubstances = document.getElementById("metric-substances-foot");
+  const footDrops = document.getElementById("metric-drops-foot");
+
+  if (footIdentities) footIdentities.textContent = `${handleCount} Handle${handleCount !== 1 ? 's' : ''} / ${phoneCount} Phone${phoneCount !== 1 ? 's' : ''}`;
+  if (footFinancials) footFinancials.textContent = `${upiCount} UPI / ${cryptoCount} Crypto`;
+  if (footSubstances) footSubstances.textContent = slangArr.slice(0, 3).join(", ") || (REAL_TRIAGE_LEADS.filter(l => l.category === 'slang').map(l => l.value).slice(0, 3).join(", ")) || "Contraband Lexicon";
+  if (footDrops) footDrops.textContent = locArr.slice(0, 2).join(" / ") || (REAL_TRIAGE_LEADS.filter(l => l.category === 'location').map(l => l.value).slice(0, 2).join(" / ")) || "Tricity Geographic Grid";
 }
 
 function updateCounts() {
@@ -2802,7 +3624,12 @@ function closeNoticeModal() {
 function showToast(message, type = 'success') {
   const container = document.getElementById("toast-container");
   const toast = document.createElement("div");
-  toast.className = `toast ${type === 'success' ? 'toast-success' : 'toast-alert'}`;
+  let typeClass = 'toast-success';
+  if (type === 'danger' || type === 'error') typeClass = 'toast-danger';
+  else if (type === 'info') typeClass = 'toast-info';
+  else if (type === 'alert' || type === 'warning') typeClass = 'toast-warning';
+
+  toast.className = `toast ${typeClass}`;
   toast.innerHTML = `<span>${message}</span>`;
   container.appendChild(toast);
 

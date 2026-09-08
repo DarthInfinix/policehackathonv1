@@ -728,20 +728,23 @@ def get_case_graph_data(case_id: str, db_path: str = DB_PATH) -> Dict[str, Any]:
             "color": color
         }
 
-    # 2. Get edges (co-occurrence in same record between non-narcotics entities)
+    # 2. Get edges (conversational proximity linkage within 5 lines)
     cur.execute("""
     SELECT em1.entity_id as src, em2.entity_id as dst, COUNT(*) as weight
     FROM entity_mentions em1
-    JOIN entity_mentions em2 ON em1.record_id = em2.record_id AND em1.entity_id < em2.entity_id
-    JOIN evidence_records er ON em1.record_id = er.record_id
+    JOIN entity_mentions em2 ON em1.entity_id < em2.entity_id
+    JOIN evidence_records er1 ON em1.record_id = er1.record_id
+    JOIN evidence_records er2 ON em2.record_id = er2.record_id
     JOIN entities e1 ON em1.entity_id = e1.entity_id
     JOIN entities e2 ON em2.entity_id = e2.entity_id
-    WHERE er.case_id = ? 
+    WHERE er1.case_id = ? AND er2.case_id = ?
+      AND er1.file_id = er2.file_id
+      AND ABS(er1.line_number - er2.line_number) <= 5
       AND e1.entity_type NOT IN ('NARCOTICS_KEYWORD', 'SLANG') 
       AND e2.entity_type NOT IN ('NARCOTICS_KEYWORD', 'SLANG')
     GROUP BY em1.entity_id, em2.entity_id
     LIMIT 60
-    """, (case_id,))
+    """, (case_id, case_id))
 
     edges = []
     connected_node_ids = set()
@@ -824,10 +827,13 @@ def get_all_cases(db_path: str = DB_PATH) -> List[Dict[str, Any]]:
         c.category, 
         c.created_at,
         COUNT(DISTINCT ef.file_id) as total_files,
-        COUNT(DISTINCT er.record_id) as total_records
+        COUNT(DISTINCT er.record_id) as total_records,
+        COUNT(DISTINCT CASE WHEN er.is_flagged = 1 THEN er.record_id END) as flagged_records,
+        COUNT(DISTINCT em.entity_id) as total_entities
     FROM cases c
     LEFT JOIN evidence_files ef ON c.case_id = ef.case_id
     LEFT JOIN evidence_records er ON c.case_id = er.case_id
+    LEFT JOIN entity_mentions em ON er.record_id = em.record_id
     GROUP BY c.case_id
     ORDER BY c.created_at DESC
     """)
@@ -1091,7 +1097,7 @@ def get_transactional_candidates(case_id: Optional[str] = None, file_id: Optiona
     where_clauses = []
     params: List[Any] = []
     if case_id:
-        where_clauses.append("(er.case_id = ? OR er.case_id LIKE 'FIR%')")
+        where_clauses.append("er.case_id = ?")
         params.append(case_id)
     if file_id and file_id != "all":
         where_clauses.append("er.file_id = ?")
@@ -1128,20 +1134,8 @@ def get_transactional_candidates(case_id: Optional[str] = None, file_id: Optiona
         LIMIT ?
         """, (file_id, limit))
         rows = [dict(r) for r in cur.fetchall()]
-        con.close()
-        return rows
 
     con.close()
-
-    # Fallback to realistic seeds ONLY if database as a whole has no transaction messages yet and scope is global
-    if not rows and (not file_id or file_id == "all"):
-        return [
-            {"record_id": "CAND_1", "file_id": "seed-1", "line_number": 2, "sender": "Karan_Tricity", "filename": "sample_telegram_export.json", "raw_text": "Bhai 2 parcel ice tea deliver kar dena sector 35 me, 3k gpay on raj@upi kar diya", "is_flagged": 1},
-            {"record_id": "CAND_2", "file_id": "seed-1", "line_number": 4, "sender": "Shadow_Sector", "filename": "sample_telegram_export.json", "raw_text": "Send 2k on mule44@ybl for 5 boxes of stamp papers, drop at sec 17 plaza backlane", "is_flagged": 1},
-            {"record_id": "CAND_3", "file_id": "seed-1", "line_number": 5, "sender": "Aman_Mohali", "filename": "sample_telegram_export.json", "raw_text": "Bro need 3 bottles cough syrup near PU campus gate 2, paid on rahul@okhdfcbank", "is_flagged": 1},
-            {"record_id": "CAND_4", "file_id": "seed-1", "line_number": 7, "sender": "Karan_Tricity", "filename": "sample_telegram_export.json", "raw_text": "Bhai urgent 3 piece cold coffee ready rakhna Aroma hotel ke peeche, USDT bheja hai", "is_flagged": 1},
-            {"record_id": "CAND_5", "file_id": "seed-1", "line_number": 8, "sender": "Punjab_Rider", "filename": "sample_telegram_export.json", "raw_text": "4 packs of green apples dispatched to Mohali phase 7, confirm receipt", "is_flagged": 1},
-        ]
     return rows
 
 def load_default_demo_datasets(case_id: str = "FIR_104_2026", base_dir: Optional[str] = None, dataset_type: str = "default") -> Dict[str, Any]:

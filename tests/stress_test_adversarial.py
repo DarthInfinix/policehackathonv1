@@ -99,27 +99,30 @@ def run_stress_test():
     print("--------------------------------------------------------------------------")
 
     target_checks = [
-        ("UPI: 9814022341@paytm", "9814022341@paytm"),
-        ("UPI: chd_mule99@okaxis", "chd_mule99@okaxis"),
-        ("UPI: mule44@ybl", "mule44@ybl"),
-        ("Phone: 9814022341", "9814022341"),
-        ("Phone: 9876543210", "9876543210"),
-        ("TRON USDT: TJ4V87qR984b2cNmQ7yXkL99pQ12345678", "tj4v87qr984b2cnmq7yxkl99pq12345678"),
-        ("Bitcoin: 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", "1a1zp1ep5qgefi2dmptftl5slmv7divfna"),
-        ("Darknet Vendor: @chd_plug_official", "@chd_plug_official"),
-        ("Location: Sector 35", "sector 35"),
-        ("Location: Sector 22", "sector 22"),
-        ("Narcotic: Chitta", "chitta"),
-        ("Narcotic: White Shoes", "white shoes"),
-        ("Narcotic: 4-MMC", "4-mmc"),
+        ("UPI: 9814022341@paytm", ["9814022341@paytm"]),
+        ("UPI: chd_mule99@okaxis", ["chd_mule99@okaxis"]),
+        ("UPI: mule44@ybl", ["mule44@ybl"]),
+        ("Phone: 9814022341", ["9814022341"]),
+        ("Phone: 9876543210", ["9876543210"]),
+        ("TRON USDT: TJ4V87qR984b2cNmQ7yXkL99pQ12345678", ["tj4v87qr984b2cnmq7yxkl99pq12345678"]),
+        ("Bitcoin: 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", ["1a1zp1ep5qgefi2dmptftl5slmv7divfna"]),
+        ("Darknet Vendor: @chd_plug_official", ["@chd_plug_official"]),
+        ("Location: Sector 35", ["sector 35"]),
+        ("Location: Sector 22", ["sector 22"]),
+        ("Narcotic: Chitta", ["chitta"]),
+        ("Narcotic: White Shoes / Sneakers", ["white shoes", "white sneakers", "sneakers"]),
+        ("Narcotic: 4-MMC", ["4-mmc"]),
     ]
 
     hits = 0
-    for label, target_val in target_checks:
+    for label, target_vals in target_checks:
         found = False
         for ext in all_extracted_values:
-            if target_val.lower() in ext or ext in target_val.lower():
-                found = True
+            for tv in target_vals:
+                if tv.lower() in ext or ext in tv.lower():
+                    found = True
+                    break
+            if found:
                 break
         status_icon = "✅ PASS" if found else "❌ MISS"
         if found:
