@@ -115,9 +115,99 @@ def init_db(db_path: str = DB_PATH):
         io_name TEXT,
         io_belt TEXT,
         category TEXT,
+        created_at TEXT,
+        assigned_officer_id TEXT
+    );
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS officers (
+        officer_id TEXT PRIMARY KEY,
+        name TEXT,
+        belt TEXT,
+        rank TEXT,
+        role TEXT,
+        station TEXT,
         created_at TEXT
     );
     """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS case_collaborators (
+        case_id TEXT,
+        officer_id TEXT,
+        role TEXT,
+        granted_by TEXT,
+        granted_at TEXT,
+        notes TEXT,
+        PRIMARY KEY (case_id, officer_id)
+    );
+    """)
+
+    # Safe migration: ensure assigned_officer_id exists on cases table if it pre-existed
+    cur.execute("PRAGMA table_info(cases)")
+    columns = [col[1] for col in cur.fetchall()]
+    if "assigned_officer_id" not in columns:
+        try:
+            cur.execute("ALTER TABLE cases ADD COLUMN assigned_officer_id TEXT DEFAULT 'OFFICER_IO_01'")
+        except Exception:
+            pass
+
+    # Pre-seed 3 minimal, realistic demo officer profiles if table is empty
+    cur.execute("SELECT COUNT(*) FROM officers")
+    if cur.fetchone()[0] == 0:
+        demo_officers = [
+            ("OFFICER_IO_01", "Insp. Vikramjit Singh", "Belt #788-UT", "Inspector of Police", "IO", "PS Cyber Crime, Sector 17, Chandigarh", datetime.utcnow().isoformat() + "Z"),
+            ("OFFICER_EXAM_02", "SI Priya Sharma", "Belt #412-UT", "Sub-Inspector (Forensics)", "EXAMINER", "Digital Forensic Science Lab, Sector 9, Chandigarh", datetime.utcnow().isoformat() + "Z"),
+            ("OFFICER_SHO_03", "SP Balwinder Singh", "Belt #102-UT", "Superintendent of Police (Cyber)", "SHO", "Cyber Crime Division Headquarters, Chandigarh", datetime.utcnow().isoformat() + "Z")
+        ]
+        cur.executemany("INSERT INTO officers (officer_id, name, belt, rank, role, station, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", demo_officers)
+
+    # Ensure baseline FIR-104 case exists and is assigned to Insp. Vikramjit Singh (IO)
+    cur.execute("SELECT COUNT(*) FROM cases WHERE case_id = 'FIR_104_2026'")
+    if cur.fetchone()[0] == 0:
+        cur.execute("""
+        INSERT INTO cases (case_id, fir_number, police_station, io_name, io_belt, category, created_at, assigned_officer_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            'FIR_104_2026',
+            'FIR No. 104/2026/CYBER',
+            'PS Cyber Crime, Sector 17, Chandigarh',
+            'Insp. Vikramjit Singh',
+            'Belt #788-UT',
+            'NDPS_CYBER',
+            datetime.utcnow().isoformat() + "Z",
+            'OFFICER_IO_01'
+        ))
+    else:
+        cur.execute("UPDATE cases SET assigned_officer_id = 'OFFICER_IO_01' WHERE case_id = 'FIR_104_2026' AND (assigned_officer_id IS NULL OR assigned_officer_id = '')")
+
+    # Ensure inquest FIR-999 case exists and is assigned to SI Priya Sharma (EXAMINER)
+    cur.execute("SELECT COUNT(*) FROM cases WHERE case_id = 'FIR_999_ADVERSARIAL'")
+    if cur.fetchone()[0] == 0:
+        cur.execute("""
+        INSERT INTO cases (case_id, fir_number, police_station, io_name, io_belt, category, created_at, assigned_officer_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            'FIR_999_ADVERSARIAL',
+            'FIR No. 999/2026/CYBER-STRESS',
+            'Digital Forensics Lab & Inquest Cell, Sector 9, Chandigarh',
+            'SI Priya Sharma',
+            'Belt #412-UT',
+            'NDPS_CYBER',
+            datetime.utcnow().isoformat() + "Z",
+            'OFFICER_EXAM_02'
+        ))
+    else:
+        cur.execute("UPDATE cases SET assigned_officer_id = 'OFFICER_EXAM_02' WHERE case_id = 'FIR_999_ADVERSARIAL' AND (assigned_officer_id IS NULL OR assigned_officer_id = '')")
+
+    # Pre-seed default bridge from FIR_104_2026 to SI Priya Sharma (EXAMINER) if not exists
+    cur.execute("SELECT COUNT(*) FROM case_collaborators WHERE case_id = 'FIR_104_2026' AND officer_id = 'OFFICER_EXAM_02'")
+    if cur.fetchone()[0] == 0:
+        cur.execute("""
+        INSERT INTO case_collaborators (case_id, officer_id, role, granted_by, granted_at, notes)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, ('FIR_104_2026', 'OFFICER_EXAM_02', 'FORENSIC_EXAMINER', 'Insp. Vikramjit Singh', datetime.utcnow().isoformat() + "Z", "Delegated for deep OCR & handwritten chit extraction under BSA Sec 63"))
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS evidence_files (
@@ -867,24 +957,32 @@ def get_case_graph_data(case_id: str, db_path: str = DB_PATH) -> Dict[str, Any]:
         "edge_count": len(edges)
     }
 
-def create_or_update_case(case_id: str, fir_number: str, police_station: str = "PS Cyber Crime, Sector 17, Chandigarh", io_name: str = "Insp. Vikramjit Singh", io_belt: str = "Belt #788-UT", category: str = "NDPS_CYBER", db_path: str = DB_PATH) -> Dict[str, Any]:
+def create_or_update_case(case_id: str, fir_number: str, police_station: str = "PS Cyber Crime, Sector 17, Chandigarh", io_name: str = "Insp. Vikramjit Singh", io_belt: str = "Belt #788-UT", category: str = "NDPS_CYBER", assigned_officer_id: Optional[str] = None, db_path: str = DB_PATH) -> Dict[str, Any]:
     """Registers or updates a case entry in SQLite."""
     con = get_db(db_path)
     cur = con.cursor()
     now_str = datetime.utcnow().isoformat() + "Z"
+
+    # Match assigned_officer_id by name if not explicitly passed
+    if not assigned_officer_id:
+        cur.execute("SELECT officer_id FROM officers WHERE name = ?", (io_name,))
+        row = cur.fetchone()
+        assigned_officer_id = row[0] if row else "OFFICER_IO_01"
+
     cur.execute("""
-    INSERT INTO cases (case_id, fir_number, police_station, io_name, io_belt, category, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO cases (case_id, fir_number, police_station, io_name, io_belt, category, created_at, assigned_officer_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(case_id) DO UPDATE SET
         fir_number = excluded.fir_number,
         police_station = excluded.police_station,
         io_name = excluded.io_name,
         io_belt = excluded.io_belt,
-        category = excluded.category
-    """, (case_id, fir_number, police_station, io_name, io_belt, category, now_str))
+        category = excluded.category,
+        assigned_officer_id = COALESCE(excluded.assigned_officer_id, cases.assigned_officer_id)
+    """, (case_id, fir_number, police_station, io_name, io_belt, category, now_str, assigned_officer_id))
     con.commit()
     con.close()
-    log_audit(case_id, "CASE_REGISTERED", f"Case {case_id} ({fir_number}) registered under IO {io_name}.", performed_by=io_name, db_path=db_path)
+    log_audit(case_id, "CASE_REGISTERED", f"Case {case_id} ({fir_number}) registered under IO {io_name} ({assigned_officer_id}).", performed_by=io_name, db_path=db_path)
     return {
         "case_id": case_id,
         "fir_number": fir_number,
@@ -892,11 +990,120 @@ def create_or_update_case(case_id: str, fir_number: str, police_station: str = "
         "io_name": io_name,
         "io_belt": io_belt,
         "category": category,
+        "assigned_officer_id": assigned_officer_id,
         "created_at": now_str
     }
 
-def get_all_cases(db_path: str = DB_PATH) -> List[Dict[str, Any]]:
-    """Returns all registered forensic cases with file and record aggregates."""
+def get_officers(db_path: str = DB_PATH) -> List[Dict[str, Any]]:
+    """Returns list of registered officers/investigators with role information and case counts."""
+    con = get_db(db_path)
+    cur = con.cursor()
+    cur.execute("""
+    SELECT 
+        o.officer_id,
+        o.name,
+        o.belt,
+        o.rank,
+        o.role,
+        o.station,
+        o.created_at,
+        COUNT(DISTINCT c.case_id) as assigned_cases_count,
+        COUNT(DISTINCT cc.case_id) as shared_cases_count
+    FROM officers o
+    LEFT JOIN cases c ON c.assigned_officer_id = o.officer_id
+    LEFT JOIN case_collaborators cc ON cc.officer_id = o.officer_id
+    GROUP BY o.officer_id
+    ORDER BY o.officer_id ASC
+    """)
+    rows = [dict(r) for r in cur.fetchall()]
+    con.close()
+    return rows
+
+def create_officer(name: str, belt: str, rank: str, role: str, station: str, db_path: str = DB_PATH) -> Dict[str, Any]:
+    """Registers a new officer profile."""
+    con = get_db(db_path)
+    cur = con.cursor()
+    officer_id = f"OFFICER_{role}_{int(datetime.utcnow().timestamp())}"
+    now_str = datetime.utcnow().isoformat() + "Z"
+    cur.execute("""
+    INSERT INTO officers (officer_id, name, belt, rank, role, station, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (officer_id, name, belt, rank, role, station, now_str))
+    con.commit()
+    con.close()
+    return {
+        "officer_id": officer_id,
+        "name": name,
+        "belt": belt,
+        "rank": rank,
+        "role": role,
+        "station": station,
+        "created_at": now_str
+    }
+
+def share_case(case_id: str, officer_id: str, role: str = "FORENSIC_EXAMINER", granted_by: str = "Insp. Vikramjit Singh", notes: str = "", db_path: str = DB_PATH) -> Dict[str, Any]:
+    """Shares or bridges case exhibits and triage stream to another officer profile."""
+    con = get_db(db_path)
+    cur = con.cursor()
+    now_str = datetime.utcnow().isoformat() + "Z"
+    cur.execute("""
+    INSERT INTO case_collaborators (case_id, officer_id, role, granted_by, granted_at, notes)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(case_id, officer_id) DO UPDATE SET
+        role = excluded.role,
+        granted_by = excluded.granted_by,
+        granted_at = excluded.granted_at,
+        notes = excluded.notes
+    """, (case_id, officer_id, role, granted_by, now_str, notes))
+    con.commit()
+    con.close()
+
+    # Log Section 63 BSA audit trail
+    log_audit(
+        case_id,
+        "CASE_BRIDGED_COLLABORATION",
+        f"Case exhibit stream bridged to {officer_id} (Role: {role}) by {granted_by}. Purpose: {notes or 'Inter-Agency / Specialist Delegation'}",
+        performed_by=granted_by,
+        db_path=db_path
+    )
+
+    return {
+        "case_id": case_id,
+        "officer_id": officer_id,
+        "role": role,
+        "granted_by": granted_by,
+        "granted_at": now_str,
+        "notes": notes
+    }
+
+def get_case_collaborators(case_id: str, db_path: str = DB_PATH) -> List[Dict[str, Any]]:
+    """Returns all officers who have bridged access to a case."""
+    con = get_db(db_path)
+    cur = con.cursor()
+    cur.execute("""
+    SELECT 
+        cc.case_id,
+        cc.officer_id,
+        cc.role as bridge_role,
+        cc.granted_by,
+        cc.granted_at,
+        cc.notes,
+        o.name as officer_name,
+        o.belt as officer_belt,
+        o.rank as officer_rank,
+        o.role as officer_role,
+        o.station as officer_station
+    FROM case_collaborators cc
+    JOIN officers o ON cc.officer_id = o.officer_id
+    WHERE cc.case_id = ?
+    ORDER BY cc.granted_at ASC
+    """, (case_id,))
+    rows = [dict(r) for r in cur.fetchall()]
+    con.close()
+    return rows
+
+def get_all_cases(officer_id: Optional[str] = None, db_path: str = DB_PATH) -> List[Dict[str, Any]]:
+    """Returns all registered forensic cases with file/record aggregates, assigned officer info, and collaboration bridges."""
     con = get_db(db_path)
     cur = con.cursor()
     cur.execute("""
@@ -908,11 +1115,17 @@ def get_all_cases(db_path: str = DB_PATH) -> List[Dict[str, Any]]:
         c.io_belt, 
         c.category, 
         c.created_at,
+        COALESCE(c.assigned_officer_id, 'OFFICER_IO_01') as assigned_officer_id,
+        o.name as assigned_officer_name,
+        o.belt as assigned_officer_belt,
+        o.rank as assigned_officer_rank,
+        o.role as assigned_officer_role,
         COUNT(DISTINCT ef.file_id) as total_files,
         COUNT(DISTINCT er.record_id) as total_records,
         COUNT(DISTINCT CASE WHEN er.is_flagged = 1 THEN er.record_id END) as flagged_records,
         COUNT(DISTINCT em.entity_id) as total_entities
     FROM cases c
+    LEFT JOIN officers o ON c.assigned_officer_id = o.officer_id
     LEFT JOIN evidence_files ef ON c.case_id = ef.case_id
     LEFT JOIN evidence_records er ON c.case_id = er.case_id
     LEFT JOIN entity_mentions em ON er.record_id = em.record_id
@@ -920,7 +1133,35 @@ def get_all_cases(db_path: str = DB_PATH) -> List[Dict[str, Any]]:
     ORDER BY c.created_at DESC
     """)
     cases = [dict(row) for row in cur.fetchall()]
+
+    # Fetch collaborators for each case
+    cur.execute("""
+    SELECT cc.case_id, cc.officer_id, cc.role as bridge_role, cc.granted_by, cc.granted_at, cc.notes,
+           o.name as officer_name, o.belt as officer_belt, o.role as officer_role
+    FROM case_collaborators cc
+    JOIN officers o ON cc.officer_id = o.officer_id
+    """)
+    collab_map = {}
+    for r in cur.fetchall():
+        cid = r["case_id"]
+        if cid not in collab_map:
+            collab_map[cid] = []
+        collab_map[cid].append(dict(r))
+
     con.close()
+
+    for c in cases:
+        c["collaborators"] = collab_map.get(c["case_id"], [])
+        if officer_id:
+            c["is_assigned"] = (c.get("assigned_officer_id") == officer_id)
+            c["is_shared"] = any(col["officer_id"] == officer_id for col in c["collaborators"])
+            shared_info = next((col for col in c["collaborators"] if col["officer_id"] == officer_id), None)
+            c["shared_role"] = shared_info["bridge_role"] if shared_info else None
+        else:
+            c["is_assigned"] = False
+            c["is_shared"] = False
+            c["shared_role"] = None
+
     return cases
 
 def get_case_details(case_id: str, db_path: str = DB_PATH) -> Optional[Dict[str, Any]]:

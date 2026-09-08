@@ -75,6 +75,13 @@
           <span class="model-pulse-dot"></span>
           <span class="mono" id="header-model-name">LFM2.5 (Local)</span>
         </div>
+
+        <!-- Active Officer Profile Pill -->
+        <button class="btn btn-header-profile" id="header-officer-btn" onclick="openOfficerProfileModal()" title="Active Officer Profile & Statutory Role Directory">
+          <span class="officer-avatar-circle">👮</span>
+          <span class="officer-name-header" id="header-officer-name">Insp. Vikramjit Singh</span>
+          <span class="badge badge-sm badge-blue" id="header-officer-role-badge">IO</span>
+        </button>
       </div>
     </header>
 
@@ -127,6 +134,27 @@
             <div class="docket-stat-label">SECTION 63 BSA STATUS</div>
             <div class="docket-stat-val" id="docket-stat-verified" style="color: #10b981;">100% SEALED</div>
             <div class="docket-stat-sub">Cryptographic Hash Verification</div>
+          </div>
+        </div>
+
+        <!-- Case Scope Filter Ribbon (Assigned vs Shared vs Precinct) -->
+        <div class="docket-scope-ribbon">
+          <div class="docket-scope-tabs">
+            <button class="docket-scope-tab active" id="scope-tab-my" onclick="setDocketScopeFilter('MY_CASES')">
+              ★ My Assigned Cases (<span id="scope-count-my">0</span>)
+            </button>
+            <button class="docket-scope-tab" id="scope-tab-shared" onclick="setDocketScopeFilter('SHARED_CASES')">
+              🤝 Shared with Me (Bridges: <span id="scope-count-shared">0</span>)
+            </button>
+            <button class="docket-scope-tab" id="scope-tab-all" onclick="setDocketScopeFilter('ALL_PRECINCT')">
+              🏛️ All Precinct Cases (<span id="scope-count-all">0</span>)
+            </button>
+          </div>
+          <div class="docket-scope-auth-pill">
+            <span class="mono text-xs" style="color: #94a3b8;">Logged in as:</span>
+            <strong id="docket-officer-banner-name" style="color: #f8fafc;">Insp. Vikramjit Singh</strong>
+            <span class="badge badge-sm badge-blue" id="docket-officer-banner-role">IO</span>
+            <button class="btn-text-action" onclick="openOfficerProfileModal()" title="Switch active profile or view roles">Switch Profile ➔</button>
           </div>
         </div>
 
@@ -1323,6 +1351,269 @@
           <button class="btn btn-gov-primary btn-sm" id="btn-close-mining-modal" onclick="closeMiningProgressModal()" disabled>
             <span>Processing...</span>
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- MODAL: OFFICER PROFILES & STATUTORY ROLE DIRECTORY -->
+    <!-- ================================================================= -->
+    <div class="modal-overlay" id="modal-officer-profiles" style="display: none;">
+      <div class="modal-container modal-lg" style="max-width: 820px;">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <span class="modal-icon">👮</span>
+            <div>
+              <h3 class="modal-title">OFFICER PROFILES & STATUTORY ROLE DIRECTORY</h3>
+              <span class="modal-subtitle">Section 63(4) BSA Cryptographic Custody & Role-Based Access Scoping</span>
+            </div>
+          </div>
+          <button class="modal-close-btn" onclick="closeOfficerProfileModal()">✕</button>
+        </div>
+
+        <div class="modal-tabs-header" style="display: flex; gap: 8px; padding: 12px 20px 0 20px; border-bottom: 1px solid #334155;">
+          <button class="modal-tab-btn active" id="profile-tab-btn-switch" onclick="switchProfileModalTab('switch')">
+            Active Directory & Switch
+          </button>
+          <button class="modal-tab-btn" id="profile-tab-btn-roles" onclick="switchProfileModalTab('roles')">
+            Statutory Roles & Permissions (3 Minimal Roles)
+          </button>
+          <button class="modal-tab-btn" id="profile-tab-btn-create" onclick="switchProfileModalTab('create')">
+            ＋ Register Custom Officer Profile
+          </button>
+        </div>
+
+        <div class="modal-body" style="padding: 20px; max-height: 520px; overflow-y: auto;">
+          
+          <!-- TAB 1: SWITCH PROFILE -->
+          <div id="profile-tab-pane-switch">
+            <div style="font-size: 11.5px; color: #94a3b8; margin-bottom: 16px;">
+              Select an authorized officer profile to scope the forensic workspace. Cases, exhibits, and Section 91 statutory requisition rights will adapt to the officer's mandate.
+            </div>
+            <div class="profiles-card-grid" id="profiles-card-grid">
+              <!-- Rendered dynamically by renderProfilesGrid() in app.js -->
+            </div>
+          </div>
+
+          <!-- TAB 2: ROLE DEFINITIONS (3 MINIMAL ROLES) -->
+          <div id="profile-tab-pane-roles" style="display: none;">
+            <div style="font-size: 11.5px; color: #94a3b8; margin-bottom: 16px;">
+              To minimize administrative complexity and satisfy Section 63 BSA evidentiary boundaries, the platform enforces three distinct statutory operational roles:
+            </div>
+            <div class="role-definitions-container">
+              
+              <!-- Role 1: IO -->
+              <div class="role-def-card">
+                <div class="role-def-header">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="role-icon">🎖️</span>
+                    <div>
+                      <div class="role-title">Investigating Officer (IO)</div>
+                      <div class="role-sub">Primary Case Custody & Field Operations</div>
+                    </div>
+                  </div>
+                  <span class="badge badge-sm badge-blue">PRIMARY IO</span>
+                </div>
+                <div class="role-statutory-basis">Statutory Basis: Sections 36, 156, 157 CrPC &bull; Sec 63 BSA</div>
+                <ul class="role-permissions-list">
+                  <li><strong>Full FIR Custody:</strong> Register new cases, ingest raw media exhibits, and manage case evidence docket.</li>
+                  <li><strong>Statutory Requisitions:</strong> Generate and seal Section 91 CrPC Bank Freeze Notices & Telecom CDR/IPDR requisitions.</li>
+                  <li><strong>Collaboration Bridges:</strong> Delegate and bridge case exhibit streams to Forensic Examiners or Co-Investigators.</li>
+                  <li><strong>Boundary:</strong> Restricted to cases assigned to them or bridged to their profile.</li>
+                </ul>
+              </div>
+
+              <!-- Role 2: EXAMINER -->
+              <div class="role-def-card">
+                <div class="role-def-header">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="role-icon">🔬</span>
+                    <div>
+                      <div class="role-title">Digital Forensic Examiner</div>
+                      <div class="role-sub">Technical Extraction, Deep Vision OCR & Codeword Induction</div>
+                    </div>
+                  </div>
+                  <span class="badge badge-sm badge-purple">SPECIALIST EXAMINER</span>
+                </div>
+                <div class="role-statutory-basis">Statutory Basis: Section 79A IT Act (Examiner of Electronic Evidence) &bull; Sec 63(4) BSA</div>
+                <ul class="role-permissions-list">
+                  <li><strong>Technical Extraction:</strong> Ingest complex handwritten chits, deep OCR on corrupted scans, and parse darknet telemetry.</li>
+                  <li><strong>Cryptographic Codeword Induction:</strong> Induct and seal evasive slang terms into the local SHA-256 lexicon dictionary.</li>
+                  <li><strong>Entity Intelligence Graph:</strong> Explore force-directed entity networks, UPI clusters, and darknet correlations.</li>
+                  <li><strong>Boundary:</strong> Technical analysis specialist. Section 91 CrPC judicial freeze notices operate in draft mode and require IO sign-off.</li>
+                </ul>
+              </div>
+
+              <!-- Role 3: SHO -->
+              <div class="role-def-card">
+                <div class="role-def-header">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="role-icon">🏛️</span>
+                    <div>
+                      <div class="role-title">Supervisory Officer / Station House Officer (SHO)</div>
+                      <div class="role-sub">Precinct-Wide Oversight & Evidentiary Certification</div>
+                    </div>
+                  </div>
+                  <span class="badge badge-sm badge-amber">SUPERVISORY SHO</span>
+                </div>
+                <div class="role-statutory-basis">Statutory Basis: Section 36 CrPC (Powers of Superior Police Officers) &bull; Sec 63(4) BSA Certifying Authority</div>
+                <ul class="role-permissions-list">
+                  <li><strong>Universal Precinct Visibility:</strong> Oversight across all cases registered within the jurisdiction.</li>
+                  <li><strong>Cross-Case Syndicates:</strong> Review cross-case intelligence links between distinct FIR investigations.</li>
+                  <li><strong>Inter-Precinct Bridges:</strong> Authorize inter-precinct exhibit transfers and reassign cases between investigating officers.</li>
+                  <li><strong>BSA Certification:</strong> Countersign and seal the official Section 63(4) BSA Certificate of Electronic Evidence.</li>
+                </ul>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- TAB 3: CREATE CUSTOM OFFICER -->
+          <div id="profile-tab-pane-create" style="display: none;">
+            <div style="font-size: 11.5px; color: #94a3b8; margin-bottom: 16px;">
+              Register an authorized officer profile into the local SQLite cryptographic vault. Zero cloud registration required.
+            </div>
+            <form id="form-create-officer" onsubmit="handleCreateOfficerSubmit(event)">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                <div class="gov-form-group">
+                  <label class="gov-label">OFFICER FULL NAME & TITLE</label>
+                  <input type="text" id="new-officer-name" class="gov-input" placeholder="e.g. SI Amanpreet Kaur" required>
+                </div>
+                <div class="gov-form-group">
+                  <label class="gov-label">BELT / BADGE NUMBER</label>
+                  <input type="text" id="new-officer-belt" class="gov-input" placeholder="e.g. Belt #554-UT" required>
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                <div class="gov-form-group">
+                  <label class="gov-label">POLICE RANK / DESIGNATION</label>
+                  <select id="new-officer-rank" class="gov-select" required>
+                    <option value="Sub-Inspector">Sub-Inspector (SI)</option>
+                    <option value="Inspector of Police" selected>Inspector of Police (Insp.)</option>
+                    <option value="Assistant Sub-Inspector">Assistant Sub-Inspector (ASI)</option>
+                    <option value="Deputy Superintendent of Police">Deputy Superintendent of Police (DSP)</option>
+                    <option value="Superintendent of Police">Superintendent of Police (SP)</option>
+                  </select>
+                </div>
+                <div class="gov-form-group">
+                  <label class="gov-label">POLICE STATION / LAB UNIT</label>
+                  <input type="text" id="new-officer-station" class="gov-input" value="PS Cyber Crime, Sector 17, Chandigarh" required>
+                </div>
+              </div>
+
+              <div class="gov-form-group" style="margin-bottom: 20px;">
+                <label class="gov-label">OPERATIONAL ROLE ASSIGNMENT</label>
+                <div class="role-selector-cards">
+                  <label class="role-radio-card">
+                    <input type="radio" name="new-officer-role" value="IO" checked>
+                    <div class="role-radio-content">
+                      <div class="role-radio-title">🎖️ Investigating Officer (IO)</div>
+                      <div class="role-radio-desc">Primary custody, exhibit ingestion, Sec 91 Bank notices, case bridge delegation.</div>
+                    </div>
+                  </label>
+                  <label class="role-radio-card">
+                    <input type="radio" name="new-officer-role" value="EXAMINER">
+                    <div class="role-radio-content">
+                      <div class="role-radio-title">🔬 Digital Forensic Examiner</div>
+                      <div class="role-radio-desc">Deep OCR/Vision extraction, codeword induction, network graph triage.</div>
+                    </div>
+                  </label>
+                  <label class="role-radio-card">
+                    <input type="radio" name="new-officer-role" value="SHO">
+                    <div class="role-radio-content">
+                      <div class="role-radio-title">🏛️ Supervisory Officer / SHO</div>
+                      <div class="role-radio-desc">Precinct-wide case oversight, cross-case analysis, Sec 63 BSA certification.</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                <button type="button" class="btn btn-gov-secondary btn-sm" onclick="switchProfileModalTab('switch')">Cancel</button>
+                <button type="submit" class="btn btn-gov-primary btn-sm" id="btn-submit-officer">
+                  <span>Register & Activate Officer ➔</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+        </div>
+
+        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+          <div style="font-size: 11px; color: #64748b;">
+            Section 63(4) BSA Role-Based Access Control &bull; Air-Gapped SQLite Local Storage
+          </div>
+          <button class="btn btn-gov-secondary btn-sm" onclick="closeOfficerProfileModal()">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================================================================= -->
+    <!-- MODAL: BRIDGE / DELEGATE CASE EVIDENCE STREAM -->
+    <!-- ================================================================= -->
+    <div class="modal-overlay" id="modal-share-case" style="display: none;">
+      <div class="modal-container modal-md" style="max-width: 600px;">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <span class="modal-icon">🤝</span>
+            <div>
+              <h3 class="modal-title">BRIDGE CASE EVIDENCE STREAM</h3>
+              <span class="modal-subtitle">Delegate or Co-Assign Case with Section 63 BSA Hash-Preserved Custody</span>
+            </div>
+          </div>
+          <button class="modal-close-btn" onclick="closeShareCaseModal()">✕</button>
+        </div>
+
+        <div class="modal-body" style="padding: 20px;">
+          <!-- Case Brief Banner -->
+          <div class="share-case-brief" style="background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 12px; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <span class="mono text-xs" style="color: #38bdf8;" id="share-modal-case-id">FIR_104_2026</span>
+              <span class="badge badge-sm badge-purple" id="share-modal-category">NDPS Cyber</span>
+            </div>
+            <div style="font-weight: 700; color: #f8fafc; font-size: 14px;" id="share-modal-fir-num">FIR No. 104/2026/CYBER</div>
+            <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;" id="share-modal-station">PS Cyber Crime, Sector 17, Chandigarh</div>
+            <div style="font-size: 11px; color: #cbd5e1; margin-top: 4px;">
+              Assigned IO: <strong id="share-modal-assigned-io">Insp. Vikramjit Singh</strong>
+            </div>
+          </div>
+
+          <form id="form-share-case" onsubmit="handleShareCaseSubmit(event)">
+            <input type="hidden" id="share-input-case-id" value="">
+
+            <div class="gov-form-group" style="margin-bottom: 14px;">
+              <label class="gov-label">TARGET OFFICER / RECIPIENT</label>
+              <select id="share-select-officer" class="gov-select" required>
+                <!-- Populated dynamically from /api/profiles -->
+              </select>
+            </div>
+
+            <div class="gov-form-group" style="margin-bottom: 14px;">
+              <label class="gov-label">BRIDGE PURPOSE / MANDATE</label>
+              <select id="share-select-role" class="gov-select" required>
+                <option value="FORENSIC_EXAMINER" selected>Forensic Examination Delegation (Deep OCR, Codeword Induction)</option>
+                <option value="CO_INVESTIGATOR">Joint Inter-Agency Co-Investigation (Shared Exhibit Review)</option>
+                <option value="SUPERVISORY">Supervisory Inspection & Audit Review</option>
+              </select>
+            </div>
+
+            <div class="gov-form-group" style="margin-bottom: 16px;">
+              <label class="gov-label">STATUTORY JUSTIFICATION & SCOPE NOTES</label>
+              <textarea id="share-input-notes" class="gov-textarea" rows="3" placeholder="State reason for bridging exhibit stream..." required>Delegated for technical exhibit examination & deep OCR extraction under Section 63 BSA.</textarea>
+            </div>
+
+            <div class="share-audit-alert" style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 6px; padding: 10px; font-size: 11px; color: #93c5fd; margin-bottom: 16px;">
+              🔒 <strong>Cryptographic Audit Note:</strong> Establishing this bridge will record an immutable entry in the Section 63 BSA ledger with SHA-256 timestamp and digital signatures of both officers.
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 8px;">
+              <button type="button" class="btn btn-gov-secondary btn-sm" onclick="closeShareCaseModal()">Cancel</button>
+              <button type="submit" class="btn btn-gov-primary btn-sm" id="btn-submit-share">
+                <span>Authorize & Establish Bridge ➔</span>
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>

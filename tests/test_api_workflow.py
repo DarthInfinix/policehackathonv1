@@ -68,6 +68,30 @@ def main():
     assert "cases" in res, "Expected 'cases' in response"
     print(f"✓ GET /api/cases returned {len(res['cases'])} existing cases.")
 
+    # 1b. Test /api/profiles
+    status, res = http_get("/api/profiles")
+    assert status == 200, f"Expected 200, got {status}"
+    assert res.get("status") == "success", f"Failed fetching profiles: {res}"
+    profiles = res.get("profiles", [])
+    assert len(profiles) >= 3, f"Expected at least 3 seeded profiles, got {len(profiles)}"
+    roles_found = {p["role"] for p in profiles}
+    assert {"IO", "EXAMINER", "SHO"}.issubset(roles_found), f"Expected IO, EXAMINER, SHO roles, found: {roles_found}"
+    print(f"✓ GET /api/profiles returned {len(profiles)} officers ({', '.join([p['name'] + ' [' + p['role'] + ']' for p in profiles[:3]])}).")
+
+    # 1c. Test /api/profiles/create
+    custom_prof = {
+        "name": "SI Amanpreet Kaur",
+        "belt": "Belt #554-UT",
+        "rank": "Sub-Inspector",
+        "role": "IO",
+        "station": "PS Sector 34, Chandigarh"
+    }
+    status, res = http_post("/api/profiles/create", custom_prof)
+    assert status == 200, f"Expected 200, got {status}"
+    assert res.get("status") == "success", f"Profile creation failed: {res}"
+    new_officer_id = res.get("profile", {}).get("officer_id")
+    print(f"✓ POST /api/profiles/create registered custom officer: {custom_prof['name']} (ID: {new_officer_id})")
+
     # 2. Test /api/cases/create
     case_payload = {
         "case_id": test_case_id,
@@ -75,12 +99,39 @@ def main():
         "police_station": "PS Cyber Crime, Sector 17, Chandigarh",
         "io_name": "Insp. Jaswinder Singh",
         "io_belt": "Belt #999-UT",
-        "category": "NDPS_CYBER"
+        "category": "NDPS_CYBER",
+        "assigned_officer_id": new_officer_id
     }
     status, res = http_post("/api/cases/create", case_payload)
     assert status == 200, f"Expected 200, got {status}"
     assert res.get("status") == "success", f"Case creation failed: {res}"
-    print(f"✓ POST /api/cases/create registered case: {test_fir}")
+    print(f"✓ POST /api/cases/create registered case: {test_fir} assigned to {new_officer_id}")
+
+    # 2b. Test /api/cases/share (Bridge case to examiner)
+    share_payload = {
+        "case_id": test_case_id,
+        "officer_id": "OFFICER_EXAM_02",
+        "role": "FORENSIC_EXAMINER",
+        "granted_by": "SI Amanpreet Kaur",
+        "notes": "Delegated for deep OCR extraction"
+    }
+    status, res = http_post("/api/cases/share", share_payload)
+    assert status == 200, f"Expected 200, got {status}"
+    assert res.get("status") == "success", f"Case sharing failed: {res}"
+    print(f"✓ POST /api/cases/share successfully bridged {test_case_id} to SI Priya Sharma (OFFICER_EXAM_02)")
+
+    # 2c. Verify case access scoping with /api/cases?officer_id=
+    status, res = http_get(f"/api/cases?officer_id={new_officer_id}")
+    assert status == 200
+    my_cases = [c for c in res.get("cases", []) if c.get("is_assigned")]
+    assert any(c["case_id"] == test_case_id for c in my_cases), "Expected created case to be assigned to new officer"
+    print(f"✓ GET /api/cases?officer_id={new_officer_id} verified {len(my_cases)} assigned cases.")
+
+    status, res = http_get("/api/cases?officer_id=OFFICER_EXAM_02")
+    assert status == 200
+    shared_cases = [c for c in res.get("cases", []) if c.get("is_shared")]
+    assert any(c["case_id"] == test_case_id for c in shared_cases), "Expected bridged case to be shared with examiner"
+    print(f"✓ GET /api/cases?officer_id=OFFICER_EXAM_02 verified {len(shared_cases)} shared bridge cases.")
 
     # 3. Test /api/load_demo_data with adversarial dataset
     status, res = http_post(f"/api/load_demo_data?case_id={test_case_id}&type=adversarial")

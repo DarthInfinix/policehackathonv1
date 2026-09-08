@@ -330,6 +330,367 @@ async function fetchFileRecords(fileId) {
 
 let DOCKET_CASES = [];
 let docketCategoryFilter = "ALL";
+let docketScopeFilter = "MY_CASES"; // "MY_CASES" | "SHARED_CASES" | "ALL_PRECINCT"
+
+let REGISTERED_OFFICERS = [];
+let ACTIVE_OFFICER = {
+  officer_id: "OFFICER_IO_01",
+  name: "Insp. Vikramjit Singh",
+  belt: "Belt #788-UT",
+  rank: "Inspector of Police",
+  role: "IO",
+  station: "PS Cyber Crime, Sector 17, Chandigarh"
+};
+
+// ============================================================================
+// OFFICER PROFILE & ROLE MANAGEMENT CONTROLLER
+// ============================================================================
+
+function loadActiveOfficerFromStorage() {
+  try {
+    const saved = localStorage.getItem("FORENSIC_ACTIVE_OFFICER");
+    if (saved) {
+      ACTIVE_OFFICER = JSON.parse(saved);
+    }
+  } catch (e) {
+    console.warn("Could not load stored officer:", e);
+  }
+  updateOfficerUI();
+}
+
+async function loadProfilesList() {
+  try {
+    const resp = await fetch("http://localhost:8000/api/profiles");
+    if (resp.ok) {
+      const data = await resp.json();
+      REGISTERED_OFFICERS = data.profiles || [];
+      const matched = REGISTERED_OFFICERS.find(o => o.officer_id === ACTIVE_OFFICER.officer_id);
+      if (matched) {
+        ACTIVE_OFFICER = matched;
+      } else if (REGISTERED_OFFICERS.length > 0) {
+        ACTIVE_OFFICER = REGISTERED_OFFICERS[0];
+      }
+      updateOfficerUI();
+    }
+  } catch (err) {
+    console.warn("Could not fetch officer profiles:", err);
+  }
+}
+
+function setActiveOfficer(officer) {
+  ACTIVE_OFFICER = officer;
+  try {
+    localStorage.setItem("FORENSIC_ACTIVE_OFFICER", JSON.stringify(officer));
+  } catch (e) {}
+  updateOfficerUI();
+
+  if (ACTIVE_OFFICER.role === "SHO") {
+    docketScopeFilter = "ALL_PRECINCT";
+  } else {
+    docketScopeFilter = "MY_CASES";
+  }
+  updateScopeTabs();
+  renderCaseDocket();
+  showToast(`Active Profile: ${officer.name} [${officer.role}]`, "info");
+}
+
+function updateOfficerUI() {
+  const nameEl = document.getElementById("header-officer-name");
+  const badgeEl = document.getElementById("header-officer-role-badge");
+  const bannerName = document.getElementById("docket-officer-banner-name");
+  const bannerRole = document.getElementById("docket-officer-banner-role");
+
+  const roleLabels = {
+    "IO": "IO",
+    "EXAMINER": "Examiner",
+    "SHO": "SHO"
+  };
+  const roleClasses = {
+    "IO": "badge-blue",
+    "EXAMINER": "badge-purple",
+    "SHO": "badge-amber"
+  };
+
+  const shortRole = roleLabels[ACTIVE_OFFICER.role] || ACTIVE_OFFICER.role;
+  const badgeClass = roleClasses[ACTIVE_OFFICER.role] || "badge-blue";
+
+  if (nameEl) nameEl.textContent = ACTIVE_OFFICER.name;
+  if (badgeEl) {
+    badgeEl.textContent = shortRole;
+    badgeEl.className = `badge badge-sm ${badgeClass}`;
+  }
+  if (bannerName) bannerName.textContent = ACTIVE_OFFICER.name;
+  if (bannerRole) {
+    bannerRole.textContent = shortRole;
+    bannerRole.className = `badge badge-sm ${badgeClass}`;
+  }
+
+  updateWorkbenchRolePermissions();
+}
+
+function updateWorkbenchRolePermissions() {
+  const orderBadge = document.getElementById("statutory-orders-badge");
+  if (orderBadge) {
+    if (ACTIVE_OFFICER.role === "EXAMINER") {
+      orderBadge.textContent = "Examiner Draft Mode (IO Sign-off Required)";
+      orderBadge.className = "badge badge-sm badge-purple";
+    } else if (ACTIVE_OFFICER.role === "SHO") {
+      orderBadge.textContent = "Precinct Supervisory Authority";
+      orderBadge.className = "badge badge-sm badge-amber";
+    } else {
+      orderBadge.textContent = "IO Authorized Statutory Orders";
+      orderBadge.className = "badge badge-sm badge-blue";
+    }
+  }
+}
+
+function openOfficerProfileModal() {
+  switchProfileModalTab('switch');
+  loadProfilesList().then(() => {
+    renderProfilesGrid();
+  });
+  const modal = document.getElementById("modal-officer-profiles");
+  if (modal) modal.style.display = "flex";
+}
+
+function closeOfficerProfileModal() {
+  const modal = document.getElementById("modal-officer-profiles");
+  if (modal) modal.style.display = "none";
+}
+
+function switchProfileModalTab(tab) {
+  const btnSwitch = document.getElementById("profile-tab-btn-switch");
+  const btnRoles = document.getElementById("profile-tab-btn-roles");
+  const btnCreate = document.getElementById("profile-tab-btn-create");
+
+  const paneSwitch = document.getElementById("profile-tab-pane-switch");
+  const paneRoles = document.getElementById("profile-tab-pane-roles");
+  const paneCreate = document.getElementById("profile-tab-pane-create");
+
+  if (btnSwitch) btnSwitch.classList.toggle("active", tab === "switch");
+  if (btnRoles) btnRoles.classList.toggle("active", tab === "roles");
+  if (btnCreate) btnCreate.classList.toggle("active", tab === "create");
+
+  if (paneSwitch) paneSwitch.style.display = (tab === "switch") ? "block" : "none";
+  if (paneRoles) paneRoles.style.display = (tab === "roles") ? "block" : "none";
+  if (paneCreate) paneCreate.style.display = (tab === "create") ? "block" : "none";
+}
+
+function renderProfilesGrid() {
+  const container = document.getElementById("profiles-card-grid");
+  if (!container) return;
+
+  let html = "";
+  REGISTERED_OFFICERS.forEach(o => {
+    const isActive = o.officer_id === ACTIVE_OFFICER.officer_id;
+    const roleBadgeClass = o.role === "IO" ? "badge-blue" : (o.role === "EXAMINER" ? "badge-purple" : "badge-amber");
+    const roleTitle = o.role === "IO" ? "Investigating Officer (IO)" : (o.role === "EXAMINER" ? "Digital Forensic Examiner" : "Supervisory Officer / SHO");
+    const avatar = o.role === "EXAMINER" ? "🔬" : (o.role === "SHO" ? "🏛️" : "🎖️");
+
+    html += `
+      <div class="profile-card ${isActive ? 'active' : ''}">
+        ${isActive ? '<span class="profile-card-badge-active">ACTIVE NOW</span>' : ''}
+        <div>
+          <div class="profile-card-header">
+            <div class="profile-card-avatar">${avatar}</div>
+            <div>
+              <div class="profile-card-name">${escapeHtml(o.name)}</div>
+              <div class="profile-card-rank">${escapeHtml(o.rank || "Officer")} &bull; <span class="mono">${escapeHtml(o.belt || "")}</span></div>
+            </div>
+          </div>
+          <div style="margin-bottom: 8px;">
+            <span class="badge badge-sm ${roleBadgeClass}">${escapeHtml(roleTitle)}</span>
+          </div>
+          <div class="profile-card-meta">
+            ${escapeHtml(o.station || "PS Cyber Crime, Chandigarh")}
+          </div>
+          <div class="profile-card-stats">
+            <div class="profile-stat-box">
+              <div class="profile-stat-val">${o.assigned_cases_count || 0}</div>
+              <div class="profile-stat-label">Assigned</div>
+            </div>
+            <div class="profile-stat-box">
+              <div class="profile-stat-val">${o.shared_cases_count || 0}</div>
+              <div class="profile-stat-label">Bridged</div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top: 10px;">
+          ${isActive 
+            ? `<button class="btn btn-gov-secondary btn-sm btn-full" disabled style="opacity: 0.85;">✓ Currently Active</button>`
+            : `<button class="btn btn-gov-primary btn-sm btn-full" onclick="selectOfficerFromModal('${escapeHtml(o.officer_id)}')">Switch to Officer ➔</button>`
+          }
+        </div>
+      </div>
+    `;
+  });
+  container.innerHTML = html;
+}
+
+function selectOfficerFromModal(officerId) {
+  const officer = REGISTERED_OFFICERS.find(o => o.officer_id === officerId);
+  if (officer) {
+    setActiveOfficer(officer);
+    closeOfficerProfileModal();
+  }
+}
+
+async function handleCreateOfficerSubmit(e) {
+  e.preventDefault();
+  const name = document.getElementById("new-officer-name").value.trim();
+  const belt = document.getElementById("new-officer-belt").value.trim();
+  const rank = document.getElementById("new-officer-rank").value;
+  const station = document.getElementById("new-officer-station").value.trim();
+  
+  const roleRadios = document.getElementsByName("new-officer-role");
+  let role = "IO";
+  for (const r of roleRadios) {
+    if (r.checked) {
+      role = r.value;
+      break;
+    }
+  }
+
+  if (!name || !belt) {
+    showToast("Name and Belt number are required", "alert");
+    return;
+  }
+
+  const btn = document.getElementById("btn-submit-officer");
+  if (btn) btn.disabled = true;
+
+  try {
+    const resp = await fetch("http://localhost:8000/api/profiles/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, belt, rank, role, station })
+    });
+
+    if (resp.ok) {
+      const data = await resp.json();
+      const newProf = data.profile;
+      showToast(`✓ Officer ${newProf.name} registered successfully!`, "success");
+      await loadProfilesList();
+      setActiveOfficer(newProf);
+      closeOfficerProfileModal();
+      document.getElementById("form-create-officer").reset();
+    } else {
+      const errData = await resp.json();
+      showToast(`Registration failed: ${errData.message || 'Server error'}`, "alert");
+    }
+  } catch (err) {
+    console.error("Error creating officer:", err);
+    showToast(`Error: ${err.message}`, "alert");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+// ============================================================================
+// CASE BRIDGE & DELEGATION CONTROLLER
+// ============================================================================
+
+function openShareCaseModal(caseId) {
+  const caseObj = DOCKET_CASES.find(c => c.case_id === caseId);
+  if (!caseObj) return;
+
+  const idEl = document.getElementById("share-modal-case-id");
+  const firEl = document.getElementById("share-modal-fir-num");
+  const catEl = document.getElementById("share-modal-category");
+  const stEl = document.getElementById("share-modal-station");
+  const ioEl = document.getElementById("share-modal-assigned-io");
+  const hiddenInput = document.getElementById("share-input-case-id");
+  const selectOfficer = document.getElementById("share-select-officer");
+
+  if (idEl) idEl.textContent = caseObj.case_id;
+  if (firEl) firEl.textContent = caseObj.fir_number || caseObj.case_id;
+  if (catEl) catEl.textContent = caseObj.category || "NDPS_CYBER";
+  if (stEl) stEl.textContent = caseObj.police_station || "PS Cyber Crime, Chandigarh";
+  if (ioEl) ioEl.textContent = `${caseObj.io_name || "Investigating Officer"} (${caseObj.io_belt || ""})`;
+  if (hiddenInput) hiddenInput.value = caseObj.case_id;
+
+  if (selectOfficer) {
+    let opts = "";
+    REGISTERED_OFFICERS.forEach(o => {
+      const isAssigned = (o.officer_id === caseObj.assigned_officer_id);
+      if (!isAssigned) {
+        const roleLabel = o.role === "EXAMINER" ? "Forensic Examiner" : (o.role === "SHO" ? "Supervisory SHO" : "Investigating Officer");
+        opts += `<option value="${escapeHtml(o.officer_id)}">${escapeHtml(o.name)} (${escapeHtml(o.rank)}) &bull; ${escapeHtml(roleLabel)} &bull; ${escapeHtml(o.station)}</option>`;
+      }
+    });
+    selectOfficer.innerHTML = opts || `<option value="">No other officers registered</option>`;
+  }
+
+  const modal = document.getElementById("modal-share-case");
+  if (modal) modal.style.display = "flex";
+}
+
+function closeShareCaseModal() {
+  const modal = document.getElementById("modal-share-case");
+  if (modal) modal.style.display = "none";
+}
+
+async function handleShareCaseSubmit(e) {
+  e.preventDefault();
+  const caseId = document.getElementById("share-input-case-id").value;
+  const officerId = document.getElementById("share-select-officer").value;
+  const role = document.getElementById("share-select-role").value;
+  const notes = document.getElementById("share-input-notes").value.trim();
+
+  if (!caseId || !officerId) {
+    showToast("Case ID and recipient officer are required.", "alert");
+    return;
+  }
+
+  const btn = document.getElementById("btn-submit-share");
+  if (btn) btn.disabled = true;
+
+  try {
+    const resp = await fetch("http://localhost:8000/api/cases/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        case_id: caseId,
+        officer_id: officerId,
+        role: role,
+        granted_by: `${ACTIVE_OFFICER.name} (${ACTIVE_OFFICER.belt})`,
+        notes: notes
+      })
+    });
+
+    if (resp.ok) {
+      const targetOff = REGISTERED_OFFICERS.find(o => o.officer_id === officerId);
+      const targetName = targetOff ? targetOff.name : officerId;
+      showToast(`✓ Case ${caseId} bridged successfully to ${targetName}!`, "success");
+      closeShareCaseModal();
+      await renderCaseDocket();
+    } else {
+      const err = await resp.json();
+      showToast(`Bridge establishment failed: ${err.message || 'Server error'}`, "alert");
+    }
+  } catch (err) {
+    console.error("Error sharing case:", err);
+    showToast(`Error: ${err.message}`, "alert");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function setDocketScopeFilter(scope) {
+  docketScopeFilter = scope;
+  updateScopeTabs();
+  filterCaseDocketTable();
+}
+
+function updateScopeTabs() {
+  const tabMy = document.getElementById("scope-tab-my");
+  const tabShared = document.getElementById("scope-tab-shared");
+  const tabAll = document.getElementById("scope-tab-all");
+
+  if (tabMy) tabMy.classList.toggle("active", docketScopeFilter === "MY_CASES");
+  if (tabShared) tabShared.classList.toggle("active", docketScopeFilter === "SHARED_CASES");
+  if (tabAll) tabAll.classList.toggle("active", docketScopeFilter === "ALL_PRECINCT");
+}
 
 function goToCaseDocket() {
   document.querySelectorAll('.wizard-screen').forEach(s => s.style.display = 'none');
@@ -371,13 +732,34 @@ async function renderCaseDocket() {
   const statEntities = document.getElementById("docket-stat-entities");
 
   try {
-    const resp = await fetch("http://localhost:8000/api/cases");
+    const url = ACTIVE_OFFICER.officer_id 
+      ? `http://localhost:8000/api/cases?officer_id=${encodeURIComponent(ACTIVE_OFFICER.officer_id)}`
+      : `http://localhost:8000/api/cases`;
+    const resp = await fetch(url);
     if (resp.ok) {
       const data = await resp.json();
       DOCKET_CASES = data.cases || [];
     }
   } catch (err) {
     console.warn("Could not fetch docket cases:", err);
+  }
+
+  // Update Scope counts
+  const myCases = DOCKET_CASES.filter(c => c.is_assigned || c.assigned_officer_id === ACTIVE_OFFICER.officer_id);
+  const sharedCases = DOCKET_CASES.filter(c => c.is_shared);
+
+  const countMy = document.getElementById("scope-count-my");
+  const countShared = document.getElementById("scope-count-shared");
+  const countAll = document.getElementById("scope-count-all");
+
+  if (countMy) countMy.textContent = myCases.length;
+  if (countShared) countShared.textContent = sharedCases.length;
+  if (countAll) countAll.textContent = DOCKET_CASES.length;
+
+  // If active officer is an Examiner and has no assigned cases but has shared cases, default view to shared cases
+  if (docketScopeFilter === "MY_CASES" && myCases.length === 0 && sharedCases.length > 0 && ACTIVE_OFFICER.role === "EXAMINER") {
+    docketScopeFilter = "SHARED_CASES";
+    updateScopeTabs();
   }
 
   // Update Stats Ribbon
@@ -413,7 +795,18 @@ function filterCaseDocketTable() {
   const q = (searchInput ? searchInput.value : "").trim().toLowerCase();
 
   const filtered = DOCKET_CASES.filter(c => {
+    // Scope filter
+    if (docketScopeFilter === "MY_CASES") {
+      const isMine = c.is_assigned || c.assigned_officer_id === ACTIVE_OFFICER.officer_id;
+      if (!isMine) return false;
+    } else if (docketScopeFilter === "SHARED_CASES") {
+      if (!c.is_shared) return false;
+    }
+
+    // Category filter
     if (docketCategoryFilter !== "ALL" && c.category !== docketCategoryFilter) return false;
+
+    // Search query
     if (q) {
       const haystack = `${c.fir_number || ''} ${c.case_id || ''} ${c.police_station || ''} ${c.io_name || ''} ${c.category || ''}`.toLowerCase();
       if (!haystack.includes(q)) return false;
@@ -422,10 +815,16 @@ function filterCaseDocketTable() {
   });
 
   if (filtered.length === 0) {
+    let emptyMsg = `No cases match the specified filter query.`;
+    if (docketScopeFilter === "MY_CASES") {
+      emptyMsg = `No cases currently assigned to <strong>${escapeHtml(ACTIVE_OFFICER.name)}</strong>. Check <strong>[🤝 Shared with Me]</strong> or <strong>[🏛️ All Precinct Cases]</strong>.`;
+    } else if (docketScopeFilter === "SHARED_CASES") {
+      emptyMsg = `No cases currently bridged to <strong>${escapeHtml(ACTIVE_OFFICER.name)}</strong>. Other officers can bridge cases to you from their docket.`;
+    }
     tbody.innerHTML = `
       <tr>
         <td colspan="9" style="text-align: center; padding: 28px; color: #64748b;">
-          No cases match the specified filter query. Click <strong>[＋ Register New Case / FIR]</strong> to create an entry.
+          ${emptyMsg}
         </td>
       </tr>
     `;
@@ -440,10 +839,23 @@ function filterCaseDocketTable() {
     
     const catLabel = c.category === "NDPS_CYBER" ? "NDPS Cyber (Darknet/Slang)" : c.category === "FINANCIAL_1930" ? "Financial Cyber (1930)" : (c.category || "General Cyber");
 
+    let relationBadge = "";
+    if (c.is_assigned || c.assigned_officer_id === ACTIVE_OFFICER.officer_id) {
+      relationBadge = `<span class="badge badge-sm badge-blue" title="Case assigned directly to ${escapeHtml(ACTIVE_OFFICER.name)}">★ Assigned IO</span>`;
+    } else if (c.is_shared) {
+      const roleTxt = c.shared_role === "FORENSIC_EXAMINER" ? "Examiner" : (c.shared_role === "CO_INVESTIGATOR" ? "Co-IO" : "Supervisory");
+      relationBadge = `<span class="badge badge-sm badge-purple" title="Case exhibit stream bridged for ${escapeHtml(roleTxt)}">🤝 Bridged: ${escapeHtml(roleTxt)}</span>`;
+    } else {
+      relationBadge = `<span class="badge badge-sm badge-neutral" style="color: #94a3b8;">Precinct File</span>`;
+    }
+
     html += `
       <tr>
         <td>
-          <div style="font-weight: 700; color: #f8fafc;">${escapeHtml(c.fir_number || c.case_id)}</div>
+          <div style="font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+            <span>${escapeHtml(c.fir_number || c.case_id)}</span>
+            ${relationBadge}
+          </div>
           <div class="mono text-xs" style="color: #38bdf8;">${escapeHtml(c.case_id)}</div>
         </td>
         <td>
@@ -468,9 +880,12 @@ function filterCaseDocketTable() {
         <td>
           ${statusBadge}
         </td>
-        <td style="text-align: right;">
+        <td style="text-align: right; white-space: nowrap;">
           <button class="btn btn-gov-primary btn-sm" onclick="loadCaseAndOpenDashboard('${escapeHtml(c.case_id)}')">
             Open Workbench ➔
+          </button>
+          <button class="btn btn-gov-secondary btn-sm" style="margin-left: 6px;" onclick="openShareCaseModal('${escapeHtml(c.case_id)}')" title="Bridge or delegate this case to another officer">
+            🤝 Bridge
           </button>
         </td>
       </tr>
@@ -491,6 +906,7 @@ async function loadCaseAndOpenDashboard(caseId) {
   const headerTag = document.getElementById("header-case-tag");
   if (headerTag) headerTag.textContent = CASE_METADATA.fir;
 
+  updateWorkbenchRolePermissions();
   goToWorkbench();
 }
 
@@ -532,6 +948,19 @@ function goToStep(stepNum) {
     document.getElementById('screen-intake').style.display = 'flex';
     if (navDocket) navDocket.classList.remove('active');
     if (navWb) navWb.classList.remove('active');
+
+    const ioInput = document.getElementById('intake-io');
+    const beltInput = document.getElementById('intake-belt');
+    const psInput = document.getElementById('intake-ps');
+    if (ioInput && (!ioInput.value || ioInput.value === "Insp. Vikramjit Singh")) {
+      ioInput.value = ACTIVE_OFFICER.name;
+    }
+    if (beltInput && (!beltInput.value || beltInput.value === "Belt #788-UT")) {
+      beltInput.value = ACTIVE_OFFICER.belt;
+    }
+    if (psInput && (!psInput.value || psInput.value === "PS Cyber Crime, Sector 17, Chandigarh")) {
+      psInput.value = ACTIVE_OFFICER.station;
+    }
   } else if (stepNum === 2) {
     document.getElementById('screen-evidence').style.display = 'flex';
   } else if (stepNum === 3) {
@@ -592,7 +1021,8 @@ async function proceedToStep2() {
         police_station: ps,
         io_name: io,
         io_belt: belt,
-        category: cat
+        category: cat,
+        assigned_officer_id: ACTIVE_OFFICER.officer_id
       })
     });
     // Refresh cases list
@@ -1382,7 +1812,9 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Load existing cases into dropdowns & start on Case Docket landing page
+  // Load active officer profile, registered officers, and start on Case Docket
+  loadActiveOfficerFromStorage();
+  loadProfilesList();
   loadSavedCasesList();
   goToCaseDocket();
 });

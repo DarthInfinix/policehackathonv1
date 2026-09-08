@@ -110,9 +110,25 @@ class ForensicHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         # API: List all Stored Forensic Cases
         if path == '/api/cases':
-            cases = storage.get_all_cases()
+            officer_id = params.get('officer_id', [None])[0]
+            cases = storage.get_all_cases(officer_id=officer_id)
             self._set_json_headers(200)
             self.wfile.write(json.dumps({"count": len(cases), "cases": cases}).encode('utf-8'))
+            return
+
+        # API: Officer Profiles (Investigating Officers, Examiners, Supervisors)
+        if path == '/api/profiles':
+            profiles = storage.get_officers()
+            self._set_json_headers(200)
+            self.wfile.write(json.dumps({"status": "success", "count": len(profiles), "profiles": profiles}).encode('utf-8'))
+            return
+
+        # API: Case Collaborators / Bridges
+        if path == '/api/case_collaborators':
+            case_id = params.get('case_id', [''])[0]
+            collabs = storage.get_case_collaborators(case_id)
+            self._set_json_headers(200)
+            self.wfile.write(json.dumps({"case_id": case_id, "collaborators": collabs}).encode('utf-8'))
             return
 
         # API: Cross-Case Intelligence Matches
@@ -669,10 +685,56 @@ Evasion Code Word:"""
                 io_name = data.get('io_name', "Insp. Vikramjit Singh")
                 io_belt = data.get('io_belt', "Belt #788-UT")
                 category = data.get('category', "NDPS_CYBER")
+                assigned_officer_id = data.get('assigned_officer_id')
 
-                res = storage.create_or_update_case(case_id, fir_number, police_station, io_name, io_belt, category)
+                res = storage.create_or_update_case(case_id, fir_number, police_station, io_name, io_belt, category, assigned_officer_id=assigned_officer_id)
                 self._set_json_headers(200)
                 self.wfile.write(json.dumps({"status": "success", "case": res}).encode('utf-8'))
+                return
+            except Exception as e:
+                self._set_json_headers(500)
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+                return
+
+        if path == '/api/profiles/create':
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length) if content_length > 0 else b'{}'
+                data = json.loads(body.decode('utf-8')) if body else {}
+                name = data.get('name', 'SI Officer')
+                belt = data.get('belt', 'Belt #---')
+                rank = data.get('rank', 'Sub-Inspector')
+                role = data.get('role', 'IO')
+                station = data.get('station', 'PS Cyber Crime, Sector 17, Chandigarh')
+
+                profile = storage.create_officer(name, belt, rank, role, station)
+                self._set_json_headers(200)
+                self.wfile.write(json.dumps({"status": "success", "profile": profile}).encode('utf-8'))
+                return
+            except Exception as e:
+                self._set_json_headers(500)
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+                return
+
+        if path == '/api/cases/share':
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length) if content_length > 0 else b'{}'
+                data = json.loads(body.decode('utf-8')) if body else {}
+                case_id = data.get('case_id')
+                officer_id = data.get('officer_id')
+                role = data.get('role', 'FORENSIC_EXAMINER')
+                granted_by = data.get('granted_by', 'Insp. Vikramjit Singh')
+                notes = data.get('notes', '')
+
+                if not case_id or not officer_id:
+                    self._set_json_headers(400)
+                    self.wfile.write(json.dumps({"status": "error", "message": "case_id and officer_id are required"}).encode('utf-8'))
+                    return
+
+                res = storage.share_case(case_id, officer_id, role, granted_by, notes)
+                self._set_json_headers(200)
+                self.wfile.write(json.dumps({"status": "success", "share": res}).encode('utf-8'))
                 return
             except Exception as e:
                 self._set_json_headers(500)
