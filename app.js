@@ -761,8 +761,10 @@ function goToNetworkGraphView() {
   if (navWb) navWb.classList.remove('active');
   if (navGraph) navGraph.classList.add('active');
 
-  // Trigger render with isFullView = true
-  renderNetworkGraph(true);
+  // Trigger render with isFullView = true after layout reflow
+  requestAnimationFrame(() => {
+    renderNetworkGraph(true);
+  });
 }
 
 async function renderCaseDocket() {
@@ -2672,6 +2674,10 @@ function filterRawLines() {
 }
 
 async function traceToSource(fileId, lineNum) {
+  if (!REAL_FILES || REAL_FILES.length === 0) {
+    await loadCaseFiles();
+  }
+
   if (currentSelectedFileId !== fileId) {
     await selectFile(fileId);
   }
@@ -2679,10 +2685,11 @@ async function traceToSource(fileId, lineNum) {
   // If viewing image mode, toggle back to text mode so the line can be scrolled to
   setEvidenceViewMode('text');
 
-  document.getElementById("raw-search-input").value = "";
+  const searchInput = document.getElementById("raw-search-input");
+  if (searchInput) searchInput.value = "";
   await renderRawLines();
 
-  setTimeout(() => {
+  const tryScroll = (attemptsLeft) => {
     const targetElement = document.getElementById(`raw-line-${fileId}-${lineNum}`);
     if (targetElement) {
       targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2692,8 +2699,12 @@ async function traceToSource(fileId, lineNum) {
       const f = REAL_FILES.find(x => x.file_id === fileId);
       const name = f ? f.filename : "Evidence";
       showToast(`📍 Traced to source line #${lineNum} in ${name}`, 'alert');
+    } else if (attemptsLeft > 0) {
+      setTimeout(() => tryScroll(attemptsLeft - 1), 150);
     }
-  }, 120);
+  };
+
+  setTimeout(() => tryScroll(2), 120);
 }
 
 // ============================================================================
@@ -2898,7 +2909,7 @@ function saveEditedLead() {
 
 async function jumpToSourceFromNode(nodeLabel, nodeType, directFileId = null, directLineNum = null) {
   if (!nodeLabel) return;
-  const cleanLabel = nodeLabel.trim().toLowerCase();
+  const cleanLabel = String(nodeLabel).trim().toLowerCase();
 
   // If currently in Syndicate Graph dedicated screen, transition to Workbench first
   const graphScreen = document.getElementById('screen-graph-view');
@@ -2906,52 +2917,78 @@ async function jumpToSourceFromNode(nodeLabel, nodeType, directFileId = null, di
     goToWorkbench();
   }
 
-  // 1. Direct file_id and line_number provided from database
-  if (directFileId && directLineNum) {
-    await traceToSource(directFileId, directLineNum);
-    showToast(`📍 Traced [${nodeType}]: "${nodeLabel}" to line #${directLineNum}`, 'success');
+  // Ensure case evidence files are loaded into memory
+  if (!REAL_FILES || REAL_FILES.length === 0) {
+    await loadCaseFiles();
+  }
+
+  // Find node in simulation state if available
+  const graphNode = (GRAPH_SIM_STATE.nodes || []).find(n => 
+    (n.label || '').toLowerCase() === cleanLabel || 
+    n.id === nodeLabel ||
+    (n.label || '').toLowerCase().includes(cleanLabel) ||
+    cleanLabel.includes((n.label || '').toLowerCase())
+  );
+
+  let targetFileId = directFileId || (graphNode ? graphNode.file_id : null);
+  let targetLineNum = directLineNum || (graphNode ? graphNode.line_number : null);
+
+  // If directFileId is missing or invalid, resolve by filename in REAL_FILES
+  if (!targetFileId && graphNode && graphNode.filename && REAL_FILES && REAL_FILES.length > 0) {
+    const matched = REAL_FILES.find(f => f.filename === graphNode.filename);
+    if (matched) {
+      targetFileId = matched.file_id;
+    }
+  }
+
+  // If directFileId was passed as a filename, match against REAL_FILES
+  if (!targetFileId && directFileId && REAL_FILES && REAL_FILES.length > 0) {
+    const matched = REAL_FILES.find(f => f.filename === directFileId || f.file_id === directFileId);
+    if (matched) {
+      targetFileId = matched.file_id;
+    }
+  }
+
+  // 1. If file_id and line_number are resolved, jump directly to source line
+  if (targetFileId && targetLineNum) {
+    await traceToSource(targetFileId, targetLineNum);
+    showToast(`📍 Traced [${nodeType || 'Entity'}]: "${nodeLabel}" to line #${targetLineNum}`, 'success');
     return;
   }
 
-  // 2. Try finding matching node in GRAPH_SIM_STATE.nodes
-  const graphNode = GRAPH_SIM_STATE.nodes.find(n => (n.label || '').toLowerCase() === cleanLabel);
-  if (graphNode && graphNode.file_id && graphNode.line_number) {
-    await traceToSource(graphNode.file_id, graphNode.line_number);
-    showToast(`📍 Traced [${nodeType}]: "${nodeLabel}" to line #${graphNode.line_number}`, 'success');
-    return;
-  }
-
-  // 3. Try finding matching lead in REAL_TRIAGE_LEADS
-  const matchingLead = REAL_TRIAGE_LEADS.find(l => {
+  // 2. Try finding matching lead in REAL_TRIAGE_LEADS
+  const matchingLead = (REAL_TRIAGE_LEADS || []).find(l => {
     const val = (l.value || l.raw_value || '').toLowerCase();
     return val === cleanLabel || val.includes(cleanLabel) || cleanLabel.includes(val);
   });
 
   if (matchingLead && matchingLead.fileId && matchingLead.lineNum) {
     await traceToSource(matchingLead.fileId, matchingLead.lineNum);
-    showToast(`📍 Traced [${nodeType}]: "${nodeLabel}" to line #${matchingLead.lineNum} in ${matchingLead.fileName || 'case file'}`, 'success');
+    showToast(`📍 Traced [${nodeType || 'Entity'}]: "${nodeLabel}" to line #${matchingLead.lineNum} in ${matchingLead.fileName || 'case file'}`, 'success');
     return;
   }
 
-  // 4. Check if partial alphanumeric matches
-  const secondaryLead = REAL_TRIAGE_LEADS.find(l => {
-    const val = (l.value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const cleanNoPunct = cleanLabel.replace(/[^a-z0-9]/g, '');
-    return val.length > 4 && (val.includes(cleanNoPunct) || cleanNoPunct.includes(val));
-  });
+  // 3. Try partial alphanumeric match in REAL_TRIAGE_LEADS
+  const cleanNoPunct = cleanLabel.replace(/[^a-z0-9]/g, '');
+  if (cleanNoPunct.length > 3) {
+    const secondaryLead = (REAL_TRIAGE_LEADS || []).find(l => {
+      const val = (l.value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      return val.length > 4 && (val.includes(cleanNoPunct) || cleanNoPunct.includes(val));
+    });
 
-  if (secondaryLead && secondaryLead.fileId && secondaryLead.lineNum) {
-    await traceToSource(secondaryLead.fileId, secondaryLead.lineNum);
-    showToast(`📍 Traced [${nodeType}]: "${nodeLabel}" to line #${secondaryLead.lineNum}`, 'success');
-    return;
+    if (secondaryLead && secondaryLead.fileId && secondaryLead.lineNum) {
+      await traceToSource(secondaryLead.fileId, secondaryLead.lineNum);
+      showToast(`📍 Traced [${nodeType || 'Entity'}]: "${nodeLabel}" to line #${secondaryLead.lineNum}`, 'success');
+      return;
+    }
   }
 
-  // 5. Fallback: filter raw evidence in Panel 1
+  // 4. Fallback: filter raw evidence in Panel 1
   const searchInput = document.getElementById("raw-search-input");
   if (searchInput) {
     searchInput.value = nodeLabel;
     setEvidenceViewMode('text');
-    await renderRawLines();
+    await renderRawLines(nodeLabel);
     showToast(`🔍 Evidence filtered for node: "${nodeLabel}"`, 'info');
   } else {
     showToast(`Selected node: ${nodeLabel} (${nodeType})`, 'info');
@@ -2999,7 +3036,7 @@ async function renderNetworkGraph(isFullView = null) {
     const resp = await fetch(`http://localhost:8000/api/graph?case_id=${encodeURIComponent(caseId)}`);
     if (resp.ok) {
       const data = await resp.json();
-      // Filter out any drug keywords or slang so only true network entities appear
+      // Filter out raw keyword matches so only corroborated network entities appear
       const rawNodes = (data.nodes || []).filter(n => n.type !== "NARCOTICS_KEYWORD" && n.type !== "SLANG");
       const edges = data.edges || [];
 
@@ -3035,17 +3072,17 @@ async function renderNetworkGraph(isFullView = null) {
       }
       if (legendBox) legendBox.style.opacity = "1";
 
-      const width = container.clientWidth || (isFullView ? 1000 : 390);
-      const height = container.clientHeight || (isFullView ? 620 : 280);
+      const width = Math.max(container.clientWidth || 0, isFullView ? 960 : 380);
+      const height = Math.max(container.clientHeight || 0, isFullView ? 600 : 280);
       GRAPH_SIM_STATE.width = width;
       GRAPH_SIM_STATE.height = height;
 
       // Group nodes: arrange clusters
       const nodeMap = {};
-      const maxDisplayCount = isFullView ? 28 : 16;
+      const maxDisplayCount = isFullView ? Math.min(rawNodes.length, 50) : 18;
       const baseRadius = isFullView ? 22 : 14;
 
-      const displayNodes = rawNodes.slice(0, maxDisplayCount).map((n, i) => {
+      const displayNodes = rawNodes.slice(0, maxDisplayCount).map((n) => {
         let initialX = width / 2 + (Math.random() - 0.5) * (width * 0.4);
         let initialY = height / 2 + (Math.random() - 0.5) * (height * 0.4);
         
@@ -3053,7 +3090,7 @@ async function renderNetworkGraph(isFullView = null) {
         if (n.type === "DARKNET_VENDOR") {
           initialX = width * 0.22 + (Math.random() - 0.5) * (width * 0.15);
           initialY = height * 0.28 + (Math.random() - 0.5) * (height * 0.15);
-        } else if (n.type in ["UPI_ID", "CRYPTO_WALLET", "TRANSACTION_REF"]) {
+        } else if (["UPI_ID", "CRYPTO_WALLET", "TRANSACTION_REF"].includes(n.type)) {
           initialX = width * 0.50 + (Math.random() - 0.5) * (width * 0.18);
           initialY = height * 0.50 + (Math.random() - 0.5) * (height * 0.18);
         } else if (n.type === "LOCATION") {
@@ -3096,21 +3133,26 @@ async function renderNetworkGraph(isFullView = null) {
       GRAPH_SIM_STATE.edges = edges;
 
       const svgId = isFullView ? "full-force-network-svg" : "force-network-svg";
+      const edgesGroupId = isFullView ? "full-svg-edges-group" : "mini-svg-edges-group";
+      const nodesGroupId = isFullView ? "full-svg-nodes-group" : "mini-svg-nodes-group";
+      const tooltipId = isFullView ? "full-svg-tooltip" : "mini-svg-tooltip";
+      const arrowCorrobId = isFullView ? "full-arrow-corrob" : "mini-arrow-corrob";
+      const arrowDefaultId = isFullView ? "full-arrow-default" : "mini-arrow-default";
 
-      // Create SVG with defs for directional markers
+      // Create SVG with unique IDs and class hooks
       container.innerHTML = `
-        <svg id="${svgId}" width="100%" height="100%" viewBox="0 0 ${width} ${height}" style="background: #0b1120; border-radius: 6px; user-select: none; width: 100%; height: 100%;">
+        <svg id="${svgId}" width="100%" height="100%" viewBox="0 0 ${width} ${height}" style="background: #0b1120; border-radius: 6px; user-select: none; width: 100%; height: 100%; display: block;">
           <defs>
-            <marker id="arrow-corrob" viewBox="0 0 10 10" refX="24" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <marker id="${arrowCorrobId}" viewBox="0 0 10 10" refX="24" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
               <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#38bdf8"/>
             </marker>
-            <marker id="arrow-default" viewBox="0 0 10 10" refX="22" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <marker id="${arrowDefaultId}" viewBox="0 0 10 10" refX="22" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
               <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#64748b"/>
             </marker>
           </defs>
-          <g id="svg-edges-group"></g>
-          <g id="svg-nodes-group"></g>
-          <text id="svg-tooltip" x="14" y="24" fill="#94a3b8" font-size="${isFullView ? 12 : 9.5}" font-family="monospace" style="pointer-events: none; opacity: 0.9;">💡 Drag nodes to isolate • Click any node to inspect evidence source</text>
+          <g id="${edgesGroupId}" class="svg-edges-group"></g>
+          <g id="${nodesGroupId}" class="svg-nodes-group"></g>
+          <text id="${tooltipId}" class="svg-tooltip" x="14" y="24" fill="#94a3b8" font-size="${isFullView ? 12 : 9.5}" font-family="monospace" style="pointer-events: none; opacity: 0.9;">💡 Drag nodes to isolate • Click any node to inspect evidence source</text>
         </svg>
       `;
 
@@ -3210,25 +3252,31 @@ async function renderNetworkGraph(isFullView = null) {
 }
 
 function updateGraphSvgElements() {
-  const edgesGroup = document.getElementById("svg-edges-group");
-  const nodesGroup = document.getElementById("svg-nodes-group");
+  const isFull = GRAPH_SIM_STATE.isFullView;
+  const svgId = isFull ? "full-force-network-svg" : "force-network-svg";
+  const svgEl = document.getElementById(svgId);
+  if (!svgEl) return;
+
+  const edgesGroup = svgEl.querySelector(".svg-edges-group") || document.getElementById(isFull ? "full-svg-edges-group" : "mini-svg-edges-group");
+  const nodesGroup = svgEl.querySelector(".svg-nodes-group") || document.getElementById(isFull ? "full-svg-nodes-group" : "mini-svg-nodes-group");
   if (!edgesGroup || !nodesGroup) return;
 
   const nodeMap = GRAPH_SIM_STATE.nodeMap;
   const edges = GRAPH_SIM_STATE.edges;
   const nodes = GRAPH_SIM_STATE.nodes;
-  const isFull = GRAPH_SIM_STATE.isFullView;
+  const markerCorrobId = isFull ? "full-arrow-corrob" : "mini-arrow-corrob";
+  const markerDefaultId = isFull ? "full-arrow-default" : "mini-arrow-default";
 
   // Render Edges
   let edgesHtml = "";
-  edges.forEach((e, idx) => {
+  edges.forEach((e) => {
     const src = nodeMap[e.from];
     const dst = nodeMap[e.to];
     if (src && dst) {
       const isCorrob = (e.label || "").toLowerCase().includes("bank") || (e.label || "").toLowerCase().includes("corroborat");
       const strokeColor = isCorrob ? "#38bdf8" : "#475569";
       const strokeWidth = isCorrob ? (isFull ? 2.5 : 2.0) : (isFull ? 1.6 : 1.3);
-      const markerId = isCorrob ? "arrow-corrob" : "arrow-default";
+      const markerId = isCorrob ? markerCorrobId : markerDefaultId;
       const midX = (src.x + dst.x) / 2;
       const midY = (src.y + dst.y) / 2;
 
@@ -3270,6 +3318,7 @@ function updateGraphSvgElements() {
          onmousedown="startNodeDrag(event, '${n.id}')"
          onmouseenter="highlightNode('${n.id}')"
          onmouseleave="unhighlightNode('${n.id}')"
+         ondblclick="jumpToSourceFromNode('${escapeHtml(n.label)}', '${escapeHtml(n.type)}', '${n.file_id || ''}', ${n.line_number || 'null'})"
          onclick="handleNodeClick(event, '${n.id}')">
         <circle cx="${n.x}" cy="${n.y}" r="${r}" fill="#0f172a" stroke="${strokeColor}" stroke-width="${strokeWidth}" />
         <circle cx="${n.x}" cy="${n.y}" r="${r - 3}" fill="${n.color}" opacity="0.25" />
@@ -3283,7 +3332,7 @@ function updateGraphSvgElements() {
 }
 
 function handleNodeClick(event, nodeId) {
-  event.stopPropagation();
+  if (event) event.stopPropagation();
   const node = GRAPH_SIM_STATE.nodeMap[nodeId];
   if (!node) return;
 
@@ -3354,9 +3403,12 @@ function inspectGraphNode(nodeId) {
 function highlightNode(nodeId) {
   GRAPH_SIM_STATE.hoveredNode = nodeId;
   const node = GRAPH_SIM_STATE.nodeMap[nodeId];
-  const tipEl = document.getElementById("svg-tooltip");
+  const isFull = GRAPH_SIM_STATE.isFullView;
+  const svgId = isFull ? "full-force-network-svg" : "force-network-svg";
+  const svgEl = document.getElementById(svgId);
+  const tipEl = svgEl ? svgEl.querySelector(".svg-tooltip") : document.getElementById(isFull ? "full-svg-tooltip" : "svg-tooltip");
   if (node && tipEl) {
-    tipEl.textContent = `🎯 ${node.type}: "${node.label}" (Click to inspect source)`;
+    tipEl.textContent = `🎯 ${node.type}: "${node.label}" (Click to inspect • Double-click to jump to source)`;
     tipEl.setAttribute("fill", node.color);
   }
 }
@@ -3364,7 +3416,10 @@ function highlightNode(nodeId) {
 function unhighlightNode(nodeId) {
   if (GRAPH_SIM_STATE.hoveredNode === nodeId) {
     GRAPH_SIM_STATE.hoveredNode = null;
-    const tipEl = document.getElementById("svg-tooltip");
+    const isFull = GRAPH_SIM_STATE.isFullView;
+    const svgId = isFull ? "full-force-network-svg" : "force-network-svg";
+    const svgEl = document.getElementById(svgId);
+    const tipEl = svgEl ? svgEl.querySelector(".svg-tooltip") : document.getElementById(isFull ? "full-svg-tooltip" : "svg-tooltip");
     if (tipEl) {
       tipEl.textContent = `💡 Drag nodes to isolate • Click any node to inspect evidence source`;
       tipEl.setAttribute("fill", "#94a3b8");
@@ -3378,8 +3433,8 @@ function setupForceGraphInteractivity(svgEl) {
   svgEl.addEventListener("mousemove", (e) => {
     if (GRAPH_SIM_STATE.draggingNode) {
       const rect = svgEl.getBoundingClientRect();
-      const scaleX = GRAPH_SIM_STATE.width / rect.width;
-      const scaleY = GRAPH_SIM_STATE.height / rect.height;
+      const scaleX = GRAPH_SIM_STATE.width / (rect.width || 1);
+      const scaleY = GRAPH_SIM_STATE.height / (rect.height || 1);
       const mouseX = (e.clientX - rect.left) * scaleX;
       const mouseY = (e.clientY - rect.top) * scaleY;
       
@@ -3413,6 +3468,7 @@ function setupForceGraphInteractivity(svgEl) {
   };
 
   svgEl.addEventListener("mouseup", stopDrag);
+  window.addEventListener("mouseup", stopDrag);
   svgEl.addEventListener("mouseleave", stopDrag);
 }
 
