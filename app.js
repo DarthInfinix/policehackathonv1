@@ -515,10 +515,14 @@ function renderProfilesGrid() {
             </div>
           </div>
         </div>
-        <div style="margin-top: 10px;">
+        <div style="margin-top: 10px; display: flex; gap: 6px;">
           ${isActive 
             ? `<button class="btn btn-gov-secondary btn-sm btn-full" disabled style="opacity: 0.85;">✓ Currently Active</button>`
             : `<button class="btn btn-gov-primary btn-sm btn-full" onclick="selectOfficerFromModal('${escapeHtml(o.officer_id)}')">Switch to Officer ➔</button>`
+          }
+          ${(!["OFFICER_IO_01", "OFFICER_EXAM_02", "OFFICER_SHO_03"].includes(o.officer_id) && !isActive)
+            ? `<button class="btn btn-sm btn-danger-subtle" onclick="promptDeleteOfficer('${escapeHtml(o.officer_id)}', '${escapeHtml(o.name)}')" title="Purge custom officer profile">🗑️</button>`
+            : ''
           }
         </div>
       </div>
@@ -886,6 +890,9 @@ function filterCaseDocketTable() {
           </button>
           <button class="btn btn-gov-secondary btn-sm" style="margin-left: 6px;" onclick="openShareCaseModal('${escapeHtml(c.case_id)}')" title="Bridge or delegate this case to another officer">
             🤝 Bridge
+          </button>
+          <button class="btn btn-danger-subtle btn-sm" style="margin-left: 6px;" onclick="promptDeleteCase('${escapeHtml(c.case_id)}', '${escapeHtml(c.fir_number || c.case_id)}')" title="Expunge case and all exhibits from precinct repository">
+            🗑️
           </button>
         </td>
       </tr>
@@ -4371,3 +4378,197 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
+
+// ============================================================================
+// 13. STATUTORY EXPUNGE & CUSTODY DELETION CONTROLLERS
+// ============================================================================
+
+let CONFIRMED_DELETE_ACTION = null;
+
+function showConfirmDeleteModal({ title, subtitle, message, onConfirm }) {
+  const modal = document.getElementById("modal-confirm-delete");
+  const titleEl = document.getElementById("confirm-delete-title");
+  const subEl = document.getElementById("confirm-delete-subtitle");
+  const msgEl = document.getElementById("confirm-delete-message");
+  const btnExec = document.getElementById("btn-execute-confirmed-delete");
+
+  if (titleEl) titleEl.textContent = title || "STATUTORY EXPUNGE ORDER";
+  if (subEl) subEl.textContent = subtitle || "Section 63 BSA Evidence Purge Confirmation";
+  if (msgEl) msgEl.innerHTML = message || "Are you sure you want to permanently delete this item?";
+
+  CONFIRMED_DELETE_ACTION = onConfirm;
+
+  if (btnExec) {
+    btnExec.onclick = async () => {
+      if (typeof CONFIRMED_DELETE_ACTION === "function") {
+        btnExec.disabled = true;
+        btnExec.textContent = "Expunging...";
+        try {
+          await CONFIRMED_DELETE_ACTION();
+        } finally {
+          btnExec.disabled = false;
+          btnExec.textContent = "Confirm & Expunge";
+          closeConfirmDeleteModal();
+        }
+      }
+    };
+  }
+
+  if (modal) modal.style.display = "flex";
+}
+
+function closeConfirmDeleteModal() {
+  const modal = document.getElementById("modal-confirm-delete");
+  if (modal) modal.style.display = "none";
+  CONFIRMED_DELETE_ACTION = null;
+}
+
+function promptDeleteCase(caseId, firNumber) {
+  if (caseId === "FIR_104_2026" || caseId === "FIR_999_ADVERSARIAL") {
+    showToast("⚠️ Protected Benchmark Case. Cannot expunge primary precinct demonstration FIR.", "alert");
+    return;
+  }
+
+  showConfirmDeleteModal({
+    title: "EXPUNGE FIR CASE RECORD",
+    subtitle: `Permanent Purge of Case: ${firNumber}`,
+    message: `You are about to expunge <strong>${escapeHtml(firNumber)}</strong> (Case ID: <code class="mono">${escapeHtml(caseId)}</code>).<br><br>All associated seized exhibits, extracted line records, cross-case entity matches, and bridge delegations will be permanently purged from this device.`,
+    onConfirm: async () => {
+      try {
+        const resp = await fetch("http://localhost:8000/api/cases/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            case_id: caseId,
+            officer_name: ACTIVE_OFFICER ? `${ACTIVE_OFFICER.name} (${ACTIVE_OFFICER.belt})` : "Insp. Vikramjit Singh"
+          })
+        });
+
+        const data = await resp.json();
+        if (resp.ok && data.status === "success") {
+          showToast(`✓ Case ${firNumber} expunged successfully!`, "success");
+          await renderCaseDocket();
+          await loadSavedCasesList();
+
+          // If currently open case was expunged, redirect to first available case or docket
+          if (CASE_METADATA.case_id === caseId) {
+            CASE_METADATA.case_id = null;
+            goToCaseDocket();
+          }
+        } else {
+          showToast(`Deletion failed: ${data.message || 'Server error'}`, "alert");
+        }
+      } catch (err) {
+        console.error("Error expunging case:", err);
+        showToast(`Error: ${err.message}`, "alert");
+      }
+    }
+  });
+}
+
+function promptPurgeTestCases() {
+  showConfirmDeleteModal({
+    title: "PURGE AUTOMATED TEST CASES",
+    subtitle: "Bulk Cleanup of Test Fixtures (TEST_CASE_*)",
+    message: `This will permanently purge all accumulated automated test cases (e.g. <code class="mono">TEST_CASE_*</code> / <code class="mono">CYBER-TEST</code>).<br><br>Authentic precinct FIRs and baseline demo cases will remain untouched.`,
+    onConfirm: async () => {
+      try {
+        const resp = await fetch("http://localhost:8000/api/cases/purge_test_cases", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            officer_name: ACTIVE_OFFICER ? `${ACTIVE_OFFICER.name} (${ACTIVE_OFFICER.belt})` : "Insp. Vikramjit Singh"
+          })
+        });
+
+        const data = await resp.json();
+        if (resp.ok && data.status === "success") {
+          showToast(`🧹 Purged ${data.purged_count} automated test fixtures!`, "success");
+          await renderCaseDocket();
+          await loadSavedCasesList();
+        } else {
+          showToast(`Purge failed: ${data.message || 'Server error'}`, "alert");
+        }
+      } catch (err) {
+        console.error("Error purging test cases:", err);
+        showToast(`Error: ${err.message}`, "alert");
+      }
+    }
+  });
+}
+
+function promptDeleteCurrentFile() {
+  if (!currentSelectedFileId) {
+    showToast("No active exhibit selected to purge.", "alert");
+    return;
+  }
+
+  const file = REAL_FILES.find(f => f.file_id === currentSelectedFileId);
+  const fname = file ? file.filename : currentSelectedFileId;
+  const caseId = getActiveCaseId();
+
+  showConfirmDeleteModal({
+    title: "PURGE SEIZED EXHIBIT",
+    subtitle: `Exhibit Custody Disposal: ${fname}`,
+    message: `You are about to purge exhibit <strong>${escapeHtml(fname)}</strong> from Case <code class="mono">${escapeHtml(caseId)}</code>.<br><br>All parsed OCR lines, extracted financial/telecom entities, and local disk images will be permanently erased.`,
+    onConfirm: async () => {
+      try {
+        const resp = await fetch("http://localhost:8000/api/files/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            file_id: currentSelectedFileId,
+            case_id: caseId,
+            officer_name: ACTIVE_OFFICER ? `${ACTIVE_OFFICER.name} (${ACTIVE_OFFICER.belt})` : "Insp. Vikramjit Singh"
+          })
+        });
+
+        const data = await resp.json();
+        if (resp.ok && data.status === "success") {
+          showToast(`✓ Exhibit '${fname}' expunged from case!`, "success");
+          currentSelectedFileId = null;
+          await renderDashboard();
+        } else {
+          showToast(`Failed to purge exhibit: ${data.message || 'Server error'}`, "alert");
+        }
+      } catch (err) {
+        console.error("Error purging exhibit:", err);
+        showToast(`Error: ${err.message}`, "alert");
+      }
+    }
+  });
+}
+
+function promptDeleteOfficer(officerId, officerName) {
+  showConfirmDeleteModal({
+    title: "REMOVE OFFICER PROFILE",
+    subtitle: `Deregister Profile: ${officerName}`,
+    message: `Are you sure you want to remove <strong>${escapeHtml(officerName)}</strong> (<code class="mono">${escapeHtml(officerId)}</code>) from the active officer directory?<br><br>Any cases assigned to this officer will be safely reassigned to primary IO Insp. Vikramjit Singh.`,
+    onConfirm: async () => {
+      try {
+        const resp = await fetch("http://localhost:8000/api/profiles/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            officer_id: officerId,
+            performed_by: ACTIVE_OFFICER ? `${ACTIVE_OFFICER.name} (${ACTIVE_OFFICER.belt})` : "Insp. Vikramjit Singh"
+          })
+        });
+
+        const data = await resp.json();
+        if (resp.ok && data.status === "success") {
+          showToast(`✓ Officer profile '${officerName}' deleted.`, "success");
+          await loadProfilesList();
+          renderProfilesGrid();
+          await renderCaseDocket();
+        } else {
+          showToast(`Deletion failed: ${data.message || 'Server error'}`, "alert");
+        }
+      } catch (err) {
+        console.error("Error deleting officer:", err);
+        showToast(`Error: ${err.message}`, "alert");
+      }
+    }
+  });
+}
+

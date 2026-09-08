@@ -1671,14 +1671,244 @@ def mine_unstructured_entities_chunked(case_id: str, file_id: Optional[str] = No
     con.commit()
     con.close()
 
-    log_audit(case_id, "SLM_SEMANTIC_MINED", f"Chunked Miner analyzed {len(chunks)} windows, registered {newly_added} entities (LLM used: {bool(port)}).", db_path=db_path)
+    log_audit(case_id, "SLM_SEMANTIC_MINED", f"Chunked Miner analyzed {len(chunks)} windows, registered {newly_added} entities (LLM used: {bool(active_endpoint)}).", db_path=db_path)
 
     return {
         "status": "success",
         "chunks_analyzed": len(chunks),
-        "llm_used": bool(port),
+        "llm_used": bool(active_endpoint),
         "new_entities_added": newly_added,
         "discovered_locations": [d["value"] for d in discovered_locations],
         "discovered_slang": discovered_slang
     }
+
+def delete_evidence_file(file_id: str, case_id: Optional[str] = None, performed_by: str = "Insp. Vikramjit Singh", db_path: str = DB_PATH) -> Dict[str, Any]:
+    """
+    Forensically purges an ingested evidence exhibit and its extracted records,
+    cleaning up entity mentions, physical image files, and rebuilding FTS5.
+    """
+    con = get_db(db_path)
+    cur = con.cursor()
+
+    # Find file info
+    cur.execute("SELECT file_id, case_id, filename, file_type FROM evidence_files WHERE file_id = ?", (file_id,))
+    f_row = cur.fetchone()
+    if not f_row:
+        con.close()
+        return {"status": "error", "message": f"Evidence file {file_id} not found."}
+
+    cid = f_row["case_id"] or case_id
+    fname = f_row["filename"]
+
+    # 1. Remove physical image if stored on disk
+    images_dir = os.path.join(os.path.dirname(db_path), "evidence_images")
+    if os.path.isdir(images_dir):
+        for img_fn in os.listdir(images_dir):
+            if img_fn.startswith(f"{file_id}_") or img_fn.startswith(file_id):
+                try:
+                    os.remove(os.path.join(images_dir, img_fn))
+                except Exception:
+                    pass
+
+    # 2. Delete entity mentions linked to records of this file
+    cur.execute("""
+    DELETE FROM entity_mentions
+    WHERE record_id IN (SELECT record_id FROM evidence_records WHERE file_id = ?)
+    """, (file_id,))
+
+    # 3. Clean up orphan entities that have no remaining mentions anywhere
+    cur.execute("""
+    DELETE FROM entities
+    WHERE entity_id NOT IN (SELECT DISTINCT entity_id FROM entity_mentions)
+    """)
+
+    # 4. Count and delete evidence records
+    cur.execute("SELECT COUNT(*) FROM evidence_records WHERE file_id = ?", (file_id,))
+    rec_count = cur.fetchone()[0]
+    cur.execute("DELETE FROM evidence_records WHERE file_id = ?", (file_id,))
+
+    # 5. Delete file entry
+    cur.execute("DELETE FROM evidence_files WHERE file_id = ?", (file_id,))
+
+    # 6. Rebuild FTS5 virtual table
+    try:
+        cur.execute("INSERT INTO records_fts(records_fts) VALUES('rebuild')")
+    except Exception:
+        pass
+
+    con.commit()
+    con.close()
+
+    # Log Section 63 BSA audit trail
+    log_audit(cid, "EXHIBIT_PURGED", f"Seized exhibit '{fname}' (ID: {file_id}, {rec_count} records) purged from custody by {performed_by}.", performed_by=performed_by, db_path=db_path)
+
+    return {
+        "status": "success",
+        "file_id": file_id,
+        "case_id": cid,
+        "filename": fname,
+        "records_purged": rec_count,
+        "message": f"Exhibit '{fname}' successfully expunged from case."
+    }
+
+def delete_case(case_id: str, performed_by: str = "Insp. Vikramjit Singh", force: bool = False, db_path: str = DB_PATH) -> Dict[str, Any]:
+    """
+    Forensically expunges an entire case container and cascades deletions across
+    evidence_files, evidence_records, entity_mentions, orphan entities, images, and bridges.
+    Protects core benchmark cases (FIR_104_2026, FIR_999_ADVERSARIAL) unless force=True.
+    """
+    PROTECTED_CASES = {"FIR_104_2026", "FIR_999_ADVERSARIAL"}
+    if case_id in PROTECTED_CASES and not force:
+        return {
+            "status": "error",
+            "message": f"Case '{case_id}' is a protected precinct benchmark FIR. Cannot expunge without administrator override."
+        }
+
+    con = get_db(db_path)
+    cur = con.cursor()
+
+    cur.execute("SELECT case_id, fir_number, police_station, io_name FROM cases WHERE case_id = ?", (case_id,))
+    case_row = cur.fetchone()
+    if not case_row:
+        con.close()
+        return {"status": "error", "message": f"Case '{case_id}' not found."}
+
+    fir_num = case_row["fir_number"]
+
+    # 1. Gather all files in this case to clean up disk images
+    cur.execute("SELECT file_id FROM evidence_files WHERE case_id = ?", (case_id,))
+    file_ids = [r[0] for r in cur.fetchall()]
+
+    images_dir = os.path.join(os.path.dirname(db_path), "evidence_images")
+    if os.path.isdir(images_dir) and file_ids:
+        for img_fn in os.listdir(images_dir):
+            for fid in file_ids:
+                if img_fn.startswith(f"{fid}_") or img_fn.startswith(fid):
+                    try:
+                        os.remove(os.path.join(images_dir, img_fn))
+                    except Exception:
+                        pass
+
+    # 2. Delete entity mentions for this case
+    cur.execute("""
+    DELETE FROM entity_mentions
+    WHERE record_id IN (SELECT record_id FROM evidence_records WHERE case_id = ?)
+    """, (case_id,))
+
+    # 3. Clean up orphan entities
+    cur.execute("""
+    DELETE FROM entities
+    WHERE entity_id NOT IN (SELECT DISTINCT entity_id FROM entity_mentions)
+    """)
+
+    # 4. Delete evidence records
+    cur.execute("SELECT COUNT(*) FROM evidence_records WHERE case_id = ?", (case_id,))
+    rec_count = cur.fetchone()[0]
+    cur.execute("DELETE FROM evidence_records WHERE case_id = ?", (case_id,))
+
+    # 5. Delete evidence files
+    cur.execute("DELETE FROM evidence_files WHERE case_id = ?", (case_id,))
+
+    # 6. Delete case collaborators / bridges
+    cur.execute("DELETE FROM case_collaborators WHERE case_id = ?", (case_id,))
+
+    # 7. Delete case
+    cur.execute("DELETE FROM cases WHERE case_id = ?", (case_id,))
+
+    # 8. Rebuild FTS5
+    try:
+        cur.execute("INSERT INTO records_fts(records_fts) VALUES('rebuild')")
+    except Exception:
+        pass
+
+    con.commit()
+    con.close()
+
+    # Log Section 63 BSA audit trail
+    log_audit(case_id, "CASE_EXPUNGED", f"Case '{fir_num}' ({case_id}) expunged from precinct repository by {performed_by}. Purged {len(file_ids)} exhibits and {rec_count} records.", performed_by=performed_by, db_path=db_path)
+
+    return {
+        "status": "success",
+        "case_id": case_id,
+        "fir_number": fir_num,
+        "files_purged": len(file_ids),
+        "records_purged": rec_count,
+        "message": f"Case '{fir_num}' successfully expunged."
+    }
+
+def purge_test_cases(performed_by: str = "Insp. Vikramjit Singh", db_path: str = DB_PATH) -> Dict[str, Any]:
+    """
+    Cleans up all temporary automated test fixtures (e.g. TEST_CASE_*)
+    that accumulated during runs, preserving real cases and benchmark cases.
+    """
+    con = get_db(db_path)
+    cur = con.cursor()
+    cur.execute("SELECT case_id FROM cases WHERE case_id LIKE 'TEST_CASE_%' OR fir_number LIKE '%CYBER-TEST%'")
+    test_case_ids = [r[0] for r in cur.fetchall()]
+    con.close()
+
+    purged = []
+    for cid in test_case_ids:
+        res = delete_case(cid, performed_by=performed_by, force=True, db_path=db_path)
+        if res.get("status") == "success":
+            purged.append(cid)
+
+    return {
+        "status": "success",
+        "purged_count": len(purged),
+        "purged_cases": purged,
+        "message": f"Purged {len(purged)} automated test cases."
+    }
+
+def delete_officer_profile(officer_id: str, performed_by: str = "Insp. Vikramjit Singh", db_path: str = DB_PATH) -> Dict[str, Any]:
+    """
+    Removes a custom registered officer profile.
+    Prevents deletion of default statutory officers (OFFICER_IO_01, OFFICER_EXAM_02, OFFICER_SHO_03).
+    Reassigns any assigned cases to OFFICER_IO_01 before deletion.
+    """
+    PROTECTED_OFFICERS = {"OFFICER_IO_01", "OFFICER_EXAM_02", "OFFICER_SHO_03"}
+    if officer_id in PROTECTED_OFFICERS:
+        return {
+            "status": "error",
+            "message": f"Officer '{officer_id}' is a statutory core precinct role and cannot be deleted."
+        }
+
+    con = get_db(db_path)
+    cur = con.cursor()
+
+    cur.execute("SELECT officer_id, name, rank, belt FROM officers WHERE officer_id = ?", (officer_id,))
+    off_row = cur.fetchone()
+    if not off_row:
+        con.close()
+        return {"status": "error", "message": f"Officer profile '{officer_id}' not found."}
+
+    off_name = off_row["name"]
+
+    # Reassign cases to OFFICER_IO_01
+    cur.execute("""
+    UPDATE cases 
+    SET assigned_officer_id = 'OFFICER_IO_01', 
+        io_name = 'Insp. Vikramjit Singh', 
+        io_belt = 'Belt #788-UT' 
+    WHERE assigned_officer_id = ?
+    """, (officer_id,))
+
+    # Remove from collaborators
+    cur.execute("DELETE FROM case_collaborators WHERE officer_id = ?", (officer_id,))
+
+    # Delete officer profile
+    cur.execute("DELETE FROM officers WHERE officer_id = ?", (officer_id,))
+
+    con.commit()
+    con.close()
+
+    log_audit("GLOBAL_DIRECTORY", "OFFICER_DELETED", f"Custom officer profile '{off_name}' ({officer_id}) removed from directory by {performed_by}.", performed_by=performed_by, db_path=db_path)
+
+    return {
+        "status": "success",
+        "officer_id": officer_id,
+        "name": off_name,
+        "message": f"Officer profile '{off_name}' deleted."
+    }
+
 

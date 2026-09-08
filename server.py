@@ -747,6 +747,97 @@ Evasion Code Word:"""
                 self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
                 return
 
+        # API: Cascading FIR Case Deletion
+        if path == '/api/cases/delete':
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length) if content_length > 0 else b'{}'
+                data = json.loads(body.decode('utf-8')) if body else {}
+                case_id = data.get('case_id')
+                performed_by = data.get('officer_name', 'Insp. Vikramjit Singh')
+                force = data.get('force', False)
+
+                if not case_id:
+                    self._set_json_headers(400)
+                    self.wfile.write(json.dumps({"status": "error", "message": "case_id is required"}).encode('utf-8'))
+                    return
+
+                res = storage.delete_case(case_id, performed_by=performed_by, force=force)
+                status_code = 200 if res.get("status") == "success" else 400
+                self._set_json_headers(status_code)
+                self.wfile.write(json.dumps(res).encode('utf-8'))
+                return
+            except Exception as e:
+                self._set_json_headers(500)
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+                return
+
+        # API: Purge Automated Test Cases
+        if path == '/api/cases/purge_test_cases':
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length) if content_length > 0 else b'{}'
+                data = json.loads(body.decode('utf-8')) if body else {}
+                performed_by = data.get('officer_name', 'Insp. Vikramjit Singh')
+
+                res = storage.purge_test_cases(performed_by=performed_by)
+                self._set_json_headers(200)
+                self.wfile.write(json.dumps(res).encode('utf-8'))
+                return
+            except Exception as e:
+                self._set_json_headers(500)
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+                return
+
+        # API: Delete Seized Evidence Exhibit File
+        if path == '/api/files/delete':
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length) if content_length > 0 else b'{}'
+                data = json.loads(body.decode('utf-8')) if body else {}
+                file_id = data.get('file_id')
+                case_id = data.get('case_id')
+                performed_by = data.get('officer_name', 'Insp. Vikramjit Singh')
+
+                if not file_id:
+                    self._set_json_headers(400)
+                    self.wfile.write(json.dumps({"status": "error", "message": "file_id is required"}).encode('utf-8'))
+                    return
+
+                res = storage.delete_evidence_file(file_id, case_id=case_id, performed_by=performed_by)
+                status_code = 200 if res.get("status") == "success" else 400
+                self._set_json_headers(status_code)
+                self.wfile.write(json.dumps(res).encode('utf-8'))
+                return
+            except Exception as e:
+                self._set_json_headers(500)
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+                return
+
+        # API: Delete Officer Profile
+        if path == '/api/profiles/delete':
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length) if content_length > 0 else b'{}'
+                data = json.loads(body.decode('utf-8')) if body else {}
+                officer_id = data.get('officer_id')
+                performed_by = data.get('performed_by', 'Insp. Vikramjit Singh')
+
+                if not officer_id:
+                    self._set_json_headers(400)
+                    self.wfile.write(json.dumps({"status": "error", "message": "officer_id is required"}).encode('utf-8'))
+                    return
+
+                res = storage.delete_officer_profile(officer_id, performed_by=performed_by)
+                status_code = 200 if res.get("status") == "success" else 400
+                self._set_json_headers(status_code)
+                self.wfile.write(json.dumps(res).encode('utf-8'))
+                return
+            except Exception as e:
+                self._set_json_headers(500)
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+                return
+
         if path == '/api/upload':
             try:
                 content_length = int(self.headers.get('Content-Length', 0))
