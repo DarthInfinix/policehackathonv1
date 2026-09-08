@@ -2382,11 +2382,28 @@ async function jumpToSourceFromNode(nodeLabel, nodeType) {
   }
 }
 
+// Global Network Simulation State
+let GRAPH_SIM_STATE = {
+  nodes: [],
+  edges: [],
+  nodeMap: {},
+  animId: null,
+  draggingNode: null,
+  hoveredNode: null,
+  width: 400,
+  height: 290
+};
+
 async function renderNetworkGraph() {
   const container = document.getElementById("network-graph-canvas-container");
   const badge = document.getElementById("graph-linkage-badge");
   const legendBox = document.getElementById("graph-legend-box");
   if (!container) return;
+
+  if (GRAPH_SIM_STATE.animId) {
+    cancelAnimationFrame(GRAPH_SIM_STATE.animId);
+    GRAPH_SIM_STATE.animId = null;
+  }
 
   try {
     const caseId = getActiveCaseId();
@@ -2394,11 +2411,11 @@ async function renderNetworkGraph() {
     if (resp.ok) {
       const data = await resp.json();
       // Filter out any drug keywords or slang so only true network entities appear
-      const nodes = (data.nodes || []).filter(n => n.type !== "NARCOTICS_KEYWORD" && n.type !== "SLANG");
+      const rawNodes = (data.nodes || []).filter(n => n.type !== "NARCOTICS_KEYWORD" && n.type !== "SLANG");
       const edges = data.edges || [];
 
       // Linkage Guardrail: When there's not sufficient data or linkage between data, do not show a graph
-      if (data.status === "insufficient_linkage" || nodes.length < 3 || edges.length < 2) {
+      if (data.status === "insufficient_linkage" || rawNodes.length < 3 || edges.length < 2) {
         if (badge) {
           badge.className = "badge badge-sm badge-neutral";
           badge.textContent = "0 Corroborated Links";
@@ -2406,7 +2423,7 @@ async function renderNetworkGraph() {
         if (legendBox) legendBox.style.opacity = "0.4";
 
         container.innerHTML = `
-          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; padding: 25px 20px; background: #0b1120; border-radius: 6px; border: 1px dashed #334155;">
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; padding: 25px 20px; background: #0b1120; border-radius: 6px; border: 1px dashed #334155; width: 100%;">
             <div style="font-size: 26px; margin-bottom: 8px;">🕸️</div>
             <div style="font-weight: 700; font-size: 11px; color: #94a3b8; letter-spacing: 0.05em; margin-bottom: 6px;">
               INSUFFICIENT MULTI-SOURCE LINKAGE FOR SYNDICATE GRAPH
@@ -2425,58 +2442,305 @@ async function renderNetworkGraph() {
 
       if (badge) {
         badge.className = "badge badge-sm badge-blue";
-        badge.textContent = `${nodes.length} Connected Nodes (${edges.length} Links)`;
+        badge.textContent = `${rawNodes.length} Nodes &bull; ${edges.length} Corroborated Links`;
       }
       if (legendBox) legendBox.style.opacity = "1";
 
-      const width = 380;
-      const height = 260;
-      const centerX = width / 2;
-      const centerY = height / 2;
-      const radius = Math.min(centerX, centerY) - 45;
+      const width = container.clientWidth || 390;
+      const height = container.clientHeight || 280;
+      GRAPH_SIM_STATE.width = width;
+      GRAPH_SIM_STATE.height = height;
 
-      const nodePositions = {};
-      const displayNodes = nodes.slice(0, 12);
-      displayNodes.forEach((node, i) => {
-        const angle = (i / displayNodes.length) * 2 * Math.PI - Math.PI / 2;
-        nodePositions[node.id] = {
-          x: Math.round(centerX + radius * Math.cos(angle)),
-          y: Math.round(centerY + radius * Math.sin(angle)),
-          ...node
-        };
-      });
-
-      let edgesSvg = "";
-      edges.forEach(e => {
-        const src = nodePositions[e.from];
-        const dst = nodePositions[e.to];
-        if (src && dst) {
-          edgesSvg += `<line x1="${src.x}" y1="${src.y}" x2="${dst.x}" y2="${dst.y}" class="svg-edge" stroke="#64748B" stroke-width="1.4" opacity="0.7"/>`;
+      // Group nodes: arrange clusters (Darknet at top-left, financial at center, locations at bottom-right)
+      const nodeMap = {};
+      const displayNodes = rawNodes.slice(0, 16).map((n, i) => {
+        let initialX = width / 2 + (Math.random() - 0.5) * 120;
+        let initialY = height / 2 + (Math.random() - 0.5) * 100;
+        
+        // Initial biased clustering based on entity modality
+        if (n.type === "DARKNET_VENDOR") {
+          initialX = width * 0.25 + (Math.random() - 0.5) * 40;
+          initialY = height * 0.28 + (Math.random() - 0.5) * 40;
+        } else if (n.type in ["UPI_ID", "CRYPTO_WALLET", "TRANSACTION_REF"]) {
+          initialX = width * 0.52 + (Math.random() - 0.5) * 60;
+          initialY = height * 0.50 + (Math.random() - 0.5) * 50;
+        } else if (n.type === "LOCATION") {
+          initialX = width * 0.75 + (Math.random() - 0.5) * 40;
+          initialY = height * 0.72 + (Math.random() - 0.5) * 40;
         }
+
+        const color = n.type === "DARKNET_VENDOR" ? "#8b5cf6" : 
+                      (n.type === "UPI_ID" || n.type === "TRANSACTION_REF") ? "#f59e0b" : 
+                      n.type === "CRYPTO_WALLET" ? "#ec4899" : 
+                      n.type === "LOCATION" ? "#10b981" : "#3b82f6";
+
+        const nodeObj = {
+          id: n.id,
+          label: n.label,
+          type: n.type,
+          risk: n.risk,
+          color: color,
+          radius: n.type === "DARKNET_VENDOR" ? 17 : (n.type === "UPI_ID" ? 16 : 14),
+          x: initialX,
+          y: initialY,
+          vx: 0,
+          vy: 0,
+          fx: null,
+          fy: null
+        };
+        nodeMap[n.id] = nodeObj;
+        return nodeObj;
       });
 
-      let nodesSvg = "";
-      Object.values(nodePositions).forEach(n => {
-        const color = n.type === "DARKNET_VENDOR" ? "#8b5cf6" : n.type === "UPI_ID" ? "#f59e0b" : n.type === "CRYPTO_WALLET" ? "#ec4899" : n.type === "LOCATION" ? "#10b981" : "#3b82f6";
-        const shortLabel = n.label.length > 11 ? n.label.substring(0, 10) + '..' : n.label;
-        nodesSvg += `
-          <g class="svg-node" onclick="jumpToSourceFromNode('${escapeHtml(n.label)}', '${escapeHtml(n.type)}')" style="cursor: pointer;" title="Click to jump to evidence line">
-            <circle cx="${n.x}" cy="${n.y}" r="15" fill="#0f172a" stroke="${color}" stroke-width="2"/>
-            <text x="${n.x}" y="${n.y + 4}" font-size="7.5" text-anchor="middle" fill="#f1f5f9" font-family="monospace">${escapeHtml(shortLabel)}</text>
-          </g>
-        `;
-      });
+      GRAPH_SIM_STATE.nodes = displayNodes;
+      GRAPH_SIM_STATE.nodeMap = nodeMap;
+      GRAPH_SIM_STATE.edges = edges;
 
+      // Create SVG with defs for directional markers
       container.innerHTML = `
-        <svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" style="background: #0b1120; border-radius: 6px;">
-          ${edgesSvg}
-          ${nodesSvg}
+        <svg id="force-network-svg" width="100%" height="100%" viewBox="0 0 ${width} ${height}" style="background: #0b1120; border-radius: 6px; user-select: none; width: 100%; height: 100%;">
+          <defs>
+            <marker id="arrow-corrob" viewBox="0 0 10 10" refX="22" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#38bdf8"/>
+            </marker>
+            <marker id="arrow-default" viewBox="0 0 10 10" refX="20" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#64748b"/>
+            </marker>
+          </defs>
+          <g id="svg-edges-group"></g>
+          <g id="svg-nodes-group"></g>
+          <text id="svg-tooltip" x="10" y="20" fill="#94a3b8" font-size="9.5" font-family="monospace" style="pointer-events: none; opacity: 0.85;">💡 Drag nodes to isolate • Click node to trace source</text>
         </svg>
       `;
+
+      // Set up Dragging & Interaction on the SVG
+      const svgEl = document.getElementById("force-network-svg");
+      setupForceGraphInteractivity(svgEl);
+
+      // Run Force Simulation (Spring Embedder + Coulomb Repulsion)
+      let iterations = 0;
+      const maxIterations = 200;
+
+      function stepSimulation() {
+        const nodes = GRAPH_SIM_STATE.nodes;
+        const edges = GRAPH_SIM_STATE.edges;
+        const nodeMap = GRAPH_SIM_STATE.nodeMap;
+
+        // 1. Coulomb Repulsion between all node pairs
+        for (let i = 0; i < nodes.length; i++) {
+          for (let j = i + 1; j < nodes.length; j++) {
+            const na = nodes[i];
+            const nb = nodes[j];
+            let dx = nb.x - na.x;
+            let dy = nb.y - na.y;
+            let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            const minDist = (na.radius + nb.radius) * 2.8;
+            if (dist < 180) {
+              const force = (180 - dist) / 180;
+              const repulse = force * 2.2;
+              const fx = (dx / dist) * repulse;
+              const fy = (dy / dist) * repulse;
+              if (na.fx === null) { na.vx -= fx; na.vy -= fy; }
+              if (nb.fx === null) { nb.vx += fx; nb.vy += fy; }
+            }
+          }
+        }
+
+        // 2. Hooke's Law Spring Attraction along Edges
+        edges.forEach(e => {
+          const src = nodeMap[e.from];
+          const dst = nodeMap[e.to];
+          if (src && dst) {
+            let dx = dst.x - src.x;
+            let dy = dst.y - src.y;
+            let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            const targetDist = 85;
+            const delta = dist - targetDist;
+            const springForce = delta * 0.035;
+            const fx = (dx / dist) * springForce;
+            const fy = (dy / dist) * springForce;
+            if (src.fx === null) { src.vx += fx; src.vy += fy; }
+            if (dst.fx === null) { dst.vx -= fx; dst.vy -= fy; }
+          }
+        });
+
+        // 3. Center Gravity & Boundary containment
+        const cx = width / 2;
+        const cy = height / 2;
+        nodes.forEach(n => {
+          if (n.fx === null) {
+            n.vx += (cx - n.x) * 0.008;
+            n.vy += (cy - n.y) * 0.008;
+            n.vx *= 0.82; // damping
+            n.vy *= 0.82;
+            n.x += n.vx;
+            n.y += n.vy;
+
+            // Clamping inside canvas margins
+            n.x = Math.max(n.radius + 10, Math.min(width - n.radius - 10, n.x));
+            n.y = Math.max(n.radius + 15, Math.min(height - n.radius - 15, n.y));
+          } else {
+            n.x = n.fx;
+            n.y = n.fy;
+          }
+        });
+
+        updateGraphSvgElements();
+
+        iterations++;
+        if (iterations < maxIterations || GRAPH_SIM_STATE.draggingNode) {
+          GRAPH_SIM_STATE.animId = requestAnimationFrame(stepSimulation);
+        } else {
+          GRAPH_SIM_STATE.animId = null;
+        }
+      }
+
+      stepSimulation();
       return;
     }
   } catch (err) {
     console.warn("Could not load network graph:", err);
+  }
+}
+
+function updateGraphSvgElements() {
+  const edgesGroup = document.getElementById("svg-edges-group");
+  const nodesGroup = document.getElementById("svg-nodes-group");
+  if (!edgesGroup || !nodesGroup) return;
+
+  const nodeMap = GRAPH_SIM_STATE.nodeMap;
+  const edges = GRAPH_SIM_STATE.edges;
+  const nodes = GRAPH_SIM_STATE.nodes;
+
+  // Render Edges
+  let edgesHtml = "";
+  edges.forEach((e, idx) => {
+    const src = nodeMap[e.from];
+    const dst = nodeMap[e.to];
+    if (src && dst) {
+      const isCorrob = (e.label || "").toLowerCase().includes("bank") || (e.label || "").toLowerCase().includes("corroborat");
+      const strokeColor = isCorrob ? "#38bdf8" : "#475569";
+      const strokeWidth = isCorrob ? 2.0 : 1.3;
+      const markerId = isCorrob ? "arrow-corrob" : "arrow-default";
+      const midX = (src.x + dst.x) / 2;
+      const midY = (src.y + dst.y) / 2;
+
+      // Edge line with directional arrow
+      edgesHtml += `
+        <line x1="${src.x}" y1="${src.y}" x2="${dst.x}" y2="${dst.y}" 
+              stroke="${strokeColor}" stroke-width="${strokeWidth}" opacity="${isCorrob ? 0.9 : 0.6}" 
+              marker-end="url(#${markerId})" />
+      `;
+
+      // Edge label (compact)
+      if (e.label) {
+        const shortLabel = e.label.length > 18 ? e.label.substring(0, 16) + '..' : e.label;
+        edgesHtml += `
+          <text x="${midX}" y="${midY - 3}" font-size="7" fill="${isCorrob ? '#7dd3fc' : '#94a3b8'}" 
+                text-anchor="middle" font-family="monospace" opacity="0.85">${escapeHtml(shortLabel)}</text>
+        `;
+      }
+    }
+  });
+  edgesGroup.innerHTML = edgesHtml;
+
+  // Render Nodes
+  let nodesHtml = "";
+  nodes.forEach(n => {
+    const shortLabel = n.label.length > 12 ? n.label.substring(0, 10) + '..' : n.label;
+    const isHovered = GRAPH_SIM_STATE.hoveredNode === n.id;
+    const strokeWidth = isHovered ? 3.5 : 2;
+    const r = isHovered ? n.radius + 3 : n.radius;
+
+    nodesHtml += `
+      <g class="svg-node" data-node-id="${n.id}" style="cursor: grab;" 
+         onmousedown="startNodeDrag(event, '${n.id}')"
+         onmouseenter="highlightNode('${n.id}')"
+         onmouseleave="unhighlightNode('${n.id}')"
+         onclick="jumpToSourceFromNode('${escapeHtml(n.label)}', '${escapeHtml(n.type)}')">
+        <circle cx="${n.x}" cy="${n.y}" r="${r}" fill="#0f172a" stroke="${n.color}" stroke-width="${strokeWidth}" />
+        <circle cx="${n.x}" cy="${n.y}" r="${r - 3}" fill="${n.color}" opacity="0.22" />
+        <text x="${n.x}" y="${n.y + 3.5}" font-size="7.5" text-anchor="middle" fill="#f8fafc" font-family="monospace" font-weight="600" style="pointer-events: none;">
+          ${escapeHtml(shortLabel)}
+        </text>
+      </g>
+    `;
+  });
+  nodesGroup.innerHTML = nodesHtml;
+}
+
+function highlightNode(nodeId) {
+  GRAPH_SIM_STATE.hoveredNode = nodeId;
+  const node = GRAPH_SIM_STATE.nodeMap[nodeId];
+  const tipEl = document.getElementById("svg-tooltip");
+  if (node && tipEl) {
+    tipEl.textContent = `🎯 ${node.type}: "${node.label}" (Click to view source)`;
+    tipEl.setAttribute("fill", node.color);
+  }
+}
+
+function unhighlightNode(nodeId) {
+  if (GRAPH_SIM_STATE.hoveredNode === nodeId) {
+    GRAPH_SIM_STATE.hoveredNode = null;
+    const tipEl = document.getElementById("svg-tooltip");
+    if (tipEl) {
+      tipEl.textContent = `💡 Drag nodes to isolate • Click node to trace source`;
+      tipEl.setAttribute("fill", "#94a3b8");
+    }
+  }
+}
+
+function setupForceGraphInteractivity(svgEl) {
+  if (!svgEl) return;
+
+  svgEl.addEventListener("mousemove", (e) => {
+    if (GRAPH_SIM_STATE.draggingNode) {
+      const rect = svgEl.getBoundingClientRect();
+      const scaleX = GRAPH_SIM_STATE.width / rect.width;
+      const scaleY = GRAPH_SIM_STATE.height / rect.height;
+      const mouseX = (e.clientX - rect.left) * scaleX;
+      const mouseY = (e.clientY - rect.top) * scaleY;
+      
+      GRAPH_SIM_STATE.draggingNode.fx = mouseX;
+      GRAPH_SIM_STATE.draggingNode.fy = mouseY;
+      GRAPH_SIM_STATE.draggingNode.x = mouseX;
+      GRAPH_SIM_STATE.draggingNode.y = mouseY;
+
+      if (!GRAPH_SIM_STATE.animId) {
+        updateGraphSvgElements();
+      }
+    }
+  });
+
+  const stopDrag = () => {
+    if (GRAPH_SIM_STATE.draggingNode) {
+      GRAPH_SIM_STATE.draggingNode.fx = null;
+      GRAPH_SIM_STATE.draggingNode.fy = null;
+      GRAPH_SIM_STATE.draggingNode = null;
+    }
+  };
+
+  svgEl.addEventListener("mouseup", stopDrag);
+  svgEl.addEventListener("mouseleave", stopDrag);
+}
+
+function startNodeDrag(event, nodeId) {
+  event.stopPropagation();
+  const node = GRAPH_SIM_STATE.nodeMap[nodeId];
+  if (node) {
+    GRAPH_SIM_STATE.draggingNode = node;
+    node.fx = node.x;
+    node.fy = node.y;
+    if (!GRAPH_SIM_STATE.animId) {
+      // Re-trigger simulation tick while dragging
+      const tick = () => {
+        if (GRAPH_SIM_STATE.draggingNode) {
+          updateGraphSvgElements();
+          requestAnimationFrame(tick);
+        }
+      };
+      requestAnimationFrame(tick);
+    }
   }
 }
 

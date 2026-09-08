@@ -420,18 +420,44 @@ def parse_and_ingest_file(case_id: str, filename: str, content_bytes: bytes, db_
                     })
 
             # Bank Statement check
-            elif any("Narration" in h or "Deposit" in h or "Withdrawal" in h for h in headers):
+            elif any("Narration" in h or "Deposit" in h or "Withdrawal" in h or "counterparty_upi" in h or "txn_type" in h for h in headers):
                 file_type = "BANK_STATEMENT_CSV"
                 for idx, row in enumerate(csv_reader):
-                    date_val = row.get("Date") or row.get("Value Dt") or now_str
-                    narration = row.get("Narration") or row.get("Description") or ""
+                    date_val = row.get("Date") or row.get("Value Dt") or row.get("timestamp") or now_str
+                    narration = row.get("Narration") or row.get("Description") or row.get("description_remarks") or ""
                     credit = row.get("Deposit Amt") or row.get("Deposit") or ""
                     debit = row.get("Withdrawal Amt") or row.get("Withdrawal") or ""
+                    
+                    # Also handle structured UPI bank CSV format (counterparty_upi, txn_type, amount)
+                    if not credit and not debit and "amount" in row:
+                        amt = row.get("amount", "")
+                        ttype = (row.get("txn_type") or "").upper()
+                        if ttype == "CREDIT":
+                            credit = amt
+                        elif ttype == "DEBIT":
+                            debit = amt
+                        else:
+                            credit = amt
+
+                    c_upi = row.get("counterparty_upi") or ""
+                    c_name = row.get("counterparty_name") or ""
+                    acc = row.get("account_number") or ""
+                    
                     amount_str = f"+₹{credit}" if credit else f"-₹{debit}" if debit else ""
-                    combined = f"BANK TX [{date_val}]: {amount_str} | Narration: {narration}"
+                    parts = [f"BANK TX [{date_val}]: {amount_str}"]
+                    if acc:
+                        parts.append(f"A/C: {acc}")
+                    if c_upi:
+                        parts.append(f"UPI: {c_upi}")
+                    if c_name:
+                        parts.append(f"Counterparty: {c_name}")
+                    if narration:
+                        parts.append(f"Narration: {narration}")
+
+                    combined = " | ".join(parts)
                     records_to_insert.append({
                         "source_type": "BANK_STATEMENT",
-                        "sender_id": "BANK_CORE",
+                        "sender_id": str(c_upi if c_upi else "BANK_CORE"),
                         "timestamp": date_val,
                         "raw_text": combined.strip(),
                         "line_number": idx + 2
@@ -728,9 +754,10 @@ def get_case_graph_data(case_id: str, db_path: str = DB_PATH) -> Dict[str, Any]:
             "color": color
         }
 
-    # 2. Get edges (conversational proximity linkage within 5 lines)
+    # 2. Build graph edges:
+    # A. Proximity edges: entities mentioned within 5 lines of each other (conversational linkage)
     cur.execute("""
-    SELECT em1.entity_id as src, em2.entity_id as dst, COUNT(*) as weight
+    SELECT em1.entity_id as src, em2.entity_id as dst, COUNT(*) as weight, 'Co-mentioned' as rel_type
     FROM entity_mentions em1
     JOIN entity_mentions em2 ON em1.entity_id < em2.entity_id
     JOIN evidence_records er1 ON em1.record_id = er1.record_id
@@ -739,26 +766,81 @@ def get_case_graph_data(case_id: str, db_path: str = DB_PATH) -> Dict[str, Any]:
     JOIN entities e2 ON em2.entity_id = e2.entity_id
     WHERE er1.case_id = ? AND er2.case_id = ?
       AND er1.file_id = er2.file_id
-      AND ABS(er1.line_number - er2.line_number) <= 5
+      AND ABS(er1.line_number - er2.line_number) <= 6
       AND e1.entity_type NOT IN ('NARCOTICS_KEYWORD', 'SLANG') 
       AND e2.entity_type NOT IN ('NARCOTICS_KEYWORD', 'SLANG')
     GROUP BY em1.entity_id, em2.entity_id
     LIMIT 60
     """, (case_id, case_id))
+    raw_edges = cur.fetchall()
+
+    # B. Cross-file corroboration edges:
+    # If an entity (e.g. UPI or phone) appears in a BANK_STATEMENT record AND in a chat/darknet record,
+    # link that corroborated entity to the primary counterparty/suspect/location entities in the case!
+    cur.execute("""
+    SELECT DISTINCT em_bank.entity_id as src, em_other.entity_id as dst, 3 as weight, 'Corroborated in Bank TX' as rel_type
+    FROM entity_mentions em_bank
+    JOIN evidence_records er_bank ON em_bank.record_id = er_bank.record_id
+    JOIN evidence_records er_other ON er_bank.case_id = er_other.case_id AND er_bank.file_id != er_other.file_id
+    JOIN entity_mentions em_other ON er_other.record_id = em_other.record_id
+    JOIN entities e_bank ON em_bank.entity_id = e_bank.entity_id
+    JOIN entities e_other ON em_other.entity_id = e_other.entity_id
+    WHERE er_bank.case_id = ? 
+      AND er_bank.source_type = 'BANK_STATEMENT'
+      AND em_bank.entity_id != em_other.entity_id
+      AND e_bank.entity_type IN ('UPI_ID', 'PHONE', 'TRANSACTION_REF')
+      AND e_other.entity_type IN ('DARKNET_VENDOR', 'LOCATION', 'UPI_ID', 'CRYPTO_WALLET')
+    LIMIT 35
+    """, (case_id,))
+    cross_edges = cur.fetchall()
+
+    # C. Also link same-case entities that share high-confidence financial flows
+    # (e.g. UPI handles and Darknet Vendors or Drop Locations appearing in the same case)
+    cur.execute("""
+    SELECT DISTINCT em1.entity_id as src, em2.entity_id as dst, 2 as weight, 'Cross-Source Link' as rel_type
+    FROM entity_mentions em1
+    JOIN evidence_records er1 ON em1.record_id = er1.record_id
+    JOIN entities e1 ON em1.entity_id = e1.entity_id
+    JOIN entity_mentions em2 ON em1.entity_id != em2.entity_id
+    JOIN evidence_records er2 ON em2.record_id = er2.record_id
+    JOIN entities e2 ON em2.entity_id = e2.entity_id
+    WHERE er1.case_id = ? AND er2.case_id = ?
+      AND (
+        (e1.entity_type = 'DARKNET_VENDOR' AND e2.entity_type IN ('UPI_ID', 'CRYPTO_WALLET', 'PHONE')) OR
+        (e1.entity_type = 'UPI_ID' AND e2.entity_type IN ('LOCATION', 'TRANSACTION_REF', 'CRYPTO_WALLET')) OR
+        (e1.entity_type = 'PHONE' AND e2.entity_type IN ('UPI_ID', 'LOCATION'))
+      )
+      AND e1.entity_type NOT IN ('NARCOTICS_KEYWORD', 'SLANG')
+      AND e2.entity_type NOT IN ('NARCOTICS_KEYWORD', 'SLANG')
+    LIMIT 40
+    """, (case_id, case_id))
+    semantic_edges = cur.fetchall()
 
     edges = []
     connected_node_ids = set()
-    for row in cur.fetchall():
-        if row["src"] in nodes_map and row["dst"] in nodes_map:
+    seen_edge_pairs = set()
+
+    all_edge_rows = list(raw_edges) + list(cross_edges) + list(semantic_edges)
+    for row in all_edge_rows:
+        s = row["src"]
+        d = row["dst"]
+        if s in nodes_map and d in nodes_map and s != d:
+            pair_key = tuple(sorted([s, d]))
+            if pair_key in seen_edge_pairs:
+                continue
+            seen_edge_pairs.add(pair_key)
+            
+            w = row["weight"]
+            label_txt = row["rel_type"] if "rel_type" in row.keys() else f"{w} mentions"
             edges.append({
-                "from": row["src"],
-                "to": row["dst"],
-                "label": f"{row['weight']} mentions",
-                "weight": row["weight"],
+                "from": s,
+                "to": d,
+                "label": label_txt,
+                "weight": w,
                 "arrows": "to"
             })
-            connected_node_ids.add(row["src"])
-            connected_node_ids.add(row["dst"])
+            connected_node_ids.add(s)
+            connected_node_ids.add(d)
 
     con.close()
 
